@@ -6,6 +6,8 @@ export interface IconProps {
   className?: string;
 }
 
+import { Bot, Clock3, DollarSign } from 'lucide-react';
+
 const base = {
   viewBox: '0 0 24 24',
   fill: 'none',
@@ -370,6 +372,11 @@ export function IconCalendar({ className }: IconProps) {
   );
 }
 
+export function IconX(props: IconProps) { return <IconXMark {...props} />; }
+export function IconDownload(props: IconProps) { return <IconArrowDownTray {...props} />; }
+export function IconBot({ className }: IconProps) { return <Bot className={className} aria-hidden="true" />; }
+export function IconClock({ className }: IconProps) { return <Clock3 className={className} aria-hidden="true" />; }
+export function IconDollar({ className }: IconProps) { return <DollarSign className={className} aria-hidden="true" />; }
 
 
 

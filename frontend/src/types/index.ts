@@ -232,6 +232,24 @@ export interface DealSummaryResponse {
   citations: Citation[];
 }
 
+export interface ExecutiveSummary {
+  overview: string;
+  risks: Array<{
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+    category: string;
+    title: string;
+    description: string;
+    citationIds: string[];
+  }>;
+  citations: Array<{
+    id: number;
+    sourceType: 'document' | 'deadline' | 'deal';
+    deadlineId?: string;
+    relevanceExplanation?: string;
+    confidence?: number;
+  }>;
+}
+
 export interface IndexStatusResponse {
   dealId: string;
   status: IndexStatus;

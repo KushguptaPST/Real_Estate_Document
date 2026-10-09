@@ -16,6 +16,7 @@ export interface SendEmailOptions {
 export interface SendEmailResult {
   success: boolean;
   messageId?: string;
+  providerMessageId?: string;
   error?: string;
 }
 
@@ -31,12 +32,42 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     return { success: false, error: 'No recipients provided' };
   }
 
-  // 1. Resend Provider (Recommended)
+  // 1. SendGrid Provider
+  if (driver === 'sendgrid') {
+    const apiKey = process.env['SENDGRID_API_KEY'];
+    if (!apiKey) {
+      logger.warn('[Email] SENDGRID_API_KEY is not configured. Falling back to dev logger mode.');
+      const stubId = `dev-stub-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      return { success: true, messageId: stubId, providerMessageId: stubId };
+    }
+
+    try {
+      const sgMail = (await import('@sendgrid/mail')).default;
+      sgMail.setApiKey(apiKey);
+      const [response] = await sgMail.send({
+        to: recipients,
+        from,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
+      const messageId = response?.headers?.['x-message-id'] || `sg-${Date.now()}`;
+      logger.info(`[Email sent via SendGrid] ID: ${messageId} to ${recipients.join(', ')}`);
+      return { success: true, messageId, providerMessageId: messageId };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      logger.error(`[SendGrid Error] ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  // 2. Resend Provider (Recommended)
   if (driver === 'resend') {
     const apiKey = process.env['RESEND_API_KEY'];
     if (!apiKey) {
       logger.warn('[Email] RESEND_API_KEY is not set. Simulating email send.');
-      return { success: true, messageId: `mock-resend-${Date.now()}` };
+      const stubId = `dev-stub-resend-${Date.now()}`;
+      return { success: true, messageId: stubId, providerMessageId: stubId };
     }
 
     try {
@@ -63,7 +94,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       }
 
       logger.info(`[Email sent via Resend] ID: ${data.id} to ${recipients.join(', ')}`);
-      return { success: true, messageId: data.id };
+      return { success: true, messageId: data.id, providerMessageId: data.id };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       logger.error(`[Resend Network Error] ${msg}`);
@@ -71,7 +102,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     }
   }
 
-  // 2. Standard SMTP (Nodemailer)
+  // 3. Standard SMTP (Nodemailer)
   if (driver === 'smtp') {
     const host = process.env['SMTP_HOST'];
     const user = process.env['SMTP_USER'];
@@ -79,7 +110,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
 
     if (!host || !user || !pass) {
       logger.warn('[Email] SMTP credentials not fully set. Simulating email send.');
-      return { success: true, messageId: `mock-smtp-${Date.now()}` };
+      const stubId = `dev-stub-smtp-${Date.now()}`;
+      return { success: true, messageId: stubId, providerMessageId: stubId };
     }
 
     try {
@@ -99,7 +131,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       });
 
       logger.info(`[Email sent via SMTP] ID: ${info.messageId} to ${recipients.join(', ')}`);
-      return { success: true, messageId: info.messageId };
+      return { success: true, messageId: info.messageId, providerMessageId: info.messageId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       logger.error(`[SMTP Error] ${msg}`);
@@ -108,8 +140,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
   }
 
   // Default fallback
+  const stubId = `dev-stub-fallback-${Date.now()}`;
   logger.info(`[Email Mock] Would send to ${recipients.join(', ')}: "${options.subject}"`);
-  return { success: true, messageId: `mock-fallback-${Date.now()}` };
+  return { success: true, messageId: stubId, providerMessageId: stubId };
 }
 
 // ── HTML Email Templates ───────────────────────────────────────────────────────
