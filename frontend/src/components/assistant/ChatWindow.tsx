@@ -14,7 +14,6 @@ import {
   MessageSquare,
   BarChart3,
   Scale,
-  FileCheck,
   Building,
   DollarSign,
 } from 'lucide-react';
@@ -115,18 +114,19 @@ export function ChatWindow({
       };
 
       recognition.start();
-    } catch {
+    } catch (err) {
+      console.error('Speech recognition error:', err);
       setIsListening(false);
     }
   };
 
-  const isIndexing = indexStatus?.status === 'INDEXING';
+  const isIndexing = indexStatus && indexStatus.status !== 'READY';
 
   const categorizedStarters = [
     {
-      category: 'Timeline & Deadlines',
-      icon: FileCheck,
-      prompt: 'What are the exact calendar deadlines for inspection, appraisal, and loan commitment?',
+      category: 'Deadlines & Timing',
+      icon: Sparkles,
+      prompt: 'Summarize all binding contractual deadlines and notice cure periods.',
     },
     {
       category: 'Inspection & Access',
@@ -153,26 +153,26 @@ export function ChatWindow({
   ];
 
   return (
-    <div className="flex flex-col h-full glass-panel rounded-2xl overflow-hidden shadow-sm">
+    <div className="flex flex-col h-full bg-[#141418] border border-white/[0.08] rounded-2xl overflow-hidden shadow-lg">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/70 select-none bg-white/40">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] select-none bg-[#0D0D11]/70">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white shadow-2xs ring-1 ring-white/20">
-            <Sparkles className="h-4 w-4 text-sky-400" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
+            <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-bold text-slate-900">
+              <h3 className="text-xs font-semibold text-[#F5F5F7]">
                 AI Legal Copilot
               </h3>
-              <Badge variant="neutral" className="glass-badge text-[10px] px-1.5 py-0">
-                <ShieldCheck className="h-2.5 w-2.5 text-emerald-600 mr-0.5" />
+              <Badge variant="neutral" className="bg-[#34D399]/15 text-[#34D399] border-[#34D399]/25 text-[10px] px-1.5 py-0">
+                <ShieldCheck className="h-2.5 w-2.5 text-[#34D399] mr-0.5" />
                 Verified
               </Badge>
             </div>
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-[#9A9AA5]">
               {isIndexing ? (
-                <span className="text-amber-600 flex items-center gap-1 font-medium">
+                <span className="text-[#C9A961] flex items-center gap-1 font-medium">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" /> Indexing documents&hellip;
                 </span>
               ) : (
@@ -184,14 +184,14 @@ export function ChatWindow({
 
         {/* Tab switch & actions */}
         <div className="flex items-center gap-1.5">
-          <div className="flex rounded-xl glass-badge p-0.5 text-xs font-medium">
+          <div className="flex rounded-full bg-[#0D0D11] border border-white/[0.08] p-0.5 text-xs font-medium">
             <button
               type="button"
               onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all text-[11px] ${
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-all text-[11px] ${
                 activeTab === 'chat'
-                  ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#C9A961] text-[#0A0A0B] font-semibold'
+                  : 'text-[#9A9AA5] hover:text-[#F5F5F7]'
               }`}
             >
               <MessageSquare className="h-3 w-3" />
@@ -200,10 +200,10 @@ export function ChatWindow({
             <button
               type="button"
               onClick={() => setActiveTab('summary')}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all text-[11px] ${
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-all text-[11px] ${
                 activeTab === 'summary'
-                  ? 'bg-slate-900 text-white shadow-xs font-semibold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#C9A961] text-[#0A0A0B] font-semibold'
+                  : 'text-[#9A9AA5] hover:text-[#F5F5F7]'
               }`}
             >
               <BarChart3 className="h-3 w-3" />
@@ -215,7 +215,7 @@ export function ChatWindow({
             <button
               type="button"
               onClick={onClear}
-              className="p-1.5 rounded-xl glass-badge text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              className="p-1.5 rounded-full border border-white/[0.08] bg-[#0D0D11] text-[#9A9AA5] hover:text-[#F5F5F7] transition-colors cursor-pointer"
               title="Reset conversation"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -234,13 +234,13 @@ export function ChatWindow({
             {messages.length === 0 && (
               <div className="py-2 px-1 space-y-4">
                 <div className="text-center space-y-1.5 max-w-sm mx-auto">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl glass-card text-slate-800 mx-auto shadow-2xs">
-                    <Sparkles className="h-4.5 w-4.5 text-sky-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25 mx-auto">
+                    <Sparkles className="h-4.5 w-4.5" />
                   </div>
-                  <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                  <h4 className="text-xs font-semibold text-[#F5F5F7] tracking-tight">
                     Transaction Intelligence Assistant
                   </h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-[11px] text-[#9A9AA5] leading-relaxed">
                     Ask questions with full traceability to clauses, deadlines, remedies, and addenda.
                   </p>
                 </div>
@@ -254,13 +254,13 @@ export function ChatWindow({
                         type="button"
                         disabled={loading}
                         onClick={() => onAsk(item.prompt)}
-                        className="group p-3 rounded-xl glass-card text-left transition-all cursor-pointer"
+                        className="group p-3 rounded-xl bg-[#0D0D11] border border-white/[0.08] hover:border-[#C9A961]/40 text-left transition-all cursor-pointer"
                       >
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                          <Icon className="h-3.5 w-3.5 text-sky-600" />
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#C9A961] uppercase tracking-wide mb-1">
+                          <Icon className="h-3.5 w-3.5" />
                           <span>{item.category}</span>
                         </div>
-                        <p className="text-[11px] text-slate-600 font-medium group-hover:text-slate-900 leading-snug">
+                        <p className="text-[11px] text-[#9A9AA5] font-medium group-hover:text-[#F5F5F7] leading-snug">
                           {item.prompt}
                         </p>
                       </button>
@@ -299,7 +299,7 @@ export function ChatWindow({
 
             {/* Error Banner */}
             {error && (
-              <div className="banner-error text-xs">
+              <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-300 flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -312,7 +312,7 @@ export function ChatWindow({
 
       {/* Input Box (Chat Tab only) */}
       {activeTab === 'chat' && (
-        <div className="border-t border-slate-200/70 p-3 space-y-2 bg-white/50 backdrop-blur-md">
+        <div className="border-t border-white/[0.08] p-3 space-y-2 bg-[#0D0D11]/80 backdrop-blur-md">
           {/* Quick Prompt Pill Strip */}
           {messages.length > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -322,7 +322,7 @@ export function ChatWindow({
                   type="button"
                   onClick={() => onAsk(qp)}
                   disabled={loading}
-                  className="shrink-0 rounded-full glass-badge px-2.5 py-0.5 text-[10px] text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 cursor-pointer shadow-2xs"
+                  className="shrink-0 rounded-full border border-white/[0.08] bg-[#141418] hover:border-[#C9A961]/40 px-2.5 py-0.5 text-[10px] text-[#9A9AA5] hover:text-[#F5F5F7] transition-all disabled:opacity-40 cursor-pointer shadow-xs"
                 >
                   {qp}
                 </button>
@@ -334,10 +334,10 @@ export function ChatWindow({
             <button
               type="button"
               onClick={handleToggleVoice}
-              className={`p-2 rounded-xl glass-badge transition-all cursor-pointer ${
+              className={`p-2 rounded-xl border border-white/[0.08] transition-all cursor-pointer ${
                 isListening
-                  ? 'bg-rose-500 text-white border-rose-600 ring-2 ring-rose-300 animate-pulse'
-                  : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-rose-500 text-white border-rose-600 ring-2 ring-rose-400 animate-pulse'
+                  : 'bg-[#141418] text-[#9A9AA5] hover:text-[#F5F5F7]'
               }`}
               title={isListening ? 'Listening... click to stop' : 'Voice dictation'}
             >
@@ -350,7 +350,7 @@ export function ChatWindow({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={loading}
-              className="flex-1 glass-input rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all"
+              className="flex-1 bg-[#141418] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] placeholder-[#6E6E7A] focus:border-[#C9A961] focus:outline-none transition-all"
             />
 
             <Button
@@ -358,7 +358,7 @@ export function ChatWindow({
               disabled={loading || !input.trim()}
               size="sm"
               variant="default"
-              className="shrink-0 h-8 px-3.5 rounded-xl shadow-xs"
+              className="shrink-0 h-8 px-3.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
             </Button>

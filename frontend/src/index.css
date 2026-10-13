@@ -9,57 +9,59 @@
 
 @layer base {
   :root {
-    --background: 210 33% 98%; /* #f6f9fc Stripe dashboard bg */
-    --foreground: 222 47% 16%; /* #1a1f36 Stripe dark text */
+    /* Luxury Dark Palette (Mizumi/Baccarat PropTech vibe) */
+    --background: 240 6% 4%; /* #0A0A0B Near Black */
+    --foreground: 240 6% 96%; /* #F5F5F7 Off White */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 16%;
+    --card: 240 7% 9%; /* #141418 Surface */
+    --card-foreground: 240 6% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 16%;
+    --popover: 240 7% 9%;
+    --popover-foreground: 240 6% 96%;
 
-    --primary: 247 100% 68%; /* #635bff Stripe royal blue */
-    --primary-foreground: 0 0% 100%;
+    --primary: 41 49% 58%; /* #C9A961 Warm Champagne Gold */
+    --primary-foreground: 240 6% 4%; /* #0A0A0B */
 
-    --secondary: 210 25% 96%;
-    --secondary-foreground: 222 47% 16%;
+    --secondary: 240 6% 14%; /* #1E1E26 */
+    --secondary-foreground: 240 6% 96%;
 
-    --muted: 210 25% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 4% 63%; /* #9A9AA5 Muted Grey */
 
-    --accent: 210 25% 96%;
-    --accent-foreground: 222 47% 16%;
+    --accent: 41 49% 58%;
+    --accent-foreground: 240 6% 4%;
 
-    --destructive: 350 89% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 28% 91%; /* #e3e8ee Stripe border */
-    --input: 215 28% 91%;
-    --ring: 247 100% 68%;
+    --border: 240 5% 16%; /* rgba(255,255,255,0.08) */
+    --input: 240 5% 16%;
+    --ring: 41 49% 58%;
 
-    --radius: 0.5rem;
+    --radius: 0.875rem; /* 14px */
   }
 
   html {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+    color-scheme: dark;
   }
 
   body {
-    background-color: #f6f9fc;
-    color: #1a1f36;
+    background-color: #0A0A0B;
+    color: #F5F5F7;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight font-semibold text-[#0a2540];
+    @apply tracking-tight font-semibold text-[#F5F5F7];
   }
 
-  /* Custom Stripe Slim Scrollbars */
+  /* Custom Minimal Slim Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -68,74 +70,103 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded-full hover:bg-slate-400 transition-colors;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(201, 169, 97, 0.4);
   }
 }
 
 @layer components {
-  /* ── Stripe Enterprise Design System Tokens ── */
+  /* ── Luxury Real Estate Design System Tokens ── */
   .stripe-nav {
-    background-color: #ffffff;
-    border-bottom: 1px solid #e3e8ee;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    background-color: rgba(14, 14, 18, 0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   }
 
   .stripe-card {
-    background-color: #ffffff;
-    border: 1px solid #e3e8ee;
-    border-radius: 0.75rem;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
-    transition: all 0.15s ease-in-out;
+    background-color: #141418;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .stripe-card:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    border-color: rgba(201, 169, 97, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(201, 169, 97, 0.08);
   }
 
-  /* ── Stripe Buttons ── */
+  /* ── Luxury Buttons (Champagne Gold & Dark Outline) ── */
   .btn-stripe-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#635bff] hover:bg-[#5469d4] active:bg-[#4b5ebb] text-white px-3.5 py-1.5 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-[#C9A961] hover:bg-[#DFBF77] active:bg-[#B5934C] text-[#0A0A0B] px-4 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:shadow-[0_0_15px_rgba(201,169,97,0.35)];
   }
 
   .btn-stripe-navy {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a2540] hover:bg-[#1a385c] text-white px-3.5 py-1.5 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-[#1E1E26] hover:bg-[#282834] text-[#F5F5F7] border border-white/10 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
   }
 
   .btn-stripe-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#e3e8ee] bg-white text-[#4f566b] hover:bg-[#f8f9fa] hover:text-[#1a1f36] px-3.5 py-1.5 text-xs font-semibold shadow-2xs transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-[#16161C] text-[#F5F5F7] hover:bg-[#1E1E26] hover:border-[#C9A961]/40 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
   }
 
   .btn-stripe-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#4f566b] hover:bg-[#f2f4f8] hover:text-[#1a1f36] transition-all;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7] transition-all cursor-pointer;
   }
 
   .card {
-    @apply rounded-xl border border-[#e3e8ee] bg-white shadow-2xs transition-all;
+    @apply rounded-2xl border border-white/10 bg-[#141418] shadow-luxury-sm transition-all;
   }
 
   .card-hover {
-    @apply rounded-xl border border-[#e3e8ee] bg-white shadow-2xs transition-all hover:border-[#cbd5e1] hover:shadow-xs;
+    @apply rounded-2xl border border-white/10 bg-[#141418] shadow-luxury-sm transition-all hover:border-[#C9A961]/30 hover:shadow-luxury-md;
   }
 
   .input-base {
-    @apply w-full rounded-lg border border-[#e3e8ee] bg-white px-3 py-1.5 text-xs text-[#1a1f36] placeholder:text-[#a3acb9] focus:border-[#635bff] focus:ring-2 focus:ring-[#635bff]/20 focus:outline-none transition-all;
+    @apply w-full rounded-xl border border-white/10 bg-[#101014] px-3.5 py-2 text-xs text-[#F5F5F7] placeholder:text-[#686873] focus:border-[#C9A961] focus:ring-2 focus:ring-[#C9A961]/20 focus:outline-none transition-all;
   }
 
   .label-base {
-    @apply mb-1.5 block text-xs font-semibold text-[#3c4257];
+    @apply mb-1.5 block text-xs font-medium text-[#9A9AA5];
   }
 
   .banner-error {
-    @apply flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs text-rose-800;
+    @apply flex items-start gap-2 rounded-xl border border-rose-500/20 bg-rose-950/30 px-3.5 py-2.5 text-xs text-rose-300;
   }
 
   .banner-success {
-    @apply flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-800;
+    @apply flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-950/30 px-3.5 py-2.5 text-xs text-emerald-300;
   }
 
   .empty-state {
-    @apply rounded-xl border border-dashed border-[#e3e8ee] bg-white p-10 text-center;
+    @apply rounded-2xl border border-dashed border-white/10 bg-[#141418] p-10 text-center;
+  }
+
+  /* ── PropTech Badges ── */
+  .badge-escrow-active {
+    @apply inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 px-2.5 py-0.5 text-[10px] font-semibold;
+  }
+
+  .badge-escrow-pending {
+    @apply inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 px-2.5 py-0.5 text-[10px] font-semibold;
+  }
+
+  .badge-escrow-closed {
+    @apply inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 text-[#9A9AA5] px-2.5 py-0.5 text-[10px] font-semibold;
+  }
+
+  .glass-panel {
+    background-color: #141418;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  }
+
+  .glass-badge {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #F5F5F7;
   }
 }
 

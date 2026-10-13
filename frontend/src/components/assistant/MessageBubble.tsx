@@ -29,7 +29,7 @@ function FormattedContent({
   const paragraphs = content.split(/\n\n+/);
 
   return (
-    <div className="text-xs leading-relaxed text-slate-800 space-y-2.5">
+    <div className="text-xs leading-relaxed text-[#F5F5F7] space-y-2.5">
       {paragraphs.map((paragraph, pIdx) => {
         const lines = paragraph.split('\n');
         const isList = lines.length > 1 && lines.every((l) => /^\s*[-*•\d+.]\s+/.test(l));
@@ -41,7 +41,7 @@ function FormattedContent({
                 const cleanedLine = line.replace(/^\s*[-*•\d+.]\s+/, '');
                 return (
                   <li key={lIdx} className="flex items-start gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-900 mt-1.5 shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961] mt-1.5 shrink-0" />
                     <span>
                       <InlineFormattedText
                         text={cleanedLine}
@@ -85,7 +85,7 @@ function InlineFormattedText({
               key={idx}
               type="button"
               onClick={() => onFootnoteClick?.(num)}
-              className="inline-flex items-center justify-center -translate-y-0.5 mx-0.5 h-4 min-w-[18px] px-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-mono text-[10px] font-bold transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center -translate-y-0.5 mx-0.5 h-4 min-w-[18px] px-1 rounded bg-[#0D0D11] hover:border-[#C9A961] border border-white/[0.08] text-[#C9A961] font-mono text-[10px] font-bold transition-all cursor-pointer"
               title={`View Citation [${num}]`}
             >
               {num}
@@ -99,7 +99,7 @@ function InlineFormattedText({
             {subParts.map((sub, sIdx) => {
               if (sub.startsWith('**') && sub.endsWith('**')) {
                 return (
-                  <strong key={sIdx} className="font-semibold text-slate-900">
+                  <strong key={sIdx} className="font-semibold text-[#F5F5F7]">
                     {sub.slice(2, -2)}
                   </strong>
                 );
@@ -119,17 +119,17 @@ export function MessageBubble({
   onFollowUpClick,
   activeCitationId,
 }: Props) {
-  const isUser = message.role === 'user';
-  const citations = (message.citations as Citation[]) || [];
-  const followUps = (message.suggestedFollowUps as string[]) || [];
-
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+
+  const isUser = message.role === 'user';
+  const citations = message.citations || [];
+  const followUps = message.suggestedFollowUps || [];
 
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-md rounded-xl bg-slate-900 px-3.5 py-2 text-xs text-white shadow-xs">
+        <div className="max-w-md rounded-2xl bg-[#C9A961] px-4 py-2.5 text-xs text-[#0A0A0B] font-medium shadow-sm">
           <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>
       </div>
@@ -171,17 +171,17 @@ export function MessageBubble({
   return (
     <div className="flex items-start gap-2.5">
       {/* Avatar */}
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-2xs">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
         <Sparkles className="h-3.5 w-3.5" />
       </div>
 
       <div className="flex-1 space-y-2.5 min-w-0">
-        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3 relative">
+        <div className="rounded-xl border border-white/[0.08] bg-[#141418] p-3.5 shadow-lg space-y-3 relative">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
             <div className="flex items-center gap-1.5">
-              <Badge variant="neutral" className="text-[10px] px-1.5 py-0">
-                <ShieldCheck className="h-2.5 w-2.5 text-emerald-600 mr-0.5" />
+              <Badge variant="neutral" className="text-[10px] px-1.5 py-0 bg-[#34D399]/15 text-[#34D399] border-[#34D399]/25">
+                <ShieldCheck className="h-2.5 w-2.5 text-[#34D399] mr-0.5" />
                 Contract Grounded
               </Badge>
             </div>
@@ -190,20 +190,20 @@ export function MessageBubble({
               <button
                 type="button"
                 onClick={handleSpeak}
-                className={`p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ${
-                  speaking ? 'text-slate-900 bg-slate-100' : ''
+                className={`p-1 rounded text-[#9A9AA5] hover:text-[#F5F5F7] hover:bg-white/[0.06] transition-colors ${
+                  speaking ? 'text-[#C9A961] bg-[#C9A961]/10' : ''
                 }`}
                 title={speaking ? 'Stop speech' : 'Read aloud'}
               >
-                {speaking ? <VolumeX className="h-3.5 w-3.5 text-rose-600" /> : <Volume2 className="h-3.5 w-3.5" />}
+                {speaking ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5" />}
               </button>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="p-1 rounded text-[#9A9AA5] hover:text-[#F5F5F7] hover:bg-white/[0.06] transition-colors"
                 title="Copy text"
               >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-3.5 w-3.5 text-[#34D399]" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
@@ -213,12 +213,12 @@ export function MessageBubble({
 
           {/* Citations */}
           {citations.length > 0 && (
-            <div className="border-t border-slate-100 pt-2.5 space-y-1.5">
+            <div className="border-t border-white/[0.06] pt-2.5 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                <span className="text-[10px] font-semibold text-[#9A9AA5] uppercase tracking-wider">
                   Contract Citations ({citations.length})
                 </span>
-                <span className="text-[10px] text-slate-400">Click to jump in PDF</span>
+                <span className="text-[10px] text-[#6E6E7A]">Click to jump in PDF</span>
               </div>
 
               <div className="grid grid-cols-1 gap-1.5 pt-0.5">
@@ -235,7 +235,7 @@ export function MessageBubble({
           )}
 
           {/* Legal Footer */}
-          <div className="border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 italic">
+          <div className="border-t border-white/[0.06] pt-1.5 text-[10px] text-[#6E6E7A] italic">
             Automated legal AI assistance. Confirm terms with broker or transaction coordinator.
           </div>
         </div>
@@ -243,7 +243,7 @@ export function MessageBubble({
         {/* Suggested Follow-Ups */}
         {followUps.length > 0 && (
           <div className="space-y-1 pl-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[10px] font-semibold text-[#6E6E7A] uppercase tracking-wider">
               Suggested Follow-ups
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -252,10 +252,10 @@ export function MessageBubble({
                   key={idx}
                   type="button"
                   onClick={() => onFollowUpClick?.(q)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-2xs hover:border-slate-300 hover:bg-slate-50 transition-all flex items-center gap-1.5 cursor-pointer text-left"
+                  className="rounded-lg border border-white/[0.08] bg-[#0D0D11] px-2.5 py-1 text-xs text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 transition-all flex items-center gap-1.5 cursor-pointer text-left"
                 >
                   <span>{q}</span>
-                  <ArrowRight className="h-3 w-3 text-slate-400" />
+                  <ArrowRight className="h-3 w-3 text-[#6E6E7A]" />
                 </button>
               ))}
             </div>

@@ -23,12 +23,12 @@ export function Breadcrumbs() {
   if (pathnames.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+    <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs font-medium text-[#6E6E7A]">
       <Link
         to="/deals"
-        className="flex items-center gap-1 text-slate-600 hover:text-slate-900 transition-colors"
+        className="flex items-center gap-1 text-[#9A9AA5] hover:text-[#C9A961] transition-colors"
       >
-        <Home className="h-3.5 w-3.5 text-slate-400" />
+        <Home className="h-3.5 w-3.5 text-[#6E6E7A]" />
         <span>Home</span>
       </Link>
 
@@ -39,13 +39,13 @@ export function Breadcrumbs() {
 
         return (
           <div key={to} className="flex items-center gap-1.5">
-            <ChevronRight className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+            <ChevronRight className="h-3.5 w-3.5 text-[#4A4A55] flex-shrink-0" />
             {isLast ? (
-              <span className="font-semibold text-slate-900 truncate" aria-current="page">
+              <span className="font-semibold text-[#F5F5F7] truncate" aria-current="page">
                 {label}
               </span>
             ) : (
-              <Link to={to} className="text-slate-600 hover:text-slate-900 transition-colors truncate">
+              <Link to={to} className="text-[#9A9AA5] hover:text-[#C9A961] transition-colors truncate">
                 {label}
               </Link>
             )}

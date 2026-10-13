@@ -2,6 +2,7 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -38,21 +39,26 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        brand: {
-          50: '#f0f4f8',
-          100: '#d9e2ec',
-          200: '#bcccdc',
-          300: '#9fb3c8',
-          400: '#829ab1',
-          500: '#627d98',
-          600: '#486581',
-          700: '#334e68',
-          800: '#243b53',
-          900: '#102a43',
-          950: '#0b1d30',
+        // Luxury Real Estate Palette (Mizumi Dark Luxury)
+        luxury: {
+          black: '#0A0A0B',
+          dark: '#0D0D11',
+          card: '#141418',
+          cardElevated: '#1A1A22',
+          border: 'rgba(255, 255, 255, 0.08)',
+          borderHover: 'rgba(201, 169, 97, 0.35)',
+          gold: '#C9A961',
+          goldLight: '#DFBF77',
+          goldDark: '#A68742',
+          goldMuted: 'rgba(201, 169, 97, 0.15)',
+          text: '#F5F5F7',
+          textMuted: '#9A9AA5',
+          textSubtle: '#686873',
         },
       },
       borderRadius: {
+        '2xl': '1rem',
+        '3xl': '1.25rem',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
@@ -62,16 +68,10 @@ const config: Config = {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       boxShadow: {
-        '2xs': '0 1px 2px 0 rgb(15 23 42 / 0.03)',
-        xs: '0 1px 2px 0 rgb(15 23 42 / 0.05)',
-        sm: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06)',
-        md: '0 4px 6px -1px rgb(15 23 42 / 0.06), 0 2px 4px -2px rgb(15 23 42 / 0.06)',
-        lg: '0 10px 15px -3px rgb(15 23 42 / 0.07), 0 4px 6px -4px rgb(15 23 42 / 0.07)',
-        subtle: '0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px 0 rgba(15, 23, 42, 0.04)',
-      },
-      letterSpacing: {
-        tight: '-0.015em',
-        tighter: '-0.025em',
+        'luxury-sm': '0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.6)',
+        'luxury-md': '0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.6)',
+        'luxury-lg': '0 20px 40px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.7)',
+        'gold-glow': '0 0 25px rgba(201, 169, 97, 0.25)',
       },
     },
   },

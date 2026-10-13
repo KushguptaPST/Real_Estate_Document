@@ -7,11 +7,8 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
   ArrowRight,
   BookOpen,
-  Search,
-  Filter,
   Info,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -182,22 +179,21 @@ const CONTRACT_STANDARDS: ContractStandard[] = [
 
 export function ContractsLibraryPage() {
   const [activeTab, setActiveTab] = useState<string>('nwmls');
-  const [searchQuery, setSearchQuery] = useState('');
 
   const currentStandard = CONTRACT_STANDARDS.find((c) => c.id === activeTab) || CONTRACT_STANDARDS[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
+    <div className="min-h-screen bg-[#0A0A0B] text-[#F5F5F7] pb-24">
       {/* Header */}
-      <section className="pt-10 pb-12 text-center border-b border-slate-200/80 bg-white/50 backdrop-blur-md">
+      <section className="pt-10 pb-12 text-center border-b border-white/[0.08] bg-[#0D0D11]/60 backdrop-blur-md">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
-          <Badge variant="neutral" className="mb-3 glass-badge text-slate-700">
-            <BookOpen className="h-3.5 w-3.5 text-sky-600 mr-1.5 inline" /> State Real Estate Contract Knowledge Base
+          <Badge variant="neutral" className="mb-3 bg-[#C9A961]/10 text-[#C9A961] border border-[#C9A961]/20 px-3.5 py-1 text-xs font-medium">
+            <BookOpen className="h-3.5 w-3.5 text-[#C9A961] mr-1.5 inline" /> State Real Estate Contract Knowledge Base
           </Badge>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            State Contract Standards & Rules Engine
+          <h1 className="text-3xl sm:text-4xl font-semibold text-[#F5F5F7] tracking-tight">
+            State Contract Standards &amp; Rules Engine
           </h1>
-          <p className="mt-3 text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-3 text-sm text-[#9A9AA5] max-w-2xl mx-auto leading-relaxed">
             Contingency Copilot automatically adapts date calculations, weekend spillovers, and cutoff times based on official state association guidelines.
           </p>
         </div>
@@ -206,16 +202,16 @@ export function ContractsLibraryPage() {
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
         {/* State Tabs Navigation */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 border-b border-slate-200">
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-4 border-b border-white/[0.08]">
           {CONTRACT_STANDARDS.map((std) => (
             <button
               key={std.id}
               type="button"
               onClick={() => setActiveTab(std.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === std.id
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'glass-card text-slate-600 hover:text-slate-900 hover:bg-white'
+                  ? 'bg-[#C9A961] text-[#0A0A0B] shadow-sm'
+                  : 'bg-[#141418] border border-white/[0.08] text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-white/20'
               }`}
             >
               <Building2 className="h-3.5 w-3.5" />
@@ -228,41 +224,41 @@ export function ContractsLibraryPage() {
         {/* Selected State Standard Overview Card */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Summary Box */}
-          <Card className="glass-card p-6 rounded-2xl border border-slate-200/80 lg:col-span-1 space-y-5 bg-white/90">
+          <Card className="bg-[#141418] p-6 rounded-2xl border border-white/[0.08] lg:col-span-1 space-y-5 shadow-xl">
             <div>
-              <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">{currentStandard.state} Standard</span>
-              <h2 className="text-2xl font-bold text-slate-900 mt-0.5">{currentStandard.name}</h2>
-              <p className="text-xs text-slate-500 mt-1">Widely used across {currentStandard.popularIn}</p>
+              <span className="text-[11px] font-semibold text-[#C9A961] uppercase tracking-wider">{currentStandard.state} Standard</span>
+              <h2 className="text-2xl font-semibold text-[#F5F5F7] mt-0.5">{currentStandard.name}</h2>
+              <p className="text-xs text-[#9A9AA5] mt-1">Widely used across {currentStandard.popularIn}</p>
             </div>
 
-            <div className="space-y-3 pt-3 border-t border-slate-200/60 text-xs">
+            <div className="space-y-3.5 pt-3 border-t border-white/[0.06] text-xs">
               <div className="flex items-start gap-2.5">
-                <Calendar className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                <Calendar className="h-4 w-4 text-[#C9A961] mt-0.5 flex-shrink-0" />
                 <div>
-                  <span className="font-semibold text-slate-900 block">Day Calculation Standard</span>
-                  <span className="text-slate-600">{currentStandard.defaultDayMath}</span>
+                  <span className="font-semibold text-[#F5F5F7] block">Day Calculation Standard</span>
+                  <span className="text-[#9A9AA5]">{currentStandard.defaultDayMath}</span>
                 </div>
               </div>
 
               <div className="flex items-start gap-2.5">
-                <Clock className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                <Clock className="h-4 w-4 text-[#C9A961] mt-0.5 flex-shrink-0" />
                 <div>
-                  <span className="font-semibold text-slate-900 block">Daily Cutoff Time</span>
-                  <span className="text-slate-600">{currentStandard.cutoffTime}</span>
+                  <span className="font-semibold text-[#F5F5F7] block">Daily Cutoff Time</span>
+                  <span className="text-[#9A9AA5]">{currentStandard.cutoffTime}</span>
                 </div>
               </div>
 
               <div className="flex items-start gap-2.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <ShieldCheck className="h-4 w-4 text-[#34D399] mt-0.5 flex-shrink-0" />
                 <div>
-                  <span className="font-semibold text-slate-900 block">AI Validation Engine</span>
-                  <span className="text-slate-600">Cross-checked against state legal addenda & Form 35/22 revisions.</span>
+                  <span className="font-semibold text-[#F5F5F7] block">AI Validation Engine</span>
+                  <span className="text-[#9A9AA5]">Cross-checked against state legal addenda &amp; Form 35/22 revisions.</span>
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200/60">
-              <Button asChild className="w-full bg-slate-900 text-white font-medium text-xs">
+            <div className="pt-4 border-t border-white/[0.06]">
+              <Button asChild className="w-full rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold text-xs py-2.5">
                 <Link to="/upload">
                   Scan {currentStandard.name} Contract <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                 </Link>
@@ -272,38 +268,42 @@ export function ContractsLibraryPage() {
 
           {/* Right Clause Cards Breakdown */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-slate-700" /> Standard Contingency Clauses & Rules
+            <h3 className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
+              <FileText className="h-4 w-4 text-[#C9A961]" /> Standard Contingency Clauses &amp; Rules
             </h3>
 
             <div className="space-y-3">
               {currentStandard.clauses.map((clause, idx) => (
                 <div
                   key={idx}
-                  className="glass-card p-5 rounded-xl border border-slate-200/80 bg-white/80 hover:bg-white transition-all space-y-2"
+                  className="bg-[#141418] p-5 rounded-xl border border-white/[0.08] hover:border-[#C9A961]/30 transition-all space-y-2.5 shadow-md"
                 >
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <h4 className="text-xs font-semibold text-[#F5F5F7] flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
                       {clause.title}
                     </h4>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px] bg-slate-100 font-mono">
+                      <Badge variant="outline" className="text-[10px] bg-[#0D0D11] border-white/[0.08] text-[#9A9AA5] font-mono">
                         Standard: {clause.standardDays}
                       </Badge>
                       <Badge
                         variant={clause.type === 'critical' ? 'destructive' : 'neutral'}
-                        className="text-[10px]"
+                        className={`text-[10px] ${
+                          clause.type === 'critical'
+                            ? 'bg-rose-500/15 text-rose-300 border-rose-500/25'
+                            : 'bg-white/[0.06] text-[#9A9AA5] border-white/[0.08]'
+                        }`}
                       >
                         {clause.type.toUpperCase()}
                       </Badge>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-600 leading-relaxed">{clause.description}</p>
+                  <p className="text-xs text-[#9A9AA5] leading-relaxed">{clause.description}</p>
 
-                  <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 pt-2 border-t border-slate-100">
-                    <Info className="h-3 w-3 text-sky-600" />
+                  <div className="flex items-center gap-2 text-[11px] font-mono text-[#6E6E7A] pt-2 border-t border-white/[0.06]">
+                    <Info className="h-3 w-3 text-[#C9A961]" />
                     <span>Citation: {clause.citation}</span>
                   </div>
                 </div>
