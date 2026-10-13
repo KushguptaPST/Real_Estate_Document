@@ -3,15 +3,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
-import { PrismaClient, type TaskStatus } from '@prisma/client';
+import { type TaskStatus } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
 import { extractTextFromPdf } from './pdf.service.js';
 import { computeContractDeadline } from './dateEngine.service.js';
 import { logger } from '../utils/logger.js';
 import { createError } from '../middleware/errorHandler.js';
+import { requireOrgId } from '../utils/tenant.js';
 
-const prisma = new PrismaClient();
 
 const ExtractedTaskSchema = z.object({
   title: z.string(),
@@ -52,13 +53,13 @@ const taskJsonSchema = {
  * Extracts non-contingency transaction milestone tasks from a document.
  * Records immutable TaskProposal entries and preserves human-reviewed tasks upon document reprocessing.
  */
-export async function extractTransactionTasksFromPdf(filePath: string, dealId: string, documentId: string, organizationId?: string) {
+export async function extractTransactionTasksFromPdf(filePath: string, dealId: string, documentId: string, organizationId: string) {
+  const orgId = requireOrgId(organizationId);
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, ...(organizationId ? { organizationId } : {}) },
+    where: { id: dealId, organizationId: orgId },
   });
   if (!deal) throw createError('Deal not found or access denied', 404);
 
-  const orgId = organizationId ?? deal.organizationId;
   const baseDate = deal.acceptanceDate ?? new Date();
   const apiKey = process.env['GEMINI_API_KEY'];
 
@@ -235,7 +236,9 @@ function createSampleTasks(dealId: string, documentId: string, baseDate: Date, o
  */
 export async function reviewTransactionTask(params: {
   taskId: string;
-  organizationId?: string;
+  organizationId: string;
+  /** When given, the task must also belong to this deal. */
+  dealId?: string;
   dueDate?: string;
   title?: string;
   amount?: number;
@@ -243,10 +246,11 @@ export async function reviewTransactionTask(params: {
   status?: TaskStatus;
   actorEmail?: string;
 }) {
-  const { taskId, organizationId, dueDate, title, amount, assignedTo, status, actorEmail } = params;
+  const { taskId, dealId, dueDate, title, amount, assignedTo, status, actorEmail } = params;
+  const organizationId = requireOrgId(params.organizationId);
 
   const existing = await prisma.transactionTask.findFirst({
-    where: { id: taskId, ...(organizationId ? { organizationId } : {}) },
+    where: { id: taskId, organizationId, ...(dealId ? { dealId } : {}) },
   });
   if (!existing) throw createError('Transaction task not found', 404);
 

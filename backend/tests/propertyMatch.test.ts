@@ -76,7 +76,7 @@ describe('Property Match Service', () => {
   });
 
   it('filters out properties that violate hard budget ceilings', async () => {
-    const matches = await computeMatchesForLead(testLeadId);
+    const matches = await computeMatchesForLead(testLeadId, testOrgId);
 
     // Over budget property (prop2: $850k) MUST be excluded by SQL hard filter!
     const matchedPropIds = matches.map((m) => m.property.id);
@@ -85,7 +85,7 @@ describe('Property Match Service', () => {
   });
 
   it('computes match scores and provides explicit match explanations', async () => {
-    const matches = await computeMatchesForLead(testLeadId);
+    const matches = await computeMatchesForLead(testLeadId, testOrgId);
     const topMatch = matches.find((m) => m.property.id === prop1Id);
 
     expect(topMatch).toBeDefined();

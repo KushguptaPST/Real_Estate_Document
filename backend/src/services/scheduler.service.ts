@@ -1,9 +1,8 @@
 import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { checkAndDispatchAlerts } from './alert.service.js';
 import { logger } from '../utils/logger.js';
 
-const prisma = new PrismaClient();
 let cronTask: cron.ScheduledTask | null = null;
 
 export async function resetDeadlineAlertWindows(deadlineId: string): Promise<void> {

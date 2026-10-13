@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import {
   askDealAssistant,
@@ -19,7 +19,7 @@ import { requireAuth } from '../../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 // Rate limiting in-memory map
 const rateLimitMap = new Map<string, number[]>();
@@ -86,7 +86,8 @@ router.post(
         res.end();
       } catch (err) {
         logger.error(`[Assistant SSE Error] ${(err as Error).message}`);
-        sendSse('error', { message: (err as Error).message });
+        const safe = (err as { isOperational?: boolean }).isOperational ? (err as Error).message : 'Assistant request failed';
+        sendSse('error', { message: safe });
         res.end();
       }
       return;

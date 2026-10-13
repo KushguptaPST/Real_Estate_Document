@@ -25,11 +25,21 @@ model Organization {
   kbDocuments         KBDocument[]
   conversationThreads ConversationThread[]
   webhookEvents       WebhookEvent[]
+  invitations         Invitation[]
+  apiKeys             OrganizationApiKey[]
+  callLogs            LeadCallLog[]
+  leadTasks           LeadTask[]
+  siteVisits          SiteVisit[]
 
   @@map("organizations")
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────
+enum UserRole {
+  OWNER
+  AGENT
+}
+
 model User {
   id             String        @id @default(cuid())
   googleId       String        @unique
@@ -37,15 +47,71 @@ model User {
   name           String?
   pictureUrl     String?
   organizationId String?
+  role           UserRole      @default(AGENT)
+  // Bumped on role change / removal so previously issued session tokens stop working.
+  sessionVersion Int           @default(0)
   lastLoginAt    DateTime      @default(now())
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization  Organization? @relation(fields: [organizationId], references: [id])
-  assignedLeads Lead[]
+  organization        Organization?           @relation(fields: [organizationId], references: [id])
+  assignedLeads       Lead[]
+  previousAssignments LeadAssignmentHistory[] @relation("PreviousLeadAssignments")
+  currentAssignments  LeadAssignmentHistory[] @relation("CurrentLeadAssignments")
+  authoredAssignments LeadAssignmentHistory[] @relation("LeadAssignmentAuthor")
+  loggedCalls         LeadCallLog[]
+  assignedLeadTasks   LeadTask[]              @relation("LeadTaskAssignee")
+  createdLeadTasks    LeadTask[]              @relation("LeadTaskCreator")
+  completedLeadTasks  LeadTask[]              @relation("LeadTaskCompleter")
+  assignedSiteVisits  SiteVisit[]             @relation("SiteVisitAssignee")
+  createdSiteVisits   SiteVisit[]             @relation("SiteVisitCreator")
+  cancelledSiteVisits SiteVisit[]             @relation("SiteVisitCanceller")
+  completedSiteVisits SiteVisit[]             @relation("SiteVisitCompleter")
+  noShowSiteVisits    SiteVisit[]             @relation("SiteVisitNoShower")
 
   @@index([organizationId])
   @@map("users")
+}
+
+// ─── Invitation (invite-only organization membership) ───────────────────────
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           UserRole  @default(AGENT)
+  // SHA-256 of the one-time invite token; the plaintext token is never stored.
+  tokenHash      String    @unique
+  invitedById    String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+  @@map("invitations")
+}
+
+// ─── Organization API Key (server-to-server lead intake) ────────────────────
+model OrganizationApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  keyPrefix      String
+  // SHA-256 of the full key; the plaintext key is shown once at creation.
+  keyHash        String    @unique
+  scope          String    @default("lead_intake")
+  createdById    String?
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("organization_api_keys")
 }
 
 // ─── Lead & Lead Requirements ────────────────────────────────────────────────
@@ -67,9 +133,13 @@ model Lead {
   assignedUser  User?                      @relation(fields: [assignedUserId], references: [id])
   requirements  LeadRequirement?
   proposals     LeadRequirementProposal[]
-  conversations ConversationThread[]
-  matches       PropertyMatch[]
-  deals         Deal[]
+  conversations     ConversationThread[]
+  matches           PropertyMatch[]
+  deal              Deal?
+  assignmentHistory LeadAssignmentHistory[]
+  callLogs          LeadCallLog[]
+  tasks             LeadTask[]
+  siteVisits        SiteVisit[]
 
   @@index([organizationId, status])
   @@unique([organizationId, email])
@@ -154,6 +224,120 @@ model LeadRequirementProposal {
   @@map("lead_requirement_proposals")
 }
 
+model LeadAssignmentHistory {
+  id             String   @id @default(cuid())
+  leadId         String
+  organizationId String
+  previousUserId String?
+  assignedUserId String?
+  changedById    String?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  lead         Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  previousUser User? @relation("PreviousLeadAssignments", fields: [previousUserId], references: [id], onDelete: SetNull)
+  assignedUser User? @relation("CurrentLeadAssignments", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  changedBy    User? @relation("LeadAssignmentAuthor", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([organizationId])
+  @@index([assignedUserId])
+  @@map("lead_assignment_history")
+}
+
+// ─── Lead Call Logs ───────────────────────────────────────────────────────────
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallOutcome {
+  CONNECTED
+  NO_ANSWER
+  BUSY
+  CALLBACK_REQUESTED
+  VOICEMAIL
+  WRONG_NUMBER
+  OTHER
+}
+
+model LeadCallLog {
+  id              String        @id @default(cuid())
+  leadId          String
+  organizationId  String
+  userId          String
+  direction       CallDirection
+  outcome         CallOutcome
+  calledAt        DateTime      @default(now())
+  durationSeconds Int?
+  notes           String?       @db.Text
+  followUpNeeded  Boolean       @default(false)
+  followUpDate    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followUpTask LeadTask?
+
+  @@index([leadId, calledAt])
+  @@index([organizationId, calledAt])
+  @@index([userId])
+  @@map("lead_call_logs")
+}
+
+// ─── Lead Follow-Up Tasks ───────────────────────────────────────────────────
+enum LeadTaskType {
+  CALL
+  MESSAGE
+  SITE_VISIT
+  SEND_DETAILS
+  DOCUMENT_FOLLOW_UP
+  OTHER
+}
+
+enum LeadTaskStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+model LeadTask {
+  id             String         @id @default(cuid())
+  leadId         String
+  organizationId String
+  taskType       LeadTaskType   @default(CALL)
+  title          String
+  description    String?        @db.Text
+  dueDate        DateTime
+  status         LeadTaskStatus @default(OPEN)
+  priority       LeadPriority   @default(MEDIUM)
+  assignedUserId String
+  createdById    String
+  completedAt    DateTime?
+  completedById  String?
+  callLogId      String?        @unique
+  siteVisitId    String?        @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  lead          Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedUser  User          @relation("LeadTaskAssignee", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  createdByUser User          @relation("LeadTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  completedUser User?         @relation("LeadTaskCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  callLog       LeadCallLog?  @relation(fields: [callLogId], references: [id], onDelete: SetNull)
+  siteVisit     SiteVisit?    @relation(fields: [siteVisitId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueDate])
+  @@index([assignedUserId, status, dueDate])
+  @@index([leadId, status])
+  @@index([callLogId])
+  @@index([siteVisitId])
+  @@map("lead_tasks")
+}
+
 // ─── Multi-Channel Conversation & Controlled State Machine ───────────────────
 enum ConversationState {
   AUTOPILOT
@@ -192,21 +376,76 @@ enum MessageChannel {
 }
 
 model ConversationMessage {
-  id              String         @id @default(cuid())
-  threadId        String
-  organizationId  String?
-  senderType      SenderType
-  senderId        String?
-  content         String         @db.Text
-  suggestedAction Json?
-  approvalStatus  ApprovalStatus @default(APPROVED)
-  createdAt       DateTime       @default(now())
+  id                String          @id @default(cuid())
+  threadId          String
+  organizationId    String?
+  senderType        SenderType
+  senderId          String?
+  content           String          @db.Text
+  suggestedAction   Json?
+  approvalStatus    ApprovalStatus  @default(APPROVED)
+  deliveryStatus    DeliveryStatus  @default(NOT_APPLICABLE)
+  deliveredAt       DateTime?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  providerMessageId String?
+  deliveryError     String?
+  idempotencyKey    String?         @unique
+  createdAt         DateTime        @default(now())
 
-  thread ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread    ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  outboxJob OutboxJob?
 
   @@index([threadId])
   @@index([organizationId])
+  @@index([providerMessageId])
+  @@index([deliveryStatus])
   @@map("conversation_messages")
+}
+
+enum DeliveryStatus {
+  NOT_APPLICABLE
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  RETRY_PENDING
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+model OutboxJob {
+  id                String         @id @default(cuid())
+  organizationId    String?
+  messageId         String         @unique
+  recipientEmail    String
+  channel           MessageChannel @default(EMAIL)
+  payload           Json
+  idempotencyKey    String         @unique
+  status            OutboxStatus   @default(PENDING)
+  attempts          Int            @default(0)
+  maxAttempts       Int            @default(3)
+  nextAttemptAt     DateTime       @default(now())
+  lockedAt          DateTime?
+  lockedBy          String?
+  lastError         String?
+  providerMessageId String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  message ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([organizationId])
+  @@index([providerMessageId])
+  @@map("outbox_jobs")
 }
 
 enum SenderType {
@@ -242,6 +481,8 @@ model Property {
 
   organization Organization?   @relation(fields: [organizationId], references: [id])
   matches      PropertyMatch[]
+  siteVisits   SiteVisit[]
+  deals        Deal[]
 
   @@index([organizationId, price, bedrooms, status])
   @@map("properties")
@@ -368,7 +609,8 @@ model KBDocument {
 model Deal {
   id               String      @id @default(cuid())
   organizationId   String?
-  leadId           String?
+  leadId           String?     @unique
+  propertyId       String?
   propertyAddress  String
   buyerName        String?
   sellerName       String?
@@ -381,6 +623,7 @@ model Deal {
 
   organization         Organization?           @relation(fields: [organizationId], references: [id])
   lead                 Lead?                   @relation(fields: [leadId], references: [id])
+  property             Property?               @relation(fields: [propertyId], references: [id])
   documents            Document[]
   clauses              ContingencyClause[]
   deadlines            Deadline[]
@@ -393,6 +636,7 @@ model Deal {
   emailLogs            EmailLog[]
 
   @@index([organizationId])
+  @@index([propertyId])
   @@map("deals")
 }
 
@@ -659,4 +903,68 @@ enum AuditAction {
   TASK_EXTRACTED
   TASK_APPROVED
   TASK_COMPLETED
+  CALL_LOGGED
+  LEAD_TASK_CREATED
+  LEAD_TASK_UPDATED
+  LEAD_TASK_COMPLETED
+  LEAD_TASK_CANCELLED
+  SITE_VISIT_SCHEDULED
+  SITE_VISIT_RESCHEDULED
+  SITE_VISIT_CANCELLED
+  SITE_VISIT_COMPLETED
+  SITE_VISIT_NO_SHOW
+  MESSAGE_DISPATCH_QUEUED
+  MESSAGE_SENT
+  MESSAGE_DELIVERED
+  MESSAGE_DISPATCH_FAILED
+  MESSAGE_BOUNCED
+  MESSAGE_RETRY_REQUESTED
+}
+
+// ─── Real Estate Site Visits ────────────────────────────────────────────────
+enum SiteVisitStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model SiteVisit {
+  id              String          @id @default(cuid())
+  organizationId  String
+  leadId          String
+  propertyId      String?
+  assignedUserId  String
+  createdById     String
+  startAt         DateTime
+  endAt           DateTime
+  status          SiteVisitStatus @default(SCHEDULED)
+  meetingLocation String?
+  notes           String?         @db.Text
+  outcomeNotes    String?         @db.Text
+  cancelReason    String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+  completedAt     DateTime?
+  completedById   String?
+  noShowAt        DateTime?
+  noShowById      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead          Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  property      Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assignedUser  User         @relation("SiteVisitAssignee", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation("SiteVisitCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  cancelledUser User?        @relation("SiteVisitCanceller", fields: [cancelledById], references: [id], onDelete: SetNull)
+  completedUser User?        @relation("SiteVisitCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  noShowUser    User?        @relation("SiteVisitNoShower", fields: [noShowById], references: [id], onDelete: SetNull)
+  leadTask      LeadTask?
+
+  @@index([organizationId, status, startAt, endAt])
+  @@index([assignedUserId, status, startAt, endAt])
+  @@index([leadId, status, startAt])
+  @@index([propertyId])
+  @@map("site_visits")
 }

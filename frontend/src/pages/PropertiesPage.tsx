@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { propertiesApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 import { PropertyMarketingModal } from '@/components/property/PropertyMarketingModal';
 import { PropertyCmaModal } from '@/components/property/PropertyCmaModal';
 import { CsvImportModal } from '@/components/CsvImportModal';
@@ -22,6 +23,8 @@ import {
 } from 'lucide-react';
 
 export function PropertiesPage() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'OWNER';
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,10 +121,19 @@ export function PropertiesPage() {
             <FileSpreadsheet className="h-3.5 w-3.5 text-[#059669]" />
             <span>Import MLS / CSV</span>
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-stripe-primary text-xs">
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Listing</span>
-          </button>
+          {isOwner ? (
+            <button onClick={() => setShowAddModal(true)} className="btn-stripe-primary text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Listing</span>
+            </button>
+          ) : (
+            <div title="Only organization owners can add listings">
+              <button disabled className="btn-stripe-secondary text-xs opacity-50 cursor-not-allowed">
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Listing (Owner Only)</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

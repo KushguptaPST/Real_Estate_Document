@@ -2,12 +2,12 @@
  * Alert Service — Automated deadline alert evaluation, Resend email dispatch, and cron scheduler.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import cron from 'node-cron';
 import { logger } from '../utils/logger.js';
+import { maskEmail } from '../utils/audit.js';
 import { sendEmail, generateTemplate } from './email.service.js';
 
-const prisma = new PrismaClient();
 
 export interface AlertPayload {
   to: string;
@@ -100,6 +100,7 @@ export async function checkAndDispatchAlerts(): Promise<{ processed: number; sen
           await prisma.emailLog.create({
             data: {
               dealId: deal.id,
+              organizationId: deal.organizationId,
               deadlineId: deadline.id,
               recipient,
               template: templateToSend,
@@ -111,7 +112,7 @@ export async function checkAndDispatchAlerts(): Promise<{ processed: number; sen
 
           if (result.success) {
             sentCount++;
-            logger.info(`[Alert Sent] Dispatched ${templateToSend} for ${deadline.label} to ${recipient}`);
+            logger.info(`[Alert Sent] Dispatched ${templateToSend} for ${deadline.label} to ${maskEmail(recipient)}`);
           }
         }
 
@@ -127,6 +128,7 @@ export async function checkAndDispatchAlerts(): Promise<{ processed: number; sen
         await prisma.auditLog.create({
           data: {
             dealId: deal.id,
+            organizationId: deal.organizationId,
             action: 'ALERT_SENT',
             entityType: 'Deadline',
             entityId: deadline.id,
@@ -145,16 +147,30 @@ export async function checkAndDispatchAlerts(): Promise<{ processed: number; sen
   }
 }
 
+let scheduledAlertTask: cron.ScheduledTask | null = null;
+
 /**
  * Initializes the background cron job for deadline alerts.
  */
-export function initAlertCron(): void {
+export function initAlertCron(): cron.ScheduledTask {
   const cronExpr = process.env['ALERT_CRON'] ?? '0 * * * *'; // hourly
   logger.info(`[Alert Scheduler] Initialized with cron schedule: "${cronExpr}"`);
 
-  cron.schedule(cronExpr, async () => {
+  scheduledAlertTask = cron.schedule(cronExpr, async () => {
     await checkAndDispatchAlerts();
   });
+  return scheduledAlertTask;
+}
+
+/**
+ * Gracefully stops the background cron job for deadline alerts.
+ */
+export function stopAlertCron(): void {
+  if (scheduledAlertTask) {
+    scheduledAlertTask.stop();
+    scheduledAlertTask = null;
+    logger.info('[Alert Scheduler] Stopped background cron task.');
+  }
 }
 
 export async function scheduleAlerts(dealId: string): Promise<void> {

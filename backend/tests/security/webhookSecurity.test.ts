@@ -2,6 +2,7 @@ import request from 'supertest';
 import crypto from 'crypto';
 import { createApp } from '../../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createIntakeKey, deleteOrgUsers } from '../helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -10,13 +11,20 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
   const secret = 'test-webhook-secret-key-2026';
   const originalSecret = process.env.WEBHOOK_SECRET;
 
-  beforeAll(() => {
+  let org: any;
+  let apiKey: string;
+
+  beforeAll(async () => {
     process.env.WEBHOOK_SECRET = secret;
+    org = await prisma.organization.create({ data: { name: 'Webhook Security Org' } });
+    apiKey = await createIntakeKey(org.id);
   });
 
   afterAll(async () => {
     process.env.WEBHOOK_SECRET = originalSecret;
-    await prisma.webhookEvent.deleteMany({ where: { provider: 'email' } });
+    await prisma.webhookEvent.deleteMany({ where: { organizationId: org.id } });
+    await deleteOrgUsers([org.id]);
+    await prisma.organization.delete({ where: { id: org.id } });
     await prisma.$disconnect();
   });
 
@@ -38,6 +46,7 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
       .post('/api/inbound/email')
       .set('Content-Type', 'application/json')
       .set('x-webhook-signature', sig)
+      .set('X-Api-Key', apiKey)
       .send(rawPayload);
 
     expect([200, 202]).toContain(res.status);
@@ -56,6 +65,7 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
       .post('/api/inbound/email')
       .set('Content-Type', 'application/json')
       .set('x-webhook-signature', 'sha256=invalid_fake_signature_hash')
+      .set('X-Api-Key', apiKey)
       .send(rawPayload);
 
     expect(res.status).toBe(401);
@@ -82,6 +92,7 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
       .post('/api/inbound/email')
       .set('Content-Type', 'application/json')
       .set('x-webhook-signature', sig)
+      .set('X-Api-Key', apiKey)
       .send(tamperedPayload);
 
     expect(res.status).toBe(401);
@@ -103,6 +114,7 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
       .post('/api/inbound/email')
       .set('Content-Type', 'application/json')
       .set('x-webhook-signature', sig)
+      .set('X-Api-Key', apiKey)
       .send(rawPayload);
 
     expect([200, 202]).toContain(res1.status);
@@ -112,6 +124,7 @@ describe('Phase 33 Security Matrix: Webhook Security & Idempotency Tests', () =>
       .post('/api/inbound/email')
       .set('Content-Type', 'application/json')
       .set('x-webhook-signature', sig)
+      .set('X-Api-Key', apiKey)
       .send(rawPayload);
 
     expect(res2.status).toBe(200);

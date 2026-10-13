@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { uploadMiddleware } from '../../middleware/upload.js';
 import { storeFile, getSignedDocumentUrl } from '../../services/storage.service.js';
 import { extractClausesFromPdf } from '../../services/ai.service.js';
@@ -14,7 +14,7 @@ import { requireAuth } from '../../middleware/auth.js';
 import { logger } from '../../utils/logger.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 // ── GET /api/deals/:id/documents ──────────────────────────────────────────
 router.get(
@@ -106,7 +106,7 @@ router.post(
     );
 
     const baseAcceptanceDate = deal.acceptanceDate ?? new Date();
-    const deadlines = await computeDeadlinesForDeal(dealId, baseAcceptanceDate, clauses);
+    const deadlines = await computeDeadlinesForDeal(dealId, baseAcceptanceDate, clauses, orgId);
 
     // Extract non-contingency milestone tasks into TaskProposal queue
     await extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
@@ -178,7 +178,7 @@ router.post(
             data: { acceptanceDate: classification.effectiveDate },
           });
           const allClauses = await prisma.contingencyClause.findMany({ where: { dealId, organizationId: orgId } });
-          await computeDeadlinesForDeal(dealId, classification.effectiveDate, allClauses);
+          await computeDeadlinesForDeal(dealId, classification.effectiveDate, allClauses, orgId);
         }
 
         await prisma.auditLog.create({

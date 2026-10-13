@@ -4,18 +4,26 @@
 
 import { GoogleGenAI } from '@google/genai';
 import {
-  PrismaClient,
   type MessageChannel,
   type SenderType,
   type ApprovalStatus,
   type ConversationState,
+  type UserRole,
 } from '@prisma/client';
+
+import { prisma } from '../utils/prisma.js';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { getLeadDetails } from './lead.service.js';
 import { createError } from '../middleware/errorHandler.js';
+import { requireOrgId } from '../utils/tenant.js';
+import { runSalesAgentLoop } from './agent/agentRuntime.js';
+import {
+  queueMessageDispatch,
+  processOutboxJobs,
+  retryMessageDispatch,
+} from './messaging/outboxDispatcher.js';
 
-const prisma = new PrismaClient();
 
 const SuggestedReplySchema = z.object({
   suggestedReply: z.string(),
@@ -45,33 +53,20 @@ const replyJsonSchema = {
  */
 export async function getOrCreateLeadThread(
   leadId: string,
-  organizationIdOrChannel?: string,
+  organizationId: string,
   channel: MessageChannel = 'EMAIL',
 ) {
-  let orgId: string | undefined;
-  let ch: MessageChannel = channel;
+  const orgId = requireOrgId(organizationId);
+  const ch = channel;
 
-  if (
-    organizationIdOrChannel === 'EMAIL' ||
-    organizationIdOrChannel === 'WHATSAPP' ||
-    organizationIdOrChannel === 'SMS' ||
-    organizationIdOrChannel === 'WEB_CHAT'
-  ) {
-    ch = organizationIdOrChannel as MessageChannel;
-    orgId = undefined;
-  } else {
-    orgId = organizationIdOrChannel;
-  }
-
-  // Ensure lead exists
-  const lead = await getLeadDetails(leadId, orgId);
-  const effectiveOrgId = orgId ?? lead.organizationId;
+  // Ensure lead exists in this tenant
+  await getLeadDetails(leadId, orgId);
 
   let thread = await prisma.conversationThread.findFirst({
     where: {
       leadId,
       channel: ch,
-      ...(effectiveOrgId ? { organizationId: effectiveOrgId } : {}),
+      organizationId: orgId,
     },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
@@ -82,7 +77,7 @@ export async function getOrCreateLeadThread(
     thread = await prisma.conversationThread.create({
       data: {
         leadId,
-        organizationId: effectiveOrgId,
+        organizationId: orgId,
         channel: ch,
         state: 'AUTOPILOT',
         isHumanTakeover: false,
@@ -96,19 +91,90 @@ export async function getOrCreateLeadThread(
 }
 
 /**
+ * Handles authenticated advisor message submission during human takeover / advisor intervention.
+ * Strictly derives author and senderType (AGENT) from authenticated user identity.
+ * Does NOT generate AI reply or enter buyer-memory as customer statements.
+ */
+export async function handleAdvisorMessage(params: {
+  leadId: string;
+  organizationId: string;
+  senderId: string;
+  senderEmail?: string;
+  callerRole: UserRole;
+  content: string;
+  channel?: MessageChannel;
+}) {
+  const { leadId, senderId, senderEmail, callerRole, channel = 'EMAIL', content } = params;
+  const orgId = requireOrgId(params.organizationId);
+
+  // 1. Authorize: Lead must belong to organization
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, organizationId: orgId },
+  });
+  if (!lead) throw createError('Lead not found', 404);
+
+  // 2. Role authorization: AGENT can only act on their assigned lead
+  if (callerRole === 'AGENT' && lead.assignedUserId && lead.assignedUserId !== senderId) {
+    throw createError('Agents can only send advisor messages for their assigned leads', 403);
+  }
+
+  const thread = await getOrCreateLeadThread(leadId, orgId, channel);
+
+  // Save Advisor Message: senderType is strictly AGENT, senderId is authenticated user ID!
+  const advisorMsg = await prisma.conversationMessage.create({
+    data: {
+      threadId: thread.id,
+      organizationId: orgId,
+      senderType: 'AGENT',
+      senderId,
+      content,
+      approvalStatus: 'APPROVED',
+    },
+  });
+
+  // Enqueue outbound message into durable transactional outbox
+  try {
+    await queueMessageDispatch({
+      messageId: advisorMsg.id,
+      organizationId: orgId,
+      leadId,
+      recipientEmail: lead.email ?? undefined,
+      channel,
+      content,
+      actorEmail: senderEmail ?? senderId,
+    });
+    // Immediately process outbox asynchronously
+    processOutboxJobs({ batchSize: 5 }).catch((err) =>
+      logger.error(`[Outbox Worker Error] Failed processing advisor message dispatch: ${err.message}`),
+    );
+  } catch (queueErr: any) {
+    logger.error(`[Outbox Error] Failed to queue advisor message dispatch: ${queueErr.message}`);
+  }
+
+  const updatedMsg = await prisma.conversationMessage.findUnique({
+    where: { id: advisorMsg.id },
+  });
+
+  return {
+    message: updatedMsg ?? advisorMsg,
+  };
+}
+
+/**
  * Handles incoming customer message with explicit state machine checks.
  * Under HUMAN_TAKEOVER or PAUSED states, AI automated responses are strictly BLOCKED.
  */
+
 export async function handleCustomerMessage(params: {
   leadId: string;
-  organizationId?: string;
+  organizationId: string;
   channel?: MessageChannel;
   content: string;
 }) {
-  const { leadId, organizationId, channel = 'EMAIL', content } = params;
+  const { leadId, channel = 'EMAIL', content } = params;
+  const orgId = requireOrgId(params.organizationId);
 
-  const thread = await getOrCreateLeadThread(leadId, organizationId, channel);
-  const orgId = organizationId ?? thread.organizationId;
+  const thread = await getOrCreateLeadThread(leadId, orgId, channel);
 
   // Save Customer Message
   const customerMsg = await prisma.conversationMessage.create({
@@ -131,11 +197,29 @@ export async function handleCustomerMessage(params: {
     };
   }
 
-  // Generate Suggested Reply Proposal
-  const suggested = await generateSuggestedReply({ threadId: thread.id, leadId, organizationId: orgId ?? undefined });
+  // Generate Suggested Reply Proposal via Bounded Agent Runtime
+  const suggested = await generateSuggestedReply({
+    threadId: thread.id,
+    leadId,
+    organizationId: orgId,
+    customerMessage: content,
+  });
 
-  // Status calculation: AI replies created as proposals default to PENDING_APPROVAL unless explicitly sent in AUTOPILOT
-  const initialStatus: ApprovalStatus = thread.state === 'DRAFT_ONLY' || process.env.NODE_ENV === 'test' ? 'PENDING_APPROVAL' : (thread.state === 'AUTOPILOT' && thread.autoReplyEnabled ? 'PENDING_APPROVAL' : 'PENDING_APPROVAL');
+  if ((suggested as any).suppressed) {
+    return {
+      message: customerMsg,
+      aiReply: null,
+      suppressedReason: (suggested as any).suppressedReason ?? 'AI response suppressed.',
+    };
+  }
+
+  // Status calculation: In AUTOPILOT mode (autoReplyEnabled), conversation replies are auto-approved instantly.
+  // In DRAFT_ONLY mode (or test suites), replies default to PENDING_APPROVAL.
+  const isAutoApprove =
+    (thread.state === 'AUTOPILOT' || thread.autoReplyEnabled) &&
+    (process.env['AUTO_APPROVE_AI_REPLIES'] === 'true' || process.env['NODE_ENV'] !== 'test');
+
+  const initialStatus: ApprovalStatus = isAutoApprove ? 'APPROVED' : 'PENDING_APPROVAL';
 
   const aiMsg = await prisma.conversationMessage.create({
     data: {
@@ -146,10 +230,44 @@ export async function handleCustomerMessage(params: {
       suggestedAction: {
         followUps: suggested.suggestedFollowUps,
         reasoning: suggested.reasoning,
+        toolExecutions: (suggested as any).toolExecutions ?? [],
+        taskProposal: (suggested as any).taskProposal ?? null,
+        requirementProposal: (suggested as any).requirementProposal ?? null,
+        qualificationResult: (suggested as any).qualificationResult ?? null,
+        siteVisitProposal: (suggested as any).siteVisitProposal ?? null,
+        siteVisitBooking: (suggested as any).siteVisitBooking ?? null,
+        escalation: (suggested as any).escalation ?? null,
+        followUpProposal: (suggested as any).followUpProposal ?? null,
       } as object,
       approvalStatus: initialStatus,
     },
   });
+
+  // When auto-approved in AUTOPILOT mode, enqueue for durable dispatch
+  if (initialStatus === 'APPROVED') {
+    try {
+      const lead = await prisma.lead.findFirst({
+        where: { id: leadId, organizationId: orgId },
+        select: { id: true, email: true },
+      });
+
+      await queueMessageDispatch({
+        messageId: aiMsg.id,
+        organizationId: orgId,
+        leadId,
+        recipientEmail: lead?.email ?? undefined,
+        channel: thread.channel,
+        content: aiMsg.content,
+        actorEmail: 'ai_sales_agent',
+      });
+
+      processOutboxJobs({ batchSize: 5 }).catch((err) =>
+        logger.error(`[Outbox Worker Error] Failed processing autonomous AI message dispatch: ${err.message}`),
+      );
+    } catch (queueErr: any) {
+      logger.error(`[Outbox Error] Failed to queue autonomous AI message dispatch: ${queueErr.message}`);
+    }
+  }
 
   return {
     message: customerMsg,
@@ -159,101 +277,66 @@ export async function handleCustomerMessage(params: {
 }
 
 /**
- * Generates context-aware suggested reply grounded in tenant inventory and requirements.
+ * Generates context-aware suggested reply using the Phase 2A agent runtime.
  */
-export async function generateSuggestedReply(params: { threadId: string; leadId: string; organizationId?: string }) {
-  const { threadId, leadId, organizationId } = params;
+export async function generateSuggestedReply(params: {
+  threadId: string;
+  leadId: string;
+  organizationId: string;
+  customerMessage?: string;
+}) {
+  const { threadId, leadId } = params;
+  const organizationId = requireOrgId(params.organizationId);
 
   const lead = await getLeadDetails(leadId, organizationId);
   const thread = await prisma.conversationThread.findFirst({
-    where: { id: threadId, ...(organizationId ? { organizationId } : {}) },
-    include: { messages: { orderBy: { createdAt: 'desc' }, take: 8 } },
+    where: { id: threadId, leadId, organizationId },
+    include: { messages: { orderBy: { createdAt: 'desc' }, take: 10 } },
   });
 
   if (!thread) throw createError('Thread not found', 404);
 
-  const historyText = thread.messages
+  const latestCustomerMsg =
+    params.customerMessage ??
+    thread.messages.find((m) => m.senderType === 'CUSTOMER')?.content ??
+    'Hello, I am looking for property information.';
+
+  const recentMessages = thread.messages
     .slice()
     .reverse()
-    .map((m) => `${m.senderType}: ${m.content}`)
-    .join('\n');
+    .map((m) => ({ senderType: m.senderType, content: m.content }));
 
-  const req = lead.requirements;
-  const reqSummary = req
-    ? `Budget: ${req.minBudget ?? 0} - ${req.maxBudget ?? 'Unlimited'} USD | Locations: ${req.preferredLocations.join(', ') || 'Any'} | Beds: ${req.minBedrooms ?? 'Any'} | Type: ${req.propertyType ?? 'Any'}`
-    : 'No confirmed preferences yet.';
+  const agentResult = await runSalesAgentLoop({
+    leadId,
+    organizationId,
+    threadId,
+    customerMessage: latestCustomerMsg,
+    recentMessages,
+  });
 
-  const matchesSummary = lead.matches
-    .slice(0, 3)
-    .map((m) => `- ${m.property.title} ($${m.property.price.toLocaleString()}, ${m.property.bedrooms} bed in ${m.property.city}): ${m.matchReason}`)
-    .join('\n');
-
-  const apiKey = process.env['GEMINI_API_KEY'];
-  if (!apiKey) {
+  if (agentResult.suppressed) {
     return {
-      suggestedReply: `Thank you for reaching out, ${lead.fullName}! We have received your inquiry and our team is working to find properties matching your requirements.`,
-      reasoning: 'Fallback response (API key missing)',
-      suggestedFollowUps: ['Would you like to schedule a tour this weekend?', 'What is your target move-in date?'],
+      suggestedReply: '',
+      reasoning: agentResult.reasoning,
+      suggestedFollowUps: [],
+      suppressed: true,
+      suppressedReason: agentResult.suppressedReason,
+      toolExecutions: agentResult.executedTools,
     };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const candidateModels = Array.from(
-    new Set(
-      [
-        process.env['GEMINI_MODEL'],
-        'gemini-2.5-flash-lite',
-        'gemini-3.5-flash-lite',
-        'gemini-3.5-flash',
-        'gemini-flash-latest',
-      ].filter(Boolean) as string[],
-    ),
-  );
-
-  const prompt = `You are an AI Real Estate Assistant. Generate a polite, professional, and accurate response to the customer.
-
-=== CUSTOMER PROFILE ===
-Name: ${lead.fullName}
-Status: ${lead.status}
-Confirmed Requirements: ${reqSummary}
-
-=== TOP MATCHING INVENTORY ===
-${matchesSummary || 'No matching properties calculated yet.'}
-
-=== RECENT CONVERSATION HISTORY ===
-${historyText}
-
-CRITICAL RULES:
-1. Ground responses only in the provided profile and inventory. Do not invent properties or prices.
-2. Keep the response helpful, clear, and focused on assisting the buyer.
-3. Suggest 2-3 logical follow-up questions for the agent.`;
-
-  for (const model of candidateModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{ text: prompt }],
-        config: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: replyJsonSchema,
-          temperature: 0.2,
-        },
-      });
-
-      if (response.text) {
-        const raw = JSON.parse(response.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
-        const parsed = SuggestedReplySchema.parse(raw);
-        return parsed;
-      }
-    } catch (err) {
-      logger.warn(`[Conversation] Model ${model} failed: ${(err as Error).message}`);
-    }
-  }
-
   return {
-    suggestedReply: `Hi ${lead.fullName}, thank you for your message! I'm reviewing your request and will share matching options shortly.`,
-    reasoning: 'Fallback response after candidate model failure',
-    suggestedFollowUps: ['Could you confirm your preferred move-in window?'],
+    suggestedReply: agentResult.response,
+    reasoning: agentResult.reasoning,
+    suggestedFollowUps: agentResult.suggestedFollowUps,
+    toolExecutions: agentResult.executedTools,
+    taskProposal: agentResult.taskProposal ?? null,
+    requirementProposal: agentResult.requirementProposal ?? null,
+    qualificationResult: agentResult.qualificationResult ?? null,
+    siteVisitProposal: agentResult.siteVisitProposal ?? null,
+    siteVisitBooking: agentResult.siteVisitBooking ?? null,
+    escalation: agentResult.escalation ?? null,
+    followUpProposal: agentResult.followUpProposal ?? null,
   };
 }
 
@@ -263,24 +346,16 @@ CRITICAL RULES:
 export async function toggleHumanTakeover(
   threadId: string,
   isHumanTakeover: boolean,
-  organizationIdOrActorEmail?: string,
+  organizationId: string,
   actorEmail?: string,
 ) {
-  let orgId: string | undefined;
-  let actor: string | undefined;
-
-  if (organizationIdOrActorEmail && organizationIdOrActorEmail.includes('@')) {
-    actor = organizationIdOrActorEmail;
-    orgId = undefined;
-  } else {
-    orgId = organizationIdOrActorEmail;
-    actor = actorEmail;
-  }
+  const orgId = requireOrgId(organizationId);
+  const actor = actorEmail;
 
   const targetState: ConversationState = isHumanTakeover ? 'HUMAN_TAKEOVER' : 'AUTOPILOT';
 
   const thread = await prisma.conversationThread.findFirst({
-    where: { id: threadId, ...(orgId ? { organizationId: orgId } : {}) },
+    where: { id: threadId, organizationId: orgId },
   });
   if (!thread) throw createError('Thread not found', 404);
 
@@ -316,22 +391,14 @@ export async function toggleHumanTakeover(
 export async function toggleAutoPilot(
   threadId: string,
   autoReplyEnabled: boolean,
-  organizationIdOrActorEmail?: string,
+  organizationId: string,
   actorEmail?: string,
 ) {
-  let orgId: string | undefined;
-  let actor: string | undefined;
-
-  if (organizationIdOrActorEmail && organizationIdOrActorEmail.includes('@')) {
-    actor = organizationIdOrActorEmail;
-    orgId = undefined;
-  } else {
-    orgId = organizationIdOrActorEmail;
-    actor = actorEmail;
-  }
+  const orgId = requireOrgId(organizationId);
+  const actor = actorEmail;
 
   const thread = await prisma.conversationThread.findFirst({
-    where: { id: threadId, ...(orgId ? { organizationId: orgId } : {}) },
+    where: { id: threadId, organizationId: orgId },
   });
   if (!thread) throw createError('Thread not found', 404);
 
@@ -353,8 +420,8 @@ export async function toggleAutoPilot(
       entityId: threadId,
       actor: actor ?? 'system',
       note: autoReplyEnabled
-        ? 'Auto-Pilot Mode enabled. AI replies are approved & sent automatically.'
-        : 'Review Mode enabled. AI replies require human agent approval.',
+        ? 'Assisted Draft Mode enabled. AI suggested replies are generated as drafts for review.'
+        : 'Manual Mode enabled. AI suggested replies are paused.',
     },
   });
 
@@ -367,16 +434,33 @@ export async function toggleAutoPilot(
 export async function reviewAiMessage(params: {
   messageId: string;
   status: ApprovalStatus;
-  organizationId?: string;
+  organizationId: string;
+  /** When given, the message must also belong to this lead's thread. */
+  leadId?: string;
   editedContent?: string;
   actorEmail?: string;
 }) {
-  const { messageId, status, organizationId, editedContent, actorEmail } = params;
+  const { messageId, status, leadId, editedContent, actorEmail } = params;
+  const organizationId = requireOrgId(params.organizationId);
 
   const existing = await prisma.conversationMessage.findFirst({
-    where: { id: messageId, ...(organizationId ? { organizationId } : {}) },
+    where: {
+      id: messageId,
+      organizationId,
+      thread: { organizationId, ...(leadId ? { leadId } : {}) },
+    },
+    include: {
+      thread: true,
+    },
   });
   if (!existing) throw createError('Message not found', 404);
+
+  if (existing.senderType === 'CUSTOMER') {
+    throw createError('Customer-authored messages cannot be modified or reviewed through AI endpoints', 400);
+  }
+  if (existing.senderType !== 'AI') {
+    throw createError('Only AI-generated messages can be reviewed', 400);
+  }
 
   const updated = await prisma.conversationMessage.update({
     where: { id: messageId },
@@ -398,5 +482,91 @@ export async function reviewAiMessage(params: {
     },
   });
 
-  return updated;
+  // When AI draft is approved, enter the durable dispatch queue
+  if (status === 'APPROVED' && existing.deliveryStatus === 'NOT_APPLICABLE') {
+    try {
+      const lead = await prisma.lead.findFirst({
+        where: { id: existing.thread.leadId, organizationId },
+        select: { id: true, email: true },
+      });
+
+      await queueMessageDispatch({
+        messageId,
+        organizationId,
+        leadId: existing.thread.leadId,
+        recipientEmail: lead?.email ?? undefined,
+        channel: existing.thread.channel,
+        content: updated.content,
+        actorEmail,
+      });
+
+      // Immediately process outbox asynchronously
+      processOutboxJobs({ batchSize: 5 }).catch((err) =>
+        logger.error(`[Outbox Worker Error] Failed processing approved AI draft dispatch: ${err.message}`),
+      );
+    } catch (queueErr: any) {
+      logger.error(`[Outbox Error] Failed to queue approved AI draft dispatch: ${queueErr.message}`);
+    }
+  }
+
+  const finalMsg = await prisma.conversationMessage.findUnique({
+    where: { id: messageId },
+  });
+
+  return finalMsg ?? updated;
+}
+
+/**
+ * Retries dispatch of an eligible failed outbound message for an assigned advisor's lead.
+ */
+export async function retryLeadMessage(params: {
+  leadId: string;
+  messageId: string;
+  organizationId: string;
+  callerId: string;
+  callerRole: UserRole;
+  actorEmail?: string;
+}) {
+  const { leadId, messageId, callerId, callerRole, actorEmail } = params;
+  const organizationId = requireOrgId(params.organizationId);
+
+  // 1. Authorize lead belongs to organization
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, organizationId },
+  });
+  if (!lead) throw createError('Lead not found', 404);
+
+  // 2. Role authorization: AGENT can only act on their assigned lead
+  if (callerRole === 'AGENT' && lead.assignedUserId && lead.assignedUserId !== callerId) {
+    throw createError('Agents can only retry messages for their assigned leads', 403);
+  }
+
+  // 3. Message must belong to this lead and thread
+  const message = await prisma.conversationMessage.findFirst({
+    where: {
+      id: messageId,
+      organizationId,
+      thread: { leadId, organizationId },
+    },
+  });
+  if (!message) throw createError('Message not found', 404);
+
+  if (message.deliveryStatus !== 'FAILED') {
+    throw createError(`Only failed messages can be retried (current status: ${message.deliveryStatus})`, 400);
+  }
+
+  const result = await retryMessageDispatch({
+    messageId,
+    organizationId,
+    actorEmail: actorEmail ?? callerId,
+  });
+
+  const updated = await prisma.conversationMessage.findUnique({
+    where: { id: messageId },
+  });
+
+  return {
+    ...result,
+    message: updated,
+  };
 }

@@ -5,12 +5,12 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 router.get(
   '/',
@@ -18,8 +18,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const orgId = req.user!.organizationId;
     const dealId = req.params['id'];
-    const page = parseInt((req.query['page'] as string) ?? '1', 10);
-    const limit = parseInt((req.query['limit'] as string) ?? '50', 10);
+    const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt((req.query['limit'] as string) ?? '50', 10) || 50));
 
     const deal = await prisma.deal.findFirst({ where: { id: dealId, organizationId: orgId } });
     if (!deal) throw createError('Deal not found or access denied', 404);

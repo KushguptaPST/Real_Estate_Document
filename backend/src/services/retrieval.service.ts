@@ -2,13 +2,13 @@
 // Retrieval Service — Hybrid RAG with Tenant Pre-Filtering & Token-Budget Context Building
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { generateEmbedding, cosineSimilarity } from './embedding.service.js';
 import { logger } from '../utils/logger.js';
 import { createError } from '../middleware/errorHandler.js';
 import type { Document } from '@prisma/client';
+import { requireOrgId } from '../utils/tenant.js';
 
-const prisma = new PrismaClient();
 
 export interface RetrievedChunk {
   id: string;
@@ -36,11 +36,12 @@ export interface RetrievalResult {
  */
 export async function retrieveRelevantChunks(params: {
   dealId: string;
-  organizationId?: string;
+  organizationId: string;
   query: string;
   documents: Document[];
 }): Promise<RetrievalResult> {
-  const { dealId, organizationId, query, documents } = params;
+  const { dealId, query, documents } = params;
+  const organizationId = requireOrgId(params.organizationId);
   const fullContextBudget = parseInt(process.env['ASSISTANT_FULL_CONTEXT_TOKENS'] ?? '120000', 10);
   const topK = parseInt(process.env['ASSISTANT_TOP_K'] ?? '6', 10);
 
@@ -48,7 +49,7 @@ export async function retrieveRelevantChunks(params: {
   const deal = await prisma.deal.findFirst({
     where: {
       id: dealId,
-      ...(organizationId ? { organizationId } : {}),
+      organizationId,
     },
   });
 
@@ -60,7 +61,7 @@ export async function retrieveRelevantChunks(params: {
   const allDbChunks = await prisma.documentChunk.findMany({
     where: {
       dealId,
-      ...(organizationId ? { organizationId } : {}),
+      organizationId,
     },
     orderBy: [{ documentId: 'asc' }, { pageNumber: 'asc' }, { chunkIndex: 'asc' }],
   });

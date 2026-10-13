@@ -1,7 +1,8 @@
+import crypto from 'node:crypto';
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createMemberSession, deleteOrgUsers, createIntakeKey } from './helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -13,12 +14,14 @@ describe('Phase 34 Concurrency & Race Condition Safeguards', () => {
   let token: string;
   let deal: any;
   let task: any;
+  let apiKey: string;
+  const webhookSecret = 'concurrency-webhook-secret-0123456789';
 
   beforeAll(async () => {
-    process.env.WEBHOOK_SECRET = '';
+    process.env.EMAIL_WEBHOOK_SECRET = webhookSecret;
     org = await prisma.organization.create({ data: { name: 'Concurrency Test Org' } });
-    const jwtSecret = process.env['JWT_SECRET'] || 'development-fallback-secret-2026';
-    token = jwt.sign({ id: 'user-conc', email: 'conc@test.com', organizationId: org.id }, jwtSecret);
+    token = (await createMemberSession(org.id)).token;
+    apiKey = await createIntakeKey(org.id);
 
     deal = await prisma.deal.create({
       data: {
@@ -43,9 +46,11 @@ describe('Phase 34 Concurrency & Race Condition Safeguards', () => {
   afterAll(async () => {
     await prisma.transactionTask.deleteMany({ where: { organizationId: org.id } });
     await prisma.deal.deleteMany({ where: { organizationId: org.id } });
+    await deleteOrgUsers([org.id]);
     await prisma.organization.delete({ where: { id: org.id } });
     await prisma.lead.deleteMany({ where: { email: testEmail } });
-    await prisma.webhookEvent.deleteMany({ where: { externalEventId: webhookEventId } });
+    await prisma.webhookEvent.deleteMany({ where: { externalEventId: `${org.id}:${webhookEventId}` } });
+    delete process.env.EMAIL_WEBHOOK_SECRET;
     await prisma.$disconnect();
   });
 
@@ -54,25 +59,22 @@ describe('Phase 34 Concurrency & Race Condition Safeguards', () => {
       fullName: 'Concurrent Buyer Test',
       email: testEmail,
       enquiryText: 'Looking for a 2 bedroom condo under $600k',
-      organizationId: org.id,
     };
 
     // Fire 5 concurrent requests simultaneously
-    const responses = await Promise.all([
-      request(app).post('/api/leads/inbound').send(payload),
-      request(app).post('/api/leads/inbound').send(payload),
-      request(app).post('/api/leads/inbound').send(payload),
-      request(app).post('/api/leads/inbound').send(payload),
-      request(app).post('/api/leads/inbound').send(payload),
-    ]);
+    const responses = await Promise.all(
+      Array.from({ length: 5 }).map(() =>
+        request(app).post('/api/leads/inbound').set('X-Api-Key', apiKey).send(payload),
+      ),
+    );
 
     responses.forEach((res) => {
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(202);
     });
 
     // Query DB for created leads matching testEmail
     const dbLeads = await prisma.lead.findMany({
-      where: { email: testEmail },
+      where: { email: testEmail, organizationId: org.id },
     });
 
     expect(dbLeads.length).toBe(1);
@@ -86,8 +88,15 @@ describe('Phase 34 Concurrency & Race Condition Safeguards', () => {
       body: 'Testing 10 simultaneous webhook arrivals',
     };
 
+    const raw = JSON.stringify(payload);
+    const signature = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(raw).digest('hex');
     const reqs = Array.from({ length: 10 }).map(() =>
-      request(app).post('/api/inbound/email').send(payload)
+      request(app)
+        .post('/api/inbound/email')
+        .set('Content-Type', 'application/json')
+        .set('X-Webhook-Signature', signature)
+        .set('X-Api-Key', apiKey)
+        .send(raw)
     );
 
     const responses = await Promise.all(reqs);
@@ -97,7 +106,7 @@ describe('Phase 34 Concurrency & Race Condition Safeguards', () => {
     });
 
     const events = await prisma.webhookEvent.findMany({
-      where: { externalEventId: webhookEventId },
+      where: { externalEventId: `${org.id}:${webhookEventId}` },
     });
 
     expect(events.length).toBe(1);

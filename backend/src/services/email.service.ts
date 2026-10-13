@@ -4,6 +4,7 @@
 
 import nodemailer from 'nodemailer';
 import { logger } from '../utils/logger.js';
+import { maskEmail } from '../utils/audit.js';
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -42,7 +43,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     }
 
     try {
-      const sgMail = (await import('@sendgrid/mail')).default;
+      const moduleName = '@sendgrid/mail';
+      const sgMail = ((await import(moduleName)) as any).default;
       sgMail.setApiKey(apiKey);
       const [response] = await sgMail.send({
         to: recipients,
@@ -52,7 +54,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
         text: options.text,
       });
       const messageId = response?.headers?.['x-message-id'] || `sg-${Date.now()}`;
-      logger.info(`[Email sent via SendGrid] ID: ${messageId} to ${recipients.join(', ')}`);
+      logger.info(`[Email sent via SendGrid] ID: ${messageId} to ${recipients.map(maskEmail).join(', ')}`);
       return { success: true, messageId, providerMessageId: messageId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -93,7 +95,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
         return { success: false, error: data.message || `HTTP ${response.status}` };
       }
 
-      logger.info(`[Email sent via Resend] ID: ${data.id} to ${recipients.join(', ')}`);
+      logger.info(`[Email sent via Resend] ID: ${data.id} to ${recipients.map(maskEmail).join(', ')}`);
       return { success: true, messageId: data.id, providerMessageId: data.id };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -130,7 +132,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
         text: options.text,
       });
 
-      logger.info(`[Email sent via SMTP] ID: ${info.messageId} to ${recipients.join(', ')}`);
+      logger.info(`[Email sent via SMTP] ID: ${info.messageId} to ${recipients.map(maskEmail).join(', ')}`);
       return { success: true, messageId: info.messageId, providerMessageId: info.messageId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -141,7 +143,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
 
   // Default fallback
   const stubId = `dev-stub-fallback-${Date.now()}`;
-  logger.info(`[Email Mock] Would send to ${recipients.join(', ')}: "${options.subject}"`);
+  logger.info(`[Email Mock] Would send to ${recipients.map(maskEmail).join(', ')}: "${options.subject}"`);
   return { success: true, messageId: stubId, providerMessageId: stubId };
 }
 

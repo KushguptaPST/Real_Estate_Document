@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import {
   extractTransactionTasksFromPdf,
@@ -13,7 +13,7 @@ import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 const ReviewTaskSchema = z.object({
   title: z.string().optional(),
@@ -73,6 +73,7 @@ router.patch(
     const updated = await reviewTransactionTask({
       taskId: req.params['taskId'],
       organizationId: orgId,
+      dealId: req.params['id'],
       dueDate: parsed.data.dueDate,
       title: parsed.data.title,
       amount: parsed.data.amount ?? undefined,

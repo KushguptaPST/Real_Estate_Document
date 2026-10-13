@@ -1,7 +1,7 @@
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createMemberSession, deleteOrgUsers, createIntakeKey } from '../helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -21,12 +21,7 @@ describe('Phase 32 & E2E API Integration Test Suite', () => {
     org = await prisma.organization.create({
       data: { name: 'E2E Test Realty Corp' },
     });
-
-    const jwtSecret = process.env['JWT_SECRET'] || 'development-fallback-secret-2026';
-    token = jwt.sign(
-      { id: 'e2e-user-id', email: 'e2e.agent@realty.com', organizationId: org.id, role: 'ADMIN' },
-      jwtSecret,
-    );
+    token = (await createMemberSession(org.id, { role: 'OWNER' })).token;
 
     // Create a Deal & Task for testing
     deal = await prisma.deal.create({
@@ -83,24 +78,28 @@ describe('Phase 32 & E2E API Integration Test Suite', () => {
     await prisma.deal.deleteMany({ where: { organizationId: org.id } });
     if (lead) await prisma.lead.deleteMany({ where: { organizationId: org.id } });
     if (property) await prisma.property.deleteMany({ where: { organizationId: org.id } });
+    await deleteOrgUsers([org.id]);
     await prisma.organization.delete({ where: { id: org.id } });
     await prisma.$disconnect();
   });
 
-  it('1. POST /api/leads/inbound — ingests lead via public webhook', async () => {
+  it('1. POST /api/leads/inbound — ingests lead via API-key authenticated intake', async () => {
+    const email = `alice.e2e.${Date.now()}@example.com`;
     const res = await request(app)
       .post('/api/leads/inbound')
+      .set('X-Api-Key', await createIntakeKey(org.id))
       .send({
         fullName: 'Alice E2E Inbound',
-        email: `alice.e2e.${Date.now()}@example.com`,
+        email,
         enquiryText: 'Looking for a 3 bed single family home under $900k in Downtown.',
         source: 'WEBSITE_FORM',
-        organizationId: org.id,
       });
 
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.id).toBeDefined();
-    lead = { id: res.body.id };
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({ received: true });
+    const created = await prisma.lead.findFirst({ where: { email, organizationId: org.id } });
+    expect(created).not.toBeNull();
+    lead = { id: created!.id };
   });
 
   it('2. GET /api/leads — lists authenticated tenant leads', async () => {

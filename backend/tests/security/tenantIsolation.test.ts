@@ -1,7 +1,7 @@
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createMemberSession, deleteOrgUsers } from '../helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -25,17 +25,9 @@ describe('Phase 33 Security Matrix: Multi-Tenant Isolation Tests', () => {
       data: { name: 'Tenant Beta Brokerage' },
     });
 
-    const jwtSecret = process.env['JWT_SECRET'] || 'development-fallback-secret-2026';
+    tokenA = (await createMemberSession(orgA.id)).token;
 
-    tokenA = jwt.sign(
-      { id: 'user-alpha-id', email: 'alpha@tenant.com', organizationId: orgA.id },
-      jwtSecret,
-    );
-
-    tokenB = jwt.sign(
-      { id: 'user-beta-id', email: 'beta@tenant.com', organizationId: orgB.id },
-      jwtSecret,
-    );
+    tokenB = (await createMemberSession(orgB.id)).token;
 
     // Create Lead for Org A
     leadA = await prisma.lead.create({
@@ -58,6 +50,7 @@ describe('Phase 33 Security Matrix: Multi-Tenant Isolation Tests', () => {
 
   afterAll(async () => {
     await prisma.lead.deleteMany({ where: { id: { in: [leadA.id, leadB.id] } } });
+    await deleteOrgUsers([orgA.id, orgB.id]);
     await prisma.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
     await prisma.$disconnect();
   });

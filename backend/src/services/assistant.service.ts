@@ -3,20 +3,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import { retrieveRelevantChunks } from './retrieval.service.js';
 import { verifyCitations } from './citationVerifier.js';
 import { logger } from '../utils/logger.js';
 import { createError } from '../middleware/errorHandler.js';
+import { requireOrgId } from '../utils/tenant.js';
 import type {
   AssistantAnswer,
   Citation,
   OverrideInfo,
 } from '../types/assistant.js';
 
-const prisma = new PrismaClient();
 
 // ── Zod Validation Schemas ───────────────────────────────────────────────────
 
@@ -118,22 +118,23 @@ CRITICAL NON-NEGOTIABLES:
  */
 export async function askDealAssistant(params: {
   dealId: string;
-  organizationId?: string;
+  organizationId: string;
   question: string;
   conversationId?: string;
   userId?: string;
   actorEmail?: string;
   onStatusUpdate?: (stage: 'retrieving' | 'reasoning' | 'verifying', message: string) => void;
 }): Promise<AssistantAnswer> {
-  const { dealId, organizationId, question, conversationId, userId, actorEmail, onStatusUpdate } = params;
+  const { dealId, question, conversationId, userId, actorEmail, onStatusUpdate } = params;
+  const orgId = requireOrgId(params.organizationId);
 
   onStatusUpdate?.('retrieving', 'Loading deal documents and contingency records...');
 
   // 1. Load Deal, Documents, Deadlines, and Clauses with tenant scoping
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, ...(organizationId ? { organizationId } : {}) },
+    where: { id: dealId, organizationId: orgId },
     include: {
-      documents: { orderBy: { uploadedAt: 'asc' } },
+      documents: { where: { organizationId: orgId }, orderBy: { uploadedAt: 'asc' } },
       deadlines: { include: { clause: true }, orderBy: { computedDate: 'asc' } },
       clauses: true,
     },
@@ -141,12 +142,10 @@ export async function askDealAssistant(params: {
 
   if (!deal) throw createError('Deal not found or access denied', 404);
 
-  const orgId = organizationId ?? deal.organizationId;
-
   // 2. Retrieve relevant document chunks using hybrid RAG with tenant pre-filtering
   const retrieval = await retrieveRelevantChunks({
     dealId,
-    organizationId: orgId ?? undefined,
+    organizationId: orgId,
     query: question,
     documents: deal.documents,
   });
@@ -154,7 +153,7 @@ export async function askDealAssistant(params: {
   // 3. Load or create conversation session
   let conversation = conversationId
     ? await prisma.assistantConversation.findFirst({
-        where: { id: conversationId, dealId, ...(orgId ? { organizationId: orgId } : {}) },
+        where: { id: conversationId, dealId, organizationId: orgId },
         include: { messages: { orderBy: { createdAt: 'asc' }, take: 6 } },
       })
     : null;
@@ -261,7 +260,7 @@ USER QUESTION: "${question}"`;
   onStatusUpdate?.('verifying', 'Verifying page citations and exact quotes against contract source...');
 
   const chunks = await prisma.documentChunk.findMany({
-    where: { dealId },
+    where: { dealId, organizationId: orgId },
   });
 
   const verification = verifyCitations({
@@ -282,6 +281,7 @@ USER QUESTION: "${question}"`;
   await prisma.assistantMessage.create({
     data: {
       conversationId: conversation.id,
+      organizationId: orgId,
       role: 'user',
       content: question,
     },
@@ -290,6 +290,7 @@ USER QUESTION: "${question}"`;
   const assistantMsg = await prisma.assistantMessage.create({
     data: {
       conversationId: conversation.id,
+      organizationId: orgId,
       role: 'assistant',
       content: finalAnswerText,
       citations: verifiedCitations as unknown as object,
@@ -326,9 +327,9 @@ USER QUESTION: "${question}"`;
 /**
  * Returns suggested follow-up questions for a deal.
  */
-export async function getDealSuggestions(dealId: string, organizationId?: string): Promise<string[]> {
+export async function getDealSuggestions(dealId: string, organizationId: string): Promise<string[]> {
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, ...(organizationId ? { organizationId } : {}) },
+    where: { id: dealId, organizationId: requireOrgId(organizationId) },
     include: { deadlines: true, documents: true },
   });
 
@@ -350,9 +351,9 @@ export async function getDealSuggestions(dealId: string, organizationId?: string
 /**
  * Returns deal executive summary.
  */
-export async function getDealSummary(dealId: string, organizationId?: string) {
+export async function getDealSummary(dealId: string, organizationId: string) {
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, ...(organizationId ? { organizationId } : {}) },
+    where: { id: dealId, organizationId: requireOrgId(organizationId) },
     include: {
       documents: true,
       deadlines: { include: { clause: true }, orderBy: { computedDate: 'asc' } },

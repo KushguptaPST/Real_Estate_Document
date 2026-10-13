@@ -10,7 +10,7 @@ import {
   computeMatchesForLead,
 } from '../../services/propertyMatch.service.js';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, requireRole } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -55,6 +55,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
+  requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const parsed = CreatePropertySchema.safeParse(req.body);
     if (!parsed.success) throw createError(parsed.error.message, 422);

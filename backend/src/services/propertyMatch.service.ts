@@ -2,11 +2,12 @@
 // Property Match Service — Deterministic Inventory Filter & Soft Preference Ranking
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PrismaClient, type Property } from '@prisma/client';
+import { type Property } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { logger } from '../utils/logger.js';
 import { getLeadDetails } from './lead.service.js';
+import { requireOrgId } from '../utils/tenant.js';
 
-const prisma = new PrismaClient();
 
 export interface MatchCalculationResult {
   property: Property;
@@ -22,12 +23,12 @@ export interface MatchCalculationResult {
  * 2. Applies soft scoring for locations, amenities, price targets, and bedrooms.
  * 3. Returns and persists top matches with explicit reasons scoped strictly to organizationId.
  */
-export async function computeMatchesForLead(leadId: string, organizationId?: string): Promise<MatchCalculationResult[]> {
-  const lead = await getLeadDetails(leadId, organizationId);
+export async function computeMatchesForLead(leadId: string, organizationId: string): Promise<MatchCalculationResult[]> {
+  const orgId = requireOrgId(organizationId);
+  const lead = await getLeadDetails(leadId, orgId);
   const req = lead.requirements;
-  const orgId = organizationId ?? lead.organizationId;
 
-  logger.info(`[Property Matcher] Computing matches for Lead ${leadId} (${lead.fullName})`);
+  logger.info(`[Property Matcher] Computing matches for Lead ${leadId}`);
 
   if (!req) {
     logger.info(`[Property Matcher] No requirements recorded for lead ${leadId}. Returning empty matches.`);
@@ -37,11 +38,8 @@ export async function computeMatchesForLead(leadId: string, organizationId?: str
   // 1. Mandatory SQL Hard Filters
   const hardWhere: Record<string, unknown> = {
     status: 'AVAILABLE',
+    organizationId: orgId,
   };
-
-  if (orgId) {
-    hardWhere['organizationId'] = orgId;
-  }
 
   if (req.maxBudget && req.maxBudget > 0) {
     hardWhere['price'] = { lte: req.maxBudget };

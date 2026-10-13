@@ -3,13 +3,14 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
+import { auditFieldChanges } from '../../utils/audit.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+
 
 // ── Validation schemas ─────────────────────────────────────────────────────
 
@@ -116,8 +117,7 @@ router.patch(
             action: 'DEAL_UPDATED',
             entityType: 'Deal',
             actor: req.user?.email ?? 'system',
-            previousValue: existing as object,
-            newValue: parsed.data as object,
+            ...auditFieldChanges(existing, parsed.data, ['buyerName', 'sellerName']),
           },
         },
       },

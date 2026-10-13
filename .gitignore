@@ -21,7 +21,6 @@ frontend/out/
 
 # ── Prisma ────────────────────────────────────────────────────
 backend/node_modules/.prisma/
-backend/prisma/migrations/
 
 # ── File uploads (local dev) ──────────────────────────────────
 backend/uploads/

@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
@@ -12,7 +12,7 @@ import { computeDeadlinesForDeal } from '../../services/deadline.service.js';
 import { resetDeadlineAlertWindows } from '../../services/scheduler.service.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 const ConfirmDeadlineSchema = z.object({
   confirmedDate: z.string().datetime(),
@@ -44,7 +44,7 @@ router.get(
       });
       if (fullDeal && fullDeal.clauses.length > 0) {
         const baseDate = fullDeal.acceptanceDate ?? fullDeal.createdAt;
-        await computeDeadlinesForDeal(dealId, baseDate, fullDeal.clauses);
+        await computeDeadlinesForDeal(dealId, baseDate, fullDeal.clauses, orgId);
         deadlines = await prisma.deadline.findMany({
           where: { dealId, organizationId: orgId },
           include: { clause: true },
@@ -67,7 +67,7 @@ router.patch(
     if (!parsed.success) throw createError(parsed.error.message, 422);
 
     const existing = await prisma.deadline.findFirst({
-      where: { id: req.params['dId'], organizationId: orgId },
+      where: { id: req.params['dId'], dealId: req.params['id'], organizationId: orgId },
     });
     if (!existing) throw createError('Deadline not found or access denied', 404);
 

@@ -2,15 +2,17 @@
  * /api/deals/:id/notifications — Notification preferences, templates, test emails, and audit delivery logs with Tenant Isolation.
  */
 
+import crypto from 'node:crypto';
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { sendEmail, generateTemplate } from '../../services/email.service.js';
+import { maskEmail } from '../../utils/audit.js';
 
 const router = Router({ mergeParams: true });
-const prisma = new PrismaClient();
+
 
 const UpdateSettingsSchema = z.object({
   recipients: z.array(z.string().email()),
@@ -36,6 +38,23 @@ const PreviewSchema = z.object({
   template: z.enum(['3d', '1d', 'dayOf', 'missed', 'summary', 'docs_received']),
   deadlineId: z.string().optional(),
 });
+
+// Outbound mail from these endpoints may only go to people already associated with
+// the deal or organization — never to arbitrary addresses (prevents open-relay abuse).
+async function assertAllowedRecipients(dealId: string, organizationId: string, recipients: string[]) {
+  const [settings, members] = await Promise.all([
+    prisma.notificationSetting.findFirst({ where: { dealId, organizationId } }),
+    prisma.user.findMany({ where: { organizationId }, select: { email: true } }),
+  ]);
+  const allowed = new Set<string>(members.map((m) => m.email.toLowerCase()));
+  if (Array.isArray(settings?.recipients)) {
+    for (const r of settings.recipients) if (typeof r === 'string') allowed.add(r.toLowerCase().trim());
+  }
+  const rejected = recipients.filter((r) => !allowed.has(r.toLowerCase().trim()));
+  if (rejected.length > 0) {
+    throw createError('Recipients must be organization members or this deal\'s configured notification recipients', 422);
+  }
+}
 
 // Helper: Ensure deal belongs to organization
 async function getDealForTenant(dealId: string, organizationId: string) {
@@ -158,6 +177,7 @@ router.post(
 
     const parsed = SendTestSchema.safeParse(req.body);
     if (!parsed.success) throw createError(parsed.error.message, 422);
+    await assertAllowedRecipients(dealId, orgId, [parsed.data.to]);
 
     const address = deal.propertyAddress;
     const testTpl = generateTemplate('3d', {
@@ -197,7 +217,7 @@ router.post(
         action: 'EMAIL_SENT_TEST',
         entityType: 'EmailLog',
         actor: req.user?.email ?? 'system',
-        note: `Test email dispatched to ${parsed.data.to} via Resend`,
+        note: `Test email dispatched via Resend (recipient: ${maskEmail(parsed.data.to)})`,
       },
     });
 
@@ -207,7 +227,7 @@ router.post(
 
     res.json({
       sent: true,
-      message: `Test email dispatched successfully to ${parsed.data.to}`,
+      message: `Test email dispatched successfully to ${maskEmail(parsed.data.to)}`,
       messageId: result.messageId,
     });
   }),
@@ -222,6 +242,7 @@ router.post(
     const dealId = req.params['id'];
     const parsed = SendSummarySchema.safeParse(req.body);
     if (!parsed.success) throw createError(parsed.error.message, 422);
+    await assertAllowedRecipients(dealId, orgId, parsed.data.to);
 
     const deal = await prisma.deal.findFirst({
       where: { id: dealId, organizationId: orgId },
@@ -373,8 +394,18 @@ router.get(
     const deal = await getDealForTenant(dealId, orgId);
 
     const domain = process.env['INBOUND_EMAIL_DOMAIN'] ?? 'deals.contingencycopilot.com';
-    const alias = deal.inboundAlias ?? `deal-${deal.id.slice(-6)}`;
-    const inboundEmail = `${alias}@${domain}`;
+    // The alias is a capability: high-entropy, generated once, matched exactly by /api/inbound/email.
+    let alias = deal.inboundAlias;
+    if (!alias || !/^[a-z0-9]{16,64}$/.test(alias)) {
+      const candidate = crypto.randomBytes(12).toString('hex');
+      await prisma.deal.updateMany({
+        where: { id: deal.id, organizationId: orgId, inboundAlias: deal.inboundAlias },
+        data: { inboundAlias: candidate },
+      });
+      const fresh = await getDealForTenant(dealId, orgId);
+      alias = fresh.inboundAlias!;
+    }
+    const inboundEmail = `deal-${alias}@${domain}`;
 
     res.json({
       inboundEmail,

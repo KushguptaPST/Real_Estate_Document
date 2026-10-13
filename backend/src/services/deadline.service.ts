@@ -8,11 +8,13 @@
  * v1: orchestration stubs only — AI extraction is not yet wired.
  */
 
-import { PrismaClient, type ContingencyClause } from '@prisma/client';
+import { type ContingencyClause } from '@prisma/client';
+import { prisma } from '../utils/prisma.js';
 import { computeContractDeadline } from './dateEngine.service.js';
 import { logger } from '../utils/logger.js';
+import { createError } from '../middleware/errorHandler.js';
+import { requireOrgId } from '../utils/tenant.js';
 
-const prisma = new PrismaClient();
 
 export interface ComputedDeadline {
   clauseId: string;
@@ -29,10 +31,15 @@ export async function computeDeadlinesForDeal(
   dealId: string,
   acceptanceDate: Date,
   clauses: ContingencyClause[],
+  organizationId: string,
 ): Promise<ComputedDeadline[]> {
+  const orgId = requireOrgId(organizationId);
   const results: ComputedDeadline[] = [];
 
   for (const clause of clauses) {
+    if (clause.dealId !== dealId) {
+      throw createError('Clause does not belong to this deal', 500);
+    }
     const numDays = typeof clause.numberOfDays === 'number' && clause.numberOfDays > 0 ? clause.numberOfDays : 10;
     const dayType = (clause.dayType === 'business' ? 'business' : 'calendar') as 'calendar' | 'business';
 
@@ -43,6 +50,7 @@ export async function computeDeadlinesForDeal(
       where: { clauseId: clause.id },
       create: {
         dealId,
+        organizationId: orgId,
         clauseId: clause.id,
         label,
         computedDate: deadline,
@@ -50,6 +58,7 @@ export async function computeDeadlinesForDeal(
         status: 'PENDING',
       },
       update: {
+        organizationId: orgId,
         computedDate: deadline,
         label,
         status: 'PENDING',

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { authApi } from '@/services/api';
 import {
   Building2,
   Sparkles,
@@ -52,17 +53,28 @@ function loadGoogleScript(): Promise<void> {
 }
 
 export function LoginPage() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInAsDemoAgent } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const buttonRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [demoLoginEnabled, setDemoLoginEnabled] = useState(false);
   const [error, setError] = useState<string | null>(
     CLIENT_ID ? null : 'VITE_GOOGLE_CLIENT_ID is not configured.',
   );
   const [signingIn, setSigningIn] = useState(false);
 
+  const searchParams = new URLSearchParams(location.search);
+  const inviteToken = searchParams.get('invite') || searchParams.get('invitation') || undefined;
+
   const from = (location.state as { from?: string } | null)?.from ?? '/upload';
+
+  useEffect(() => {
+    authApi
+      .getConfig()
+      .then((cfg) => setDemoLoginEnabled(Boolean(cfg.demoLoginEnabled)))
+      .catch(() => setDemoLoginEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (!CLIENT_ID) return;
@@ -77,7 +89,7 @@ export function LoginPage() {
             setSigningIn(true);
             setError(null);
             try {
-              await signInWithGoogle(credential);
+              await signInWithGoogle(credential, inviteToken);
               navigate(from, { replace: true });
             } catch (err) {
               setError((err as Error).message);
@@ -92,7 +104,19 @@ export function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [signInWithGoogle, navigate, from]);
+  }, [signInWithGoogle, navigate, from, inviteToken]);
+
+  const handleDemoLogin = async () => {
+    setSigningIn(true);
+    setError(null);
+    try {
+      await signInAsDemoAgent();
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError((err as Error).message);
+      setSigningIn(false);
+    }
+  };
 
   useEffect(() => {
     if (!ready || signingIn || !buttonRef.current || !window.google) return;
@@ -199,6 +223,18 @@ export function LoginPage() {
               </p>
             </div>
 
+            {inviteToken && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
+                <UserCheck className="h-4 w-4 shrink-0 text-sky-400 mt-0.5" />
+                <div className="space-y-0.5 text-left">
+                  <span className="font-semibold text-sky-100 block">Workspace Invitation Active</span>
+                  <span className="text-[11px] text-sky-300 block">
+                    Signing in with Google will automatically bind your account to the inviting organization.
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Google OAuth Render Container */}
             <div className="flex min-h-[48px] w-full flex-col justify-center items-center py-2 overflow-hidden">
               {signingIn && (
@@ -219,6 +255,27 @@ export function LoginPage() {
                 </div>
               )}
             </div>
+
+            {demoLoginEnabled && (
+              <div className="space-y-3 pt-1">
+                <div className="relative flex items-center">
+                  <div className="flex-grow border-t border-white/10" />
+                  <span className="flex-shrink mx-3 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                    Sandbox Testing
+                  </span>
+                  <div className="flex-grow border-t border-white/10" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDemoLogin}
+                  disabled={signingIn}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 hover:border-slate-600 px-4 py-2.5 text-xs font-semibold text-slate-200 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                  <span>Enter Demo Sandbox (Advisor Role)</span>
+                </button>
+              </div>
+            )}
 
             {error && (
               <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/20 p-3 text-xs text-rose-200">

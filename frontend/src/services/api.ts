@@ -23,6 +23,20 @@ import type {
   SuggestedQuestionsResponse,
   DealSummaryResponse,
   IndexStatusResponse,
+  Lead,
+  LeadAssignmentHistory,
+  LeadCallLog,
+  CreateCallLogInput,
+  LeadTask,
+  CreateLeadTaskInput,
+  UpdateLeadTaskInput,
+  SiteVisit,
+  ScheduleSiteVisitInput,
+  RescheduleSiteVisitInput,
+  TimelineResponse,
+  TimelineCategory,
+  ActionQueueResponse,
+  ActionQueueBucket,
 } from '@/types';
 import { authHeaders, notifyUnauthorized } from './session';
 
@@ -57,10 +71,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  signInWithGoogle: (credential: string) =>
+  getConfig: () => request<{ demoLoginEnabled: boolean }>('/auth/config'),
+  signInWithGoogle: (credential: string, inviteToken?: string) =>
     request<{ token: string; user: User }>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ credential }),
+      body: JSON.stringify({ credential, ...(inviteToken ? { inviteToken } : {}) }),
     }),
   signInAsDemoAgent: () =>
     request<{ token: string; user: User }>('/auth/demo', {
@@ -171,7 +186,14 @@ export const assistantApi = {
 // ── Feature 1: AI Leads API ───────────────────────────────────────────────────
 
 export const leadsApi = {
-  list: (params?: { search?: string; status?: string; priority?: string }) => {
+  list: (params?: {
+    search?: string;
+    status?: string;
+    priority?: string;
+    assignedUserId?: string | null;
+    unassigned?: boolean;
+    unassignedOnly?: boolean;
+  }) => {
     const cleanParams: Record<string, string> = {};
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
@@ -181,28 +203,123 @@ export const leadsApi = {
       });
     }
     const query = new URLSearchParams(cleanParams).toString();
-    return request<any[]>(`/leads${query ? `?${query}` : ''}`);
+    return request<Lead[]>(`/leads${query ? `?${query}` : ''}`);
   },
-  get: (id: string) => request<any>(`/leads/${id}`),
+  get: (id: string) => request<Lead>(`/leads/${id}`),
   create: (data: { fullName: string; email?: string; phone?: string; enquiryText?: string; source?: string }) =>
-    request<any>('/leads', { method: 'POST', body: JSON.stringify(data) }),
+    request<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: any) =>
-    request<any>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    request<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  claim: (id: string, reason?: string) =>
+    request<Lead>(`/leads/${id}/claim`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  release: (id: string, reason?: string) =>
+    request<Lead>(`/leads/${id}/release`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  reassign: (id: string, targetUserId: string | null, reason?: string) =>
+    request<Lead>(`/leads/${id}/reassign`, { method: 'POST', body: JSON.stringify({ targetUserId, reason }) }),
+  getAssignments: (id: string) =>
+    request<LeadAssignmentHistory[]>(`/leads/${id}/assignments`),
+  logCall: (id: string, data: CreateCallLogInput) =>
+    request<LeadCallLog>(`/leads/${id}/calls`, { method: 'POST', body: JSON.stringify(data) }),
+  getCalls: (id: string, params?: { limit?: number; offset?: number }) => {
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      if (params.limit !== undefined) cleanParams.limit = String(params.limit);
+      if (params.offset !== undefined) cleanParams.offset = String(params.offset);
+    }
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<LeadCallLog[]>(`/leads/${id}/calls${query ? `?${query}` : ''}`);
+  },
+  getTasks: (id: string, status?: string) => {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request<LeadTask[]>(`/leads/${id}/tasks${query}`);
+  },
+  createTask: (id: string, data: CreateLeadTaskInput) =>
+    request<LeadTask>(`/leads/${id}/tasks`, { method: 'POST', body: JSON.stringify(data) }),
+  updateTask: (leadId: string, taskId: string, data: UpdateLeadTaskInput) =>
+    request<LeadTask>(`/leads/${leadId}/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  completeTask: (leadId: string, taskId: string) =>
+    request<LeadTask>(`/leads/${leadId}/tasks/${taskId}/complete`, { method: 'POST' }),
+  cancelTask: (leadId: string, taskId: string, reason?: string) =>
+    request<LeadTask>(`/leads/${leadId}/tasks/${taskId}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  getSiteVisits: (id: string) =>
+    request<SiteVisit[]>(`/leads/${id}/site-visits`),
+  scheduleSiteVisit: (id: string, data: ScheduleSiteVisitInput) =>
+    request<SiteVisit>(`/leads/${id}/site-visits`, { method: 'POST', body: JSON.stringify(data) }),
   updateRequirements: (id: string, data: any) =>
     request<any>(`/leads/${id}/requirements`, { method: 'PATCH', body: JSON.stringify(data) }),
   extractRequirements: (id: string, enquiryText: string) =>
     request<any>(`/leads/${id}/extract`, { method: 'POST', body: JSON.stringify({ enquiryText }) }),
+  getTimeline: (id: string, params?: { category?: TimelineCategory; limit?: number; offset?: number }) => {
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      if (params.category && params.category !== 'ALL') cleanParams.category = params.category;
+      if (params.limit !== undefined) cleanParams.limit = String(params.limit);
+      if (params.offset !== undefined) cleanParams.offset = String(params.offset);
+    }
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<TimelineResponse>(`/leads/${id}/timeline${query ? `?${query}` : ''}`);
+  },
+  getMemory: (id: string) =>
+    request<{ memory: any; recommendation: any }>(`/leads/${id}/memory`),
+  planFollowUp: (
+    id: string,
+    data?: {
+      trigger?: string;
+      title?: string;
+      description?: string;
+      priority?: string;
+      dueDate?: string;
+      draftContent?: string;
+    },
+  ) =>
+    request<any>(`/leads/${id}/follow-up/plan`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
+  convertToDeal: (
+    id: string,
+    data: {
+      propertyId?: string;
+      propertyAddress?: string;
+      buyerName?: string;
+      sellerName?: string;
+      acceptanceDate?: string;
+      timezone?: string;
+      eligibilityOverride?: boolean;
+      overrideReason?: string;
+    },
+  ) =>
+    request<{
+      deal: Deal;
+      lead: Lead;
+      contingencyStatus: string;
+      initializedDeadlinesCount: number;
+    }>(`/leads/${id}/convert-to-deal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // ── Feature 2: Conversation & Human Takeover API ──────────────────────────────
 
 export const conversationsApi = {
   getThread: (leadId: string) => request<any>(`/leads/${leadId}/conversations`),
+  simulateCustomerMessage: (leadId: string, content: string, channel = 'EMAIL') =>
+    request<any>(`/leads/${leadId}/conversations/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content, channel }),
+    }),
   sendMessage: (leadId: string, content: string, channel = 'EMAIL') =>
     request<any>(`/leads/${leadId}/conversations/messages`, {
       method: 'POST',
       body: JSON.stringify({ content, channel }),
     }),
+  sendAdvisorMessage: (leadId: string, content: string, channel = 'EMAIL') =>
+    request<any>(`/leads/${leadId}/conversations/messages/agent`, {
+      method: 'POST',
+      body: JSON.stringify({ content, channel }),
+    }),
+
   toggleTakeover: (leadId: string, isHumanTakeover: boolean) =>
     request<any>(`/leads/${leadId}/conversations/takeover`, {
       method: 'POST',
@@ -217,6 +334,10 @@ export const conversationsApi = {
     request<any>(`/leads/${leadId}/conversations/messages/${msgId}`, {
       method: 'PATCH',
       body: JSON.stringify({ status, editedContent }),
+    }),
+  retryMessage: (leadId: string, msgId: string) =>
+    request<any>(`/leads/${leadId}/conversations/messages/${msgId}/retry`, {
+      method: 'POST',
     }),
 };
 
@@ -268,3 +389,112 @@ export const knowledgeApi = {
   getDocuments: () => request<any[]>('/knowledge/documents'),
 };
 
+// ── Feature 6: Organization & Team API ────────────────────────────────────────
+
+export const organizationApi = {
+  listMembers: () => request<User[]>('/organization/members'),
+};
+
+// ── Feature 7: Advisor Tasks API ──────────────────────────────────────────────
+
+export const leadTasksApi = {
+  list: (params?: {
+    filter?: 'upcoming' | 'overdue' | 'completed' | 'all';
+    status?: string;
+    assignedUserId?: string;
+    leadId?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          cleanParams[k] = String(v);
+        }
+      });
+    }
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<LeadTask[]>(`/tasks${query ? `?${query}` : ''}`);
+  },
+  update: (id: string, data: UpdateLeadTaskInput) =>
+    request<LeadTask>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  complete: (id: string) =>
+    request<LeadTask>(`/tasks/${id}/complete`, { method: 'POST' }),
+  cancel: (id: string, reason?: string) =>
+    request<LeadTask>(`/tasks/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  getActionQueue: (params?: {
+    advisorId?: string;
+    timezone?: string;
+    bucket?: ActionQueueBucket;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      if (params.advisorId) cleanParams.advisorId = params.advisorId;
+      if (params.timezone) cleanParams.timezone = params.timezone;
+      if (params.bucket && params.bucket !== 'all') cleanParams.bucket = params.bucket;
+      if (params.limit !== undefined) cleanParams.limit = String(params.limit);
+      if (params.offset !== undefined) cleanParams.offset = String(params.offset);
+    }
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<ActionQueueResponse>(`/tasks/action-queue${query ? `?${query}` : ''}`);
+  },
+};
+
+// ── Feature 8: Real Estate Site Visits API ────────────────────────────────────
+
+export const siteVisitsApi = {
+  list: (params?: {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    advisorId?: string;
+    propertyId?: string;
+    leadId?: string;
+  }) => {
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          cleanParams[k] = String(v);
+        }
+      });
+    }
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<SiteVisit[]>(`/site-visits${query ? `?${query}` : ''}`);
+  },
+  checkAvailability: (params: {
+    startAt: string;
+    endAt?: string;
+    durationMinutes?: number;
+    advisorId?: string;
+    excludeVisitId?: string;
+  }) => {
+    const cleanParams: Record<string, string> = {};
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        cleanParams[k] = String(v);
+      }
+    });
+    const query = new URLSearchParams(cleanParams).toString();
+    return request<{ available: boolean; advisorId: string; startAt: string; endAt: string }>(
+      `/site-visits/availability?${query}`,
+    );
+  },
+  reschedule: (id: string, data: RescheduleSiteVisitInput) =>
+    request<SiteVisit>(`/site-visits/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  cancel: (id: string, reason?: string) =>
+    request<SiteVisit>(`/site-visits/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  complete: (id: string, outcomeNotes?: string) =>
+    request<SiteVisit>(`/site-visits/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ outcomeNotes }),
+    }),
+  markNoShow: (id: string, notes?: string) =>
+    request<SiteVisit>(`/site-visits/${id}/no-show`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+};

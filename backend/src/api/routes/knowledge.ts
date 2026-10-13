@@ -3,14 +3,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../utils/prisma.js';
 import { z } from 'zod';
 import { askPortfolioAssistant } from '../../services/assistant.service.js';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+
 
 const PortfolioAskSchema = z.object({
   question: z.string().min(2, 'Question is too short').max(2000, 'Question exceeds 2,000 characters'),

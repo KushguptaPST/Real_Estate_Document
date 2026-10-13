@@ -1,7 +1,7 @@
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createMemberSession, deleteOrgUsers } from '../helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -22,17 +22,8 @@ describe('Phase 33 Adversarial Multi-Tenant Isolation & Parameter Injection Matr
     orgA = await prisma.organization.create({ data: { name: 'Adversarial Org A' } });
     orgB = await prisma.organization.create({ data: { name: 'Adversarial Org B Target' } });
 
-    const jwtSecret = process.env['JWT_SECRET'] || 'development-fallback-secret-2026';
-
-    tokenA = jwt.sign(
-      { id: 'user-a-adv', email: 'attacker@orga.com', organizationId: orgA.id, role: 'ADMIN' },
-      jwtSecret,
-    );
-
-    tokenB = jwt.sign(
-      { id: 'user-b-victim', email: 'victim@orgb.com', organizationId: orgB.id, role: 'ADMIN' },
-      jwtSecret,
-    );
+    tokenA = (await createMemberSession(orgA.id, { role: 'OWNER' })).token;
+    tokenB = (await createMemberSession(orgB.id, { role: 'OWNER' })).token;
 
     // Create Victim Resources in Org B
     leadB = await prisma.lead.create({
@@ -108,6 +99,7 @@ describe('Phase 33 Adversarial Multi-Tenant Isolation & Parameter Injection Matr
     await prisma.deal.deleteMany({ where: { organizationId: orgB.id } });
     await prisma.property.deleteMany({ where: { organizationId: orgB.id } });
     await prisma.lead.deleteMany({ where: { organizationId: orgB.id } });
+    await deleteOrgUsers([orgA.id, orgB.id]);
     await prisma.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
     await prisma.$disconnect();
   });

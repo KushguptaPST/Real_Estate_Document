@@ -7,7 +7,7 @@ interface AuthState {
   user: User | null;
   /** True while an existing session token is being validated on first load. */
   loading: boolean;
-  signInWithGoogle: (credential: string) => Promise<void>;
+  signInWithGoogle: (credential: string, inviteToken?: string) => Promise<void>;
   signInAsDemoAgent: () => Promise<void>;
   signOut: () => void;
 }
@@ -29,8 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => onUnauthorized(() => setUser(null)), []);
 
-  const signInWithGoogle = useCallback(async (credential: string) => {
-    const session = await authApi.signInWithGoogle(credential);
+  const signInWithGoogle = useCallback(async (credential: string, inviteToken?: string) => {
+    const session = await authApi.signInWithGoogle(credential, inviteToken);
     setToken(session.token);
     setUser(session.user);
   }, []);

@@ -1,7 +1,7 @@
 import request from 'supertest';
-import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 import { PrismaClient } from '@prisma/client';
+import { createMemberSession, deleteOrgUsers } from '../helpers/auth.js';
 
 const app = createApp();
 const prisma = new PrismaClient();
@@ -20,10 +20,8 @@ describe('Phase 9 Security Matrix: RAG Pre-Filtering & Tenant Isolation Test', (
     // Provision Organization A and B
     orgA = await prisma.organization.create({ data: { name: 'RAG Isolation Org Alpha' } });
     orgB = await prisma.organization.create({ data: { name: 'RAG Isolation Org Beta' } });
-
-    const jwtSecret = process.env['JWT_SECRET'] || 'development-fallback-secret-2026';
-    tokenA = jwt.sign({ id: 'user-rag-a', email: 'rag.a@alpha.com', organizationId: orgA.id }, jwtSecret);
-    tokenB = jwt.sign({ id: 'user-rag-b', email: 'rag.b@beta.com', organizationId: orgB.id }, jwtSecret);
+    tokenA = (await createMemberSession(orgA.id)).token;
+    tokenB = (await createMemberSession(orgB.id)).token;
 
     // Create Deal for Org A
     dealA = await prisma.deal.create({
@@ -98,6 +96,7 @@ describe('Phase 9 Security Matrix: RAG Pre-Filtering & Tenant Isolation Test', (
     await prisma.documentChunk.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
     await prisma.document.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
     await prisma.deal.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
+    await deleteOrgUsers([orgA.id, orgB.id]);
     await prisma.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
     await prisma.$disconnect();
   });

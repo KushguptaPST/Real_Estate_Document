@@ -61,9 +61,20 @@ cp ../.env.example .env          # copy template
 
 npm install
 npx prisma generate              # generate Prisma client
-npx prisma db push               # push schema to DB (creates tables)
-npm run dev                      # starts on http://localhost:3001
+npx prisma migrate deploy        # apply versioned migrations (never `db push`)
+npm run dev                      # starts on http://localhost:3001 (refuses to start without a strong JWT_SECRET)
+
+# Organizations are invite-only. Bootstrap the first one and its owner:
+npm run org:create -- --name "My Brokerage" --owner-email you@example.com
+# → prints a one-time invite link; open it and sign in with Google as that email.
 ```
+
+An existing database that was created with `db push` must be baselined once
+(after confirming `npx prisma migrate diff --from-url "$DATABASE_URL" --to-migrations prisma/migrations --shadow-database-url <scratch db>` shows only the pending migrations):
+`npx prisma migrate resolve --applied 0_init`, then `npx prisma migrate deploy`.
+
+Tests run only against a database whose name ends in `_test`
+(`TEST_DATABASE_URL`, or `DATABASE_URL=` in `backend/.env.test.local`).
 
 Smoke test:
 ```bash
@@ -71,7 +82,7 @@ curl http://localhost:3001/health
 # → { "status": "ok", "timestamp": "..." }
 
 curl http://localhost:3001/api/deals
-# → []
+# → 401 (all data routes require a session)
 ```
 
 ### 4. Set up the frontend

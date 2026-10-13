@@ -13,18 +13,12 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   const statusCode = err.statusCode ?? 500;
-  let message = err.isOperational || process.env['NODE_ENV'] === 'development'
-    ? err.message
-    : 'Internal server error';
-
-  try {
-    const parsed = JSON.parse(err.message);
-    if (parsed.error?.message) {
-      message = parsed.error.message;
-    }
-  } catch {
-    // message is plain string
-  }
+  const isDev = process.env['NODE_ENV'] === 'development';
+  // Only messages we raised deliberately (createError) reach clients; upstream /
+  // library errors (Prisma, model providers, JSON-in-message) never do outside dev.
+  // `expose` is set by http-errors (e.g. body-parser's 400/413) for client-safe messages.
+  const isClientSafe = err.isOperational || ((err as { expose?: boolean }).expose === true && statusCode < 500);
+  const message = isClientSafe || isDev ? err.message : 'Internal server error';
 
   logger.error(`[${statusCode}] ${err.message}`, {
     stack: err.stack,
@@ -33,7 +27,7 @@ export function errorHandler(
   res.status(statusCode).json({
     error: {
       message,
-      ...(process.env['NODE_ENV'] === 'development' && { stack: err.stack }),
+      ...(isDev && { stack: err.stack }),
     },
   });
 }

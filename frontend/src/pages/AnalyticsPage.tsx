@@ -18,6 +18,7 @@ import {
   Download,
   Filter,
   PieChart as PieChartIcon,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,7 +46,7 @@ interface AgentLeaderboard {
   leadsHandled: number;
   toursBooked: number;
   dealsClosed: number;
-  autoPilotRate: string;
+  draftAcceptanceRate: string;
   commission: string;
 }
 
@@ -87,7 +88,14 @@ export function AnalyticsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Mock Agent Leaderboard for B2B Agency Analytics
+  const activeDealsCount = useMemo(() => deals.filter((d) => d.status === 'ACTIVE').length, [deals]);
+  const closedDealsCount = useMemo(() => deals.filter((d) => d.status === 'CLOSED').length, [deals]);
+  const totalDeadlinesCount = useMemo(
+    () => deals.reduce((acc, d) => acc + (d._count?.deadlines ?? d.deadlines?.length ?? 0), 0),
+    [deals],
+  );
+
+  // Mock Agent Leaderboard for B2B Agency Analytics (Simulated benchmark preview)
   const leaderboard: AgentLeaderboard[] = [
     {
       rank: 1,
@@ -98,7 +106,7 @@ export function AnalyticsPage() {
       leadsHandled: 84,
       toursBooked: 29,
       dealsClosed: 8,
-      autoPilotRate: '94%',
+      draftAcceptanceRate: '94%',
       commission: '$38,400',
     },
     {
@@ -110,7 +118,7 @@ export function AnalyticsPage() {
       leadsHandled: 62,
       toursBooked: 18,
       dealsClosed: 5,
-      autoPilotRate: '88%',
+      draftAcceptanceRate: '88%',
       commission: '$24,000',
     },
     {
@@ -122,7 +130,7 @@ export function AnalyticsPage() {
       leadsHandled: 45,
       toursBooked: 14,
       dealsClosed: 3,
-      autoPilotRate: '91%',
+      draftAcceptanceRate: '91%',
       commission: '$15,500',
     },
     {
@@ -134,7 +142,7 @@ export function AnalyticsPage() {
       leadsHandled: 38,
       toursBooked: 10,
       dealsClosed: 2,
-      autoPilotRate: '82%',
+      draftAcceptanceRate: '82%',
       commission: '$11,200',
     },
   ];
@@ -173,63 +181,74 @@ export function AnalyticsPage() {
         </div>
       </div>
 
+      {/* ── Prototype Notification Banner ── */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-900 flex items-start gap-3">
+        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <h4 className="font-bold text-xs">Prototype Preview Notice</h4>
+          <p className="text-[11px] leading-relaxed text-amber-800">
+            Escrow and deal counts reflect active database records. Pipeline forecasting, speed-to-lead benchmarks, and advisor leaderboards represent simulated demo data while the real-time database aggregation engine is in development.
+          </p>
+        </div>
+      </div>
+
       {/* ── Top Metric Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Speed to Lead */}
+        {/* Active Escrows (Live Database Metric) */}
         <div className="stripe-card p-4 bg-white relative overflow-hidden">
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] font-bold text-[#4f566b] uppercase tracking-wider">
-                Avg Speed to Lead
-              </span>
-              <div className="text-2xl font-black text-[#059669] font-mono mt-1">
-                14 sec
-              </div>
-            </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-[#059669] border border-emerald-200">
-              <Zap className="h-4.5 w-4.5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-[#e3e8ee]">
-            <span className="text-[#059669] font-bold text-[11px]">
-              ⚡ 99.8% faster than industry avg
-            </span>
-            <span className="text-[#8792a2] text-[10px]">Real-Time AI</span>
-          </div>
-        </div>
-
-        {/* Est Commission */}
-        <div className="stripe-card p-4 bg-white relative overflow-hidden">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[11px] font-bold text-[#4f566b] uppercase tracking-wider">
-                Commission Pipeline
+                Active Escrows
               </span>
               <div className="text-2xl font-black text-[#0a2540] font-mono mt-1">
-                $89,100
+                {loading ? '...' : activeDealsCount}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#635bff]/10 text-[#635bff] border border-[#635bff]/20">
-              <DollarSign className="h-4.5 w-4.5" />
+              <Building2 className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-[#e3e8ee]">
             <span className="text-[#635bff] font-bold text-[11px]">
-              <TrendingUp className="h-3.5 w-3.5 inline mr-1" /> +24% QoQ Growth
+              Live Database Deals
             </span>
-            <span className="text-[#8792a2] text-[10px]">18 Deals Closed</span>
+            <span className="text-[#8792a2] text-[10px]">{deals.length} Total Deals</span>
           </div>
         </div>
 
-        {/* Hours Saved */}
+        {/* Closed Escrows (Live Database Metric) */}
         <div className="stripe-card p-4 bg-white relative overflow-hidden">
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] font-bold text-[#4f566b] uppercase tracking-wider">
-                Agent Hours Saved
+                Closed Escrows
+              </span>
+              <div className="text-2xl font-black text-[#059669] font-mono mt-1">
+                {loading ? '...' : closedDealsCount}
+              </div>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-[#059669] border border-emerald-200">
+              <CheckCircle2 className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-[#e3e8ee]">
+            <span className="text-[#059669] font-bold text-[11px]">
+              Completed Transactions
+            </span>
+            <span className="text-[#8792a2] text-[10px]">Verified Closed</span>
+          </div>
+        </div>
+
+        {/* Contingency Deadlines (Live Database Metric) */}
+        <div className="stripe-card p-4 bg-white relative overflow-hidden">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-[#4f566b] uppercase tracking-wider">
+                Active Milestones
               </span>
               <div className="text-2xl font-black text-[#0a2540] font-mono mt-1">
-                214 hrs
+                {loading ? '...' : totalDeadlinesCount}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0a2540]/10 text-[#0a2540] border border-[#0a2540]/20">
@@ -238,32 +257,32 @@ export function AnalyticsPage() {
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-[#e3e8ee]">
             <span className="text-[#0a2540] font-bold text-[11px]">
-              5.3 work weeks reclaimed
+              Tracked Contingencies
             </span>
-            <span className="text-[#8792a2] text-[10px]">Auto-Pilot RAG</span>
+            <span className="text-[#8792a2] text-[10px]">Live Database Records</span>
           </div>
         </div>
 
-        {/* Protection Rate */}
+        {/* Speed-to-Lead Benchmark (Simulated Demo Benchmark) */}
         <div className="stripe-card p-4 bg-white relative overflow-hidden">
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] font-bold text-[#4f566b] uppercase tracking-wider">
-                Contingency SLA Rate
+                Speed to Lead (Target)
               </span>
               <div className="text-2xl font-black text-[#059669] font-mono mt-1">
-                100%
+                &lt; 5 min
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-[#059669] border border-emerald-200">
-              <ShieldCheck className="h-4.5 w-4.5" />
+              <Zap className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-[#e3e8ee]">
             <span className="text-[#059669] font-bold text-[11px]">
-              0 Deposit Forfeitures
+              Target Response Window
             </span>
-            <span className="text-[#8792a2] text-[10px]">Zero Missed</span>
+            <span className="text-amber-600 text-[10px] font-semibold">Simulated Benchmark</span>
           </div>
         </div>
       </div>
@@ -463,9 +482,9 @@ export function AnalyticsPage() {
         <div className="p-4 border-b border-[#e3e8ee] flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold text-[#0a2540] flex items-center gap-2">
-              <Award className="h-4 w-4 text-[#635bff]" /> Brokerage Agent Performance Leaderboard
+              <Award className="h-4 w-4 text-[#635bff]" /> Advisor Performance Benchmarks (Prototype Demo)
             </h2>
-            <p className="text-xs text-[#4f566b]">Ranking agent response speed, lead handling volume, and AI auto-pilot adoption rate.</p>
+            <p className="text-xs text-[#4f566b]">Simulated ranking of advisor response benchmarks, pipeline volume, and assisted draft acceptance rate.</p>
           </div>
         </div>
 
@@ -479,7 +498,7 @@ export function AnalyticsPage() {
                 <th className="py-3 px-4">Leads Handled</th>
                 <th className="py-3 px-4">Tours Booked</th>
                 <th className="py-3 px-4">Closed Deals</th>
-                <th className="py-3 px-4">Auto-Pilot %</th>
+                <th className="py-3 px-4">Draft Acceptance %</th>
                 <th className="py-3 px-4 text-right">Commission Earned</th>
               </tr>
             </thead>
@@ -520,7 +539,7 @@ export function AnalyticsPage() {
                   <td className="py-3.5 px-4 font-mono font-bold text-[#0a2540]">{agent.leadsHandled}</td>
                   <td className="py-3.5 px-4 font-mono text-[#4f566b]">{agent.toursBooked}</td>
                   <td className="py-3.5 px-4 font-mono text-[#059669] font-bold">{agent.dealsClosed}</td>
-                  <td className="py-3.5 px-4 font-mono text-[#635bff] font-bold">{agent.autoPilotRate}</td>
+                  <td className="py-3.5 px-4 font-mono text-[#635bff] font-bold">{agent.draftAcceptanceRate}</td>
                   <td className="py-3.5 px-4 text-right font-bold text-[#0a2540] font-mono">
                     {agent.commission}
                   </td>
