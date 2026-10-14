@@ -93,15 +93,15 @@ export const CORE_FEATURES: FeatureItem[] = [
     linkLabel: 'Compliance Defense',
   },
   {
-    id: 'rag-copilot',
-    title: 'AI Portfolio RAG Assistant',
-    category: 'Contract Search',
+    id: 'ai-senior-advisor',
+    title: 'Agentic Senior Real Estate Advisor',
+    category: 'Conversational Sales AI',
     description:
-      'Query your entire portfolio of active contracts and disclosures using natural language, with responses grounded in verified document text.',
+      'Autonomous 1-on-1 advisor that talks with buyers via Telegram and WhatsApp with real human voice notes, qualifying budgets and booking property tours 24/7.',
     icon: Bot,
-    tag: 'Tenant-Isolated Vectors',
-    link: '/knowledge',
-    linkLabel: 'Knowledge Copilot',
+    tag: 'Autonomous Real Estate Agent',
+    link: '/leads',
+    linkLabel: 'Open Lead Cockpit',
   },
   {
     id: 'lead-matching',

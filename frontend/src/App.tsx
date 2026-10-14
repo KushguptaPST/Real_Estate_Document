@@ -65,7 +65,7 @@ export default function App() {
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/leads/:id" element={<LeadDetailPage />} />
         <Route path="/properties" element={<PropertiesPage />} />
-        <Route path="/knowledge" element={<KnowledgePage />} />
+        <Route path="/knowledge" element={<Navigate to="/deals" replace />} />
         <Route path="/organization" element={<OrganizationPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/deals" element={<DealsPage />} />

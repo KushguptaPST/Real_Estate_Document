@@ -24,7 +24,7 @@ const MAIN_NAV = [
   { href: '/deals', label: 'Transactions', icon: Layers },
   { href: '/leads', label: 'Lead Pipeline', icon: Users },
   { href: '/properties', label: 'Property Inventory', icon: Building2 },
-  { href: '/knowledge', label: 'Knowledge Base', icon: BookOpenCheck },
+  { href: '/analytics', label: 'Analytics & ROI', icon: TrendingUp },
 ];
 
 const SECONDARY_NAV = [

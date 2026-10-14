@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Building2, Plus, ShieldCheck, BookOpen, Layers, History, Users, BookOpenCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Building2, Plus, ShieldCheck, BookOpen, Layers, History, Users, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { AgentPlaybookModal } from './deal/AgentPlaybookModal';
 
 const NAV_LINKS = [
   { href: '/leads', label: 'Lead Pipeline', icon: Users },
   { href: '/properties', label: 'Inventory', icon: Building2 },
-  { href: '/knowledge', label: 'Knowledge Base', icon: BookOpenCheck },
-  { href: '/organization', label: 'Brokerage Team', icon: ShieldCheck },
   { href: '/deals', label: 'Transactions', icon: Layers },
+  { href: '/analytics', label: 'Analytics', icon: TrendingUp },
+  { href: '/organization', label: 'Brokerage Team', icon: ShieldCheck },
   { href: '/upload', label: 'Ingest Contract', icon: Plus, highlight: true },
   { href: '/audit', label: 'Audit Trail', icon: History },
 ];
