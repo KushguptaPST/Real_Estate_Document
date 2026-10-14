@@ -392,7 +392,39 @@ export const knowledgeApi = {
 // ── Feature 6: Organization & Team API ────────────────────────────────────────
 
 export const organizationApi = {
-  listMembers: () => request<User[]>('/organization/members'),
+  listMembers: () => request<User[]>('/org/members'),
+  listInvitations: () =>
+    request<
+      Array<{
+        id: string;
+        email: string;
+        role: 'OWNER' | 'AGENT';
+        status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+        expiresAt: string;
+        createdAt: string;
+      }>
+    >('/org/invitations'),
+  sendInvitation: (data: { email: string; role: 'OWNER' | 'AGENT' }) =>
+    request<{
+      invitation: {
+        id: string;
+        email: string;
+        role: 'OWNER' | 'AGENT';
+        status: string;
+        expiresAt: string;
+        createdAt: string;
+      };
+      inviteUrl: string;
+      emailSent: boolean;
+      emailError?: string;
+    }>('/org/invitations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  removeMember: (userId: string) =>
+    request<void>(`/org/members/${userId}`, { method: 'DELETE' }),
+  revokeInvitation: (invitationId: string) =>
+    request<void>(`/org/invitations/${invitationId}`, { method: 'DELETE' }),
 };
 
 // ── Feature 7: Advisor Tasks API ──────────────────────────────────────────────

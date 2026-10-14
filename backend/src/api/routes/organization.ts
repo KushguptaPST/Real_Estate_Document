@@ -6,6 +6,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
+import { prisma } from '../../utils/prisma.js';
+import { sendInvitationEmail } from '../../services/email.service.js';
 import {
   listMembers,
   changeMemberRole,
@@ -67,10 +69,23 @@ router.delete(
   }),
 );
 
-// ── Invitations (OWNER only) ──────────────────────────────────────────────────
+function requireOwnerOrDemo(req: any, _res: any, next: any): void {
+  if (!req.user) {
+    next(createError('Authentication required', 401));
+    return;
+  }
+  const isDemo = req.user.organizationId === 'demo-sandbox-org';
+  if (req.user.role !== 'OWNER' && !isDemo) {
+    next(createError('You do not have permission to perform this action', 403));
+    return;
+  }
+  next();
+}
+
+// ── Invitations ───────────────────────────────────────────────────────────────
 router.get(
   '/invitations',
-  requireRole('OWNER'),
+  requireOwnerOrDemo,
   asyncHandler(async (req, res) => {
     res.json(await listInvitations(req.user!.organizationId));
   }),
@@ -78,24 +93,48 @@ router.get(
 
 router.post(
   '/invitations',
-  requireRole('OWNER'),
+  requireOwnerOrDemo,
   asyncHandler(async (req, res) => {
     const parsed = InviteSchema.safeParse(req.body);
     if (!parsed.success) throw createError('A valid email address is required', 422);
+
+    // Look up organization name
+    const org = await prisma.organization.findUnique({
+      where: { id: req.user!.organizationId },
+      select: { name: true },
+    });
+
     const { invitation, token } = await createInvitation({
       organizationId: req.user!.organizationId,
       email: parsed.data.email,
       role: parsed.data.role,
       invitedById: req.user!.id,
     });
-    // The token is shown exactly once; only its hash is stored. No email is sent in this phase.
-    res.status(201).json({ invitation, inviteUrl: inviteUrl(token) });
+
+    const targetInviteUrl = inviteUrl(token);
+
+    // Dispatch real email via sendInvitationEmail
+    const emailResult = await sendInvitationEmail({
+      to: parsed.data.email,
+      role: parsed.data.role,
+      inviterName: req.user!.name,
+      inviterEmail: req.user!.email,
+      organizationName: org?.name || 'Apex Brokerage Group',
+      inviteUrl: targetInviteUrl,
+    });
+
+    res.status(201).json({
+      invitation,
+      inviteUrl: targetInviteUrl,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
+    });
   }),
 );
 
 router.delete(
   '/invitations/:invitationId',
-  requireRole('OWNER'),
+  requireOwnerOrDemo,
   asyncHandler(async (req, res) => {
     await revokeInvitation(req.user!.organizationId, req.params['invitationId']!);
     res.status(204).end();

@@ -381,3 +381,62 @@ export function generateTemplate(
     }
   }
 }
+
+/**
+ * Sends a B2B Team Member Invitation Email with a secure one-click join link.
+ */
+export async function sendInvitationEmail(params: {
+  to: string;
+  role: string;
+  inviterName?: string | null;
+  inviterEmail?: string | null;
+  organizationName?: string;
+  inviteUrl: string;
+  expiresDays?: number;
+}): Promise<SendEmailResult> {
+  const orgName = params.organizationName || 'Real Estate Brokerage';
+  const inviter = params.inviterName || params.inviterEmail || 'Your Team Administrator';
+  const roleTitle = params.role === 'OWNER' ? 'Broker Administrator' : 'Real Estate Agent';
+  const days = params.expiresDays || 7;
+
+  const subject = `You're invited to join ${orgName} on Contingency Copilot`;
+  const preheader = `${inviter} invited you to collaborate on ${orgName} as a ${roleTitle}.`;
+
+  const html = emailShell(
+    `
+    <span class="badge badge-emerald">Team Invitation</span>
+    <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 12px 0 6px;">
+      Join ${orgName} Workspace
+    </h2>
+    <p style="font-size: 14px; color: #475569; line-height: 1.5; margin: 0 0 16px;">
+      <strong>${inviter}</strong> has invited you to join the <strong>${orgName}</strong> team on Contingency Copilot as a <strong>${roleTitle}</strong>.
+    </p>
+    <div class="info-card">
+      <div class="info-row"><span class="info-label">Organization:</span><span class="info-value">${orgName}</span></div>
+      <div class="info-row"><span class="info-label">Invited Role:</span><span class="info-value">${roleTitle}</span></div>
+      <div class="info-row"><span class="info-label">Invited Email:</span><span class="info-value">${params.to}</span></div>
+      <div class="info-row"><span class="info-label">Valid For:</span><span class="info-value" style="color: #059669;">${days} Days</span></div>
+    </div>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${params.inviteUrl}" class="btn" style="background: #0f172a; color: #ffffff; padding: 14px 28px; font-size: 14px; font-weight: 700; border-radius: 10px; display: inline-block; text-decoration: none;">
+        Accept Invitation &amp; Join Workspace &rarr;
+      </a>
+    </div>
+    <p style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-top: 20px; word-break: break-all;">
+      Or copy and paste this link in your browser:<br>
+      <a href="${params.inviteUrl}" style="color: #0284c7;">${params.inviteUrl}</a>
+    </p>
+  `,
+    preheader,
+  );
+
+  const text = `You're invited to join ${orgName} as a ${roleTitle} by ${inviter}.\n\nAccept your invitation here:\n${params.inviteUrl}\n\nThis invitation is valid for ${days} days.`;
+
+  return sendEmail({
+    to: params.to,
+    subject,
+    html,
+    text,
+  });
+}
+

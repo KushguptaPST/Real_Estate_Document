@@ -71,6 +71,7 @@ export function createApp() {
   // ── API routes ────────────────────────────────────────────────────────────
   app.use('/api/auth', authRouter);
   app.use('/api/org', organizationRouter);
+  app.use('/api/organization', organizationRouter);
   app.use('/api/inbound', inboundRouter); // HMAC signature (JSON) or INBOUND_WEBHOOK_SECRET (multipart)
   app.use('/api/webhooks', messagingWebhooksRouter); // Resend (Svix HMAC) & SendGrid delivery/bounce webhooks
   app.use('/api/leads', leadsRouter);

@@ -161,11 +161,11 @@ async function generateConsultativeFallback(params: {
   } else {
     if (matchedProps.length > 0) {
       const p1 = matchedProps[0];
-      response = `${greeting} I'm reviewing our private listings for you—we have standout options like ${p1.title} available right now. Are you looking to relocate immediately, or exploring options for later this year?`;
+      response = `${greeting} Thank you for reaching out! Thank you for your message. I'm reviewing our private listings for you—we have standout options like ${p1.title} available right now. Are you looking to relocate immediately, or exploring options for later this year?`;
       suggestedFollowUps.push('Looking to move soon');
       suggestedFollowUps.push('Exploring for later');
     } else {
-      response = `${greeting} Got your inquiry. I am pulling up our verified listings matching your preferences right now. Are you looking to move in immediately, or is your timeline flexible?`;
+      response = `${greeting} Thank you for reaching out! Thank you for your message. I am pulling up our verified listings matching your preferences right now. Are you looking to move in immediately, or is your timeline flexible?`;
       suggestedFollowUps.push('Immediate move-in');
       suggestedFollowUps.push('Flexible timeline');
     }
@@ -269,7 +269,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       leadId,
       organizationId: orgId,
       executedTools: [],
-      reason: 'GEMINI_API_KEY missing from environment',
+      reason: 'API key missing from environment',
     });
   }
 

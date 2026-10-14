@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Users,
   UserPlus,
@@ -12,8 +12,12 @@ import {
   Trash2,
   Palette,
   Code,
+  Mail,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { organizationApi } from '@/services/api';
 
 interface TeamMember {
   id: string;
@@ -22,6 +26,7 @@ interface TeamMember {
   role: 'BROKER_ADMIN' | 'AGENT';
   status: 'ACTIVE' | 'PENDING';
   joinedAt: string;
+  isInvite?: boolean;
 }
 
 export function OrganizationPage() {
@@ -42,8 +47,17 @@ export function OrganizationPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'BROKER_ADMIN' | 'AGENT'>('AGENT');
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [copiedInviteUrl, setCopiedInviteUrl] = useState(false);
+  const [inviteSuccessData, setInviteSuccessData] = useState<{
+    email: string;
+    inviteUrl: string;
+    emailSent: boolean;
+    emailError?: string;
+  } | null>(null);
 
-  // Mock Team Members for B2B Agency
+  // Team Members & Invitations State
+  const [loadingMembers, setLoadingMembers] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
     {
       id: '1',
@@ -61,26 +75,64 @@ export function OrganizationPage() {
       status: 'ACTIVE',
       joinedAt: '2026-02-01',
     },
-    {
-      id: '3',
-      name: 'Michael Vance',
-      email: 'michael.v@brokerage.com',
-      role: 'AGENT',
-      status: 'ACTIVE',
-      joinedAt: '2026-03-10',
-    },
-    {
-      id: '4',
-      name: 'Elena Rostova',
-      email: 'elena.r@brokerage.com',
-      role: 'AGENT',
-      status: 'PENDING',
-      joinedAt: '2026-10-01',
-    },
   ]);
 
   const webhookSecret = 'whsec_copilot_b2b_9f8a7b6c5d4e3f2a1';
   const embedCodeSnippet = `<script src="https://cdn.contingencycopilot.com/widget.js" data-org="whsec_copilot_b2b_9f8a7b6c5d4e3f2a1" async></script>`;
+
+  const fetchMembersAndInvites = useCallback(async () => {
+    try {
+      setLoadingMembers(true);
+      const [membersRes, invitesRes] = await Promise.allSettled([
+        organizationApi.listMembers(),
+        organizationApi.listInvitations(),
+      ]);
+
+      const membersList: TeamMember[] = [];
+
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value) && membersRes.value.length > 0) {
+        membersRes.value.forEach((m) => {
+          membersList.push({
+            id: m.id,
+            name: m.name || m.email.split('@')[0],
+            email: m.email,
+            role: m.role === 'OWNER' ? 'BROKER_ADMIN' : 'AGENT',
+            status: 'ACTIVE',
+            joinedAt: m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : '2026-01-15',
+            isInvite: false,
+          });
+        });
+      }
+
+      if (invitesRes.status === 'fulfilled' && Array.isArray(invitesRes.value)) {
+        invitesRes.value
+          .filter((inv) => inv.status === 'PENDING')
+          .forEach((inv) => {
+            membersList.push({
+              id: inv.id,
+              name: inv.email.split('@')[0],
+              email: inv.email,
+              role: inv.role === 'OWNER' ? 'BROKER_ADMIN' : 'AGENT',
+              status: 'PENDING',
+              joinedAt: inv.createdAt ? new Date(inv.createdAt).toISOString().split('T')[0] : 'Pending',
+              isInvite: true,
+            });
+          });
+      }
+
+      if (membersList.length > 0) {
+        setTeamMembers(membersList);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch team members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMembersAndInvites();
+  }, [fetchMembersAndInvites]);
 
   function handleCopyWebhookSecret() {
     navigator.clipboard.writeText(webhookSecret);
@@ -94,36 +146,60 @@ export function OrganizationPage() {
     setTimeout(() => setCopiedSnippet(false), 2000);
   }
 
+  function handleCopyInviteUrl() {
+    if (inviteSuccessData?.inviteUrl) {
+      navigator.clipboard.writeText(inviteSuccessData.inviteUrl);
+      setCopiedInviteUrl(true);
+      setTimeout(() => setCopiedInviteUrl(false), 2000);
+    }
+  }
+
   function handleSaveBranding(e: React.FormEvent) {
     e.preventDefault();
     setSavedBranding(true);
     setTimeout(() => setSavedBranding(false), 2500);
   }
 
-  function handleSendInvite(e: React.FormEvent) {
+  async function handleSendInvite(e: React.FormEvent) {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
 
-    setSendingInvite(true);
-    setTimeout(() => {
-      const newMember: TeamMember = {
-        id: String(Date.now()),
-        name: inviteEmail.split('@')[0],
+    try {
+      setSendingInvite(true);
+      setInviteError(null);
+      const res = await organizationApi.sendInvitation({
         email: inviteEmail.trim(),
-        role: inviteRole,
-        status: 'PENDING',
-        joinedAt: new Date().toISOString().split('T')[0],
-      };
-      setTeamMembers([...teamMembers, newMember]);
-      setInviteEmail('');
+        role: inviteRole === 'BROKER_ADMIN' ? 'OWNER' : 'AGENT',
+      });
+
+      setInviteSuccessData({
+        email: inviteEmail.trim(),
+        inviteUrl: res.inviteUrl,
+        emailSent: res.emailSent,
+        emailError: res.emailError,
+      });
+
+      // Refresh real list
+      fetchMembersAndInvites();
+    } catch (err: any) {
+      setInviteError(err.message || 'Failed to dispatch email invitation. Please check configuration.');
+    } finally {
       setSendingInvite(false);
-      setShowInviteModal(false);
-    }, 600);
+    }
   }
 
-  function handleRemoveMember(memberId: string) {
-    if (confirm('Are you sure you want to remove this team member?')) {
-      setTeamMembers(teamMembers.filter((m) => m.id !== memberId));
+  async function handleRemoveMember(memberId: string, isInvite?: boolean) {
+    if (confirm(isInvite ? 'Revoke this pending invitation?' : 'Remove this team member?')) {
+      try {
+        if (isInvite) {
+          await organizationApi.revokeInvitation(memberId);
+        } else {
+          await organizationApi.removeMember(memberId);
+        }
+        fetchMembersAndInvites();
+      } catch (err: any) {
+        setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+      }
     }
   }
 
@@ -385,9 +461,9 @@ export function OrganizationPage() {
                   <td className="py-4 px-6 text-right">
                     {member.role !== 'BROKER_ADMIN' && (
                       <button
-                        onClick={() => handleRemoveMember(member.id)}
+                        onClick={() => handleRemoveMember(member.id, member.isInvite)}
                         className="p-1.5 rounded-lg text-[#6E6E7A] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Remove Team Member"
+                        title={member.isInvite ? 'Revoke Invitation' : 'Remove Team Member'}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -432,56 +508,143 @@ export function OrganizationPage() {
                 <UserPlus className="h-4.5 w-4.5 text-[#C9A961]" /> Invite Agent to Organization
               </h3>
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInviteSuccessData(null);
+                  setInviteError(null);
+                }}
                 className="text-[#6E6E7A] hover:text-[#F5F5F7] font-semibold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSendInvite} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Agent Email Address *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="agent@brokerage.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] placeholder-[#6E6E7A] focus:border-[#C9A961] outline-none"
-                />
-              </div>
+            {inviteSuccessData ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-white">Invitation Created</p>
+                    {inviteSuccessData.emailSent ? (
+                      <p className="text-emerald-300 mt-1">
+                        An email invitation has been dispatched to <strong className="text-white">{inviteSuccessData.email}</strong> via Resend.
+                      </p>
+                    ) : (
+                      <p className="text-amber-300 mt-1">
+                        {inviteSuccessData.emailError ? (
+                          <>Delivery Note: {inviteSuccessData.emailError}</>
+                        ) : (
+                          <>Note: Free sandbox mode requires domain verification to send to external recipients.</>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Organization Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as any)}
-                  className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-[#F5F5F7] focus:border-[#C9A961] outline-none"
-                >
-                  <option value="AGENT">Agent (Standard Seat)</option>
-                  <option value="BROKER_ADMIN">Broker Admin (Full Access)</option>
-                </select>
-              </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-medium text-[#9A9AA5]">
+                    One-Click Join Link (Valid for 7 Days)
+                  </label>
+                  <div className="flex items-center gap-2 bg-[#0D0D11] border border-white/[0.08] rounded-xl p-2.5">
+                    <input
+                      type="text"
+                      readOnly
+                      value={inviteSuccessData.inviteUrl}
+                      className="bg-transparent text-[#F5F5F7] font-mono text-xs flex-1 outline-none truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyInviteUrl}
+                      className="inline-flex items-center gap-1 rounded-lg bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-bold text-xs px-3 py-1.5 shrink-0 transition-all cursor-pointer"
+                    >
+                      {copiedInviteUrl ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copiedInviteUrl ? 'Copied!' : 'Copy Link'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#9A9AA5] mt-1">
+                    The recipient can open this link in any browser to sign in and immediately join your brokerage workspace.
+                  </p>
+                </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-white/[0.08]">
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  className="rounded-full border border-white/[0.08] bg-[#0D0D11] hover:bg-white/[0.06] text-[#9A9AA5] hover:text-[#F5F5F7] px-4 py-2 text-xs font-medium transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={sendingInvite}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2 text-xs font-semibold transition-all"
-                >
-                  {sendingInvite && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Send Email Invite
-                </button>
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-white/[0.08]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInviteSuccessData(null);
+                      setInviteEmail('');
+                    }}
+                    className="rounded-full border border-white/[0.08] bg-[#0D0D11] hover:bg-white/[0.06] text-[#9A9AA5] hover:text-[#F5F5F7] px-4 py-2 text-xs font-medium transition-all cursor-pointer"
+                  >
+                    Invite Another
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInviteModal(false);
+                      setInviteSuccessData(null);
+                      setInviteEmail('');
+                    }}
+                    className="rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSendInvite} className="space-y-4 text-xs">
+                {inviteError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                    <span>{inviteError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Agent Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="agent@brokerage.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] placeholder-[#6E6E7A] focus:border-[#C9A961] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Organization Role</label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as any)}
+                    className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-[#F5F5F7] focus:border-[#C9A961] outline-none"
+                  >
+                    <option value="AGENT">Agent (Standard Seat)</option>
+                    <option value="BROKER_ADMIN">Broker Admin (Full Access)</option>
+                  </select>
+                </div>
+
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-white/[0.08]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInviteModal(false);
+                      setInviteError(null);
+                    }}
+                    className="rounded-full border border-white/[0.08] bg-[#0D0D11] hover:bg-white/[0.06] text-[#9A9AA5] hover:text-[#F5F5F7] px-4 py-2 text-xs font-medium transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sendingInvite}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {sendingInvite && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Send Email Invite
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

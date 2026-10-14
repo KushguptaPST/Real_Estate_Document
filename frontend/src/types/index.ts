@@ -136,6 +136,8 @@ export interface User {
   pictureUrl: string | null;
   organizationId?: string;
   role?: 'OWNER' | 'AGENT';
+  createdAt?: string;
+  lastLoginAt?: string;
 }
 
 // ─── Assistant Types (B Contract) ─────────────────────────────────────────────
