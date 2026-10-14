@@ -607,8 +607,14 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     },
   });
 
-  // Indicate typing indicator on Telegram while AI plans and executes tools
-  await sendTelegramChatAction(chatId, 'typing');
+  // Start persistent typing pulse so Telegram shows "typing..." throughout AI processing
+  let isTyping = true;
+  const typingTimer = setInterval(() => {
+    if (isTyping) {
+      sendTelegramChatAction(chatId, 'typing').catch(() => {});
+    }
+  }, 4000);
+  sendTelegramChatAction(chatId, 'typing').catch(() => {});
 
   // Load recent messages for agent context
   const recentHistory = await prisma.conversationMessage.findMany({
@@ -636,14 +642,20 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
   } catch (agentErr: any) {
     logger.error(`[Telegram] Error executing sales agent loop: ${agentErr.message}`);
     const firstName = lead.fullName ? lead.fullName.split(' ')[0] : 'there';
+    const lowerText = text.toLowerCase();
+    const isReady = lowerText.includes('ready') || lowerText.includes('immediate') || lowerText.includes('now');
     agentResult = {
-      response:
-        `Hey ${firstName}! For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour for late 2026. Are you looking to move in right away, or are you flexible on timeline?`,
-      suggestedFollowUps: ['Looking to move in immediately', 'Flexible on timeline', 'View Prestige Shantiniketan'],
+      response: isReady
+        ? `Hey ${firstName}! For ready-to-move options in Whitefield, Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr are both ready with complete OC. Would you like to schedule a quick walkthrough this week?`
+        : `Hey ${firstName}! For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour for late 2026. Are you looking to move in right away, or are you flexible on timeline?`,
+      suggestedFollowUps: ['Visit Prestige Shantiniketan', 'Visit Brigade Woods'],
       reasoning: 'Conversational fallback response',
       executedTools: [],
       exhaustedLimit: false,
     };
+  } finally {
+    isTyping = false;
+    clearInterval(typingTimer);
   }
 
   // Save AI Response to CRM Thread

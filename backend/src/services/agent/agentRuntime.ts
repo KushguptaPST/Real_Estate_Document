@@ -154,18 +154,25 @@ async function generateConsultativeFallback(params: {
   const suggestedFollowUps: string[] = [];
 
   if (isBangalore || lower.includes('whitefield')) {
-    response = `${greeting} For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour if you are open to late 2026. Are you looking to move in right away, or are you flexible on timeline?`;
-    suggestedFollowUps.push('Looking to move in immediately');
-    suggestedFollowUps.push('Flexible on timeline');
-    suggestedFollowUps.push('Tell me about Prestige Shantiniketan');
+    if (lower.includes('ready') || lower.includes('immediate') || lower.includes('right away') || lower.includes('now')) {
+      response = `${greeting} For ready-to-move options in Whitefield, Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr are both ready with full OC. Would you like to do a quick walkthrough of Prestige or Brigade this week?`;
+      suggestedFollowUps.push('Visit Prestige Shantiniketan');
+      suggestedFollowUps.push('Visit Brigade Woods');
+      suggestedFollowUps.push('Send floor plan brochure');
+    } else {
+      response = `${greeting} For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour if you are open to late 2026. Are you looking to move in right away, or are you flexible on timeline?`;
+      suggestedFollowUps.push('Looking to move in immediately');
+      suggestedFollowUps.push('Flexible on timeline');
+      suggestedFollowUps.push('Tell me about Prestige Shantiniketan');
+    }
   } else {
     if (matchedProps.length > 0) {
       const p1 = matchedProps[0];
-      response = `${greeting} Thank you for reaching out! Thank you for your message. I'm reviewing our private listings for you—we have standout options like ${p1.title} available right now. Are you looking to relocate immediately, or exploring options for later this year?`;
+      response = `${greeting} I'm reviewing our verified inventory for you—standout options like ${p1.title} are currently available. Are you looking to relocate immediately, or exploring options for later?`;
       suggestedFollowUps.push('Looking to move soon');
       suggestedFollowUps.push('Exploring for later');
     } else {
-      response = `${greeting} Thank you for reaching out! Thank you for your message. I am pulling up our verified listings matching your preferences right now. Are you looking to move in immediately, or is your timeline flexible?`;
+      response = `${greeting} I am pulling up our verified listings matching your preferences right now. Are you looking to move in immediately, or is your timeline flexible?`;
       suggestedFollowUps.push('Immediate move-in');
       suggestedFollowUps.push('Flexible timeline');
     }
@@ -343,10 +350,12 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     const candidateModels = Array.from(
       new Set([
         configuredModel,
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash-lite',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-lite-latest',
+        'gemini-3.8-flash',
         'gemini-3.5-flash',
-        'gemini-3.6-flash',
-        'gemini-3.7-flash',
-        'gemini-flash-latest',
       ])
     );
 
@@ -354,32 +363,49 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     let lastModelErr: any = null;
 
     for (const modelCandidate of candidateModels) {
-      try {
-        response = await ai.models.generateContent({
-          model: modelCandidate,
-          contents,
-          config: {
-            systemInstruction: `${SYSTEM_INSTRUCTION}
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout after 7000ms on ${modelCandidate}`)), 7000)
+          );
+          response = await Promise.race([
+            ai.models.generateContent({
+              model: modelCandidate,
+              contents,
+              config: {
+                systemInstruction: `${SYSTEM_INSTRUCTION}
 
 ACTIVE CONVERSATION CONTEXT:
 - Client Name: "${clientFirstName || 'Client'}" (Address them casually and warmly, e.g. "Hey ${clientFirstName || 'there'},")
 - Current Date: "${new Date().toISOString().slice(0, 10)}"
 - Authorized Lead ID: "${leadId}"
 CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with ${clientFirstName || 'the client'}. Keep your message SHORT, CONVERSATIONAL, and DIRECT (maximum 2 to 4 sentences, strictly under 60 words). DO NOT write an essay or a marketing brochure.`,
-            tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
-            temperature: 0.3,
-          },
-        });
-        if (response) {
-          lastModelErr = null;
+                tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
+                temperature: 0.3,
+              },
+            }),
+            timeoutPromise,
+          ]);
+          if (response) {
+            lastModelErr = null;
+            break;
+          }
+        } catch (candidateErr: any) {
+          lastModelErr = candidateErr;
+          const msg = candidateErr instanceof Error ? candidateErr.message : String(candidateErr);
+          const isDemandSpike = msg.includes('503') || msg.includes('high demand') || msg.includes('UNAVAILABLE');
+          if (isDemandSpike && attempt === 1) {
+            await new Promise((r) => setTimeout(r, 400));
+            continue;
+          }
+          logger.warn(
+            `[Agent Runtime] Candidate model ${modelCandidate} failed on round ${round} (attempt ${attempt}): ${msg.slice(0, 120)}. Attempting next candidate...`,
+          );
           break;
         }
-      } catch (candidateErr: any) {
-        lastModelErr = candidateErr;
-        const msg = candidateErr instanceof Error ? candidateErr.message : String(candidateErr);
-        logger.warn(
-          `[Agent Runtime] Candidate model ${modelCandidate} failed on round ${round}: ${msg.slice(0, 120)}. Attempting fallback...`,
-        );
+      }
+      if (response && !lastModelErr) {
+        break;
       }
     }
 
