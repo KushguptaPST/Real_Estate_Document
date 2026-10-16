@@ -4,7 +4,6 @@ import { dealsApi, notificationsApi } from '@/services/api';
 import { useNotifications } from '@/hooks/useNotifications';
 import { AlertPreferences } from '@/components/email/AlertPreferences';
 import { EmailLogTable } from '@/components/email/EmailLogTable';
-import { InboundEmailInfo } from '@/components/email/InboundEmailInfo';
 import { SendTestEmailButton } from '@/components/email/SendTestEmailButton';
 import { EmailPreviewModal } from '@/components/email/EmailPreviewModal';
 import { DealHeader } from '@/components/deal/DealHeader';
@@ -87,7 +86,7 @@ export function NotificationSettingsPage() {
             </Badge>
           </div>
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Email Alerts &amp; Inbound Intake
+            Email Alerts &amp; Milestone Reminders
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Configure automated milestone reminders, preview dynamic templates, and inspect cryptographic delivery logs.
@@ -157,9 +156,6 @@ export function NotificationSettingsPage() {
           <span>{summaryStatus}</span>
         </div>
       )}
-
-      {/* Inbound Email Forwarding Card */}
-      <InboundEmailInfo dealId={dealId} inboundInfo={inboundInfo} />
 
       {/* Preferences Form */}
       {loading ? (
