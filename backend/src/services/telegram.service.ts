@@ -482,9 +482,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
   // Command: /voice
   if (text.toLowerCase() === '/voice' || text.includes('Voice Note') || text.includes('Voice Mode')) {
-    const voiceIntro = "Hello! Voice mode is active. You can send me voice messages anytime or listen to my spoken voice replies. What kind of property are you looking for today?";
-    await sendTelegramMessage(chatId, `🎙️ <b>Voice Mode Active!</b>\n\n${voiceIntro}\n\n<i>Try asking: "What homes are available under $800k?"</i>`, { parseMode: 'HTML' });
-    await sendTelegramVoiceMessage(chatId, voiceIntro);
+    await sendTelegramMessage(chatId, `💬 <b>Text-Only Mode Active!</b>\n\nVoice notes are turned off. All property assistance and replies will be delivered as clean text messages.`, { parseMode: 'HTML' });
     return;
   }
 
@@ -658,22 +656,6 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     clearInterval(typingTimer);
   }
 
-  // Save AI Response to CRM Thread
-  await prisma.conversationMessage.create({
-    data: {
-      threadId: thread.id,
-      organizationId: orgId,
-      senderType: 'AI',
-      content: agentResult.response,
-      suggestedAction: {
-        followUps: agentResult.suggestedFollowUps,
-        reasoning: agentResult.reasoning,
-        toolExecutions: agentResult.executedTools,
-      } as object,
-      approvalStatus: 'APPROVED',
-    },
-  });
-
   // 6. Deliver AI Response to Telegram
   let replyContent = agentResult.response;
 
@@ -690,13 +672,29 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     return;
   }
 
-  // Deliver clean message with no button options/keyboards
+  // Save AI Response to CRM Thread only when response is generated
+  await prisma.conversationMessage.create({
+    data: {
+      threadId: thread.id,
+      organizationId: orgId,
+      senderType: 'AI',
+      content: agentResult.response,
+      suggestedAction: {
+        followUps: agentResult.suggestedFollowUps,
+        reasoning: agentResult.reasoning,
+        toolExecutions: agentResult.executedTools,
+      } as object,
+      approvalStatus: 'APPROVED',
+    },
+  });
+
+  // Deliver text message
   await sendTelegramMessage(chatId, replyContent, {
     replyMarkup: { remove_keyboard: true },
   });
 
-  // Also deliver spoken voice note naturally with no bot captions
-  if (replyContent && !agentResult.suppressed) {
+  // Audio voice note is disabled by default (text-only mode)
+  if (process.env['ENABLE_TELEGRAM_VOICE'] === 'true' && replyContent && !agentResult.suppressed) {
     sendTelegramVoiceMessage(chatId, replyContent).catch((err) => {
       logger.warn(`[Telegram Voice] Voice note delivery failed: ${err.message}`);
     });

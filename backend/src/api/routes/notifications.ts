@@ -15,7 +15,7 @@ const router = Router({ mergeParams: true });
 
 
 const UpdateSettingsSchema = z.object({
-  recipients: z.array(z.string().email()),
+  recipients: z.array(z.string().trim().toLowerCase().email()),
   windows: z.object({
     d3: z.boolean(),
     d1: z.boolean(),
@@ -27,11 +27,11 @@ const UpdateSettingsSchema = z.object({
 });
 
 const SendTestSchema = z.object({
-  to: z.string().email(),
+  to: z.string().trim().toLowerCase().email(),
 });
 
 const SendSummarySchema = z.object({
-  to: z.array(z.string().email()).min(1),
+  to: z.array(z.string().trim().toLowerCase().email()).min(1),
 });
 
 const PreviewSchema = z.object({

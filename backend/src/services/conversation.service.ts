@@ -23,6 +23,7 @@ import {
   processOutboxJobs,
   retryMessageDispatch,
 } from './messaging/outboxDispatcher.js';
+import { sendTelegramMessage } from './telegram.service.js';
 
 
 const SuggestedReplySchema = z.object({
@@ -95,6 +96,84 @@ export async function getOrCreateLeadThread(
  * Strictly derives author and senderType (AGENT) from authenticated user identity.
  * Does NOT generate AI reply or enter buyer-memory as customer statements.
  */
+async function dispatchOutboundMessage(params: {
+  messageId: string;
+  leadId: string;
+  organizationId: string;
+  channel: MessageChannel;
+  content: string;
+  actorEmail?: string;
+  lead: { email?: string | null; externalId?: string | null };
+}) {
+  const { messageId, leadId, organizationId, channel, content, actorEmail, lead } = params;
+  const isTelegram = (channel as string) === 'TELEGRAM' || Boolean(lead.externalId?.startsWith('telegram:'));
+  const tgChatId = lead.externalId?.startsWith('telegram:')
+    ? lead.externalId.replace('telegram:', '')
+    : null;
+
+  if (isTelegram && tgChatId) {
+    try {
+      const delivered = await sendTelegramMessage(
+        tgChatId,
+        content,
+        { parseMode: 'HTML' }
+      );
+      if (delivered) {
+        await prisma.conversationMessage.update({
+          where: { id: messageId },
+          data: {
+            deliveryStatus: 'DELIVERED',
+            deliveredAt: new Date(),
+            sentAt: new Date(),
+            deliveryError: null,
+          },
+        });
+        await prisma.auditLog.create({
+          data: {
+            organizationId,
+            action: 'MESSAGE_SENT',
+            entityType: 'ConversationMessage',
+            entityId: messageId,
+            actor: actorEmail ?? 'system',
+            note: `Message dispatched via Telegram to chat ${tgChatId}`,
+          },
+        });
+        return;
+      }
+    } catch (tgErr: any) {
+      logger.error(`[Telegram Dispatch Error] ${tgErr.message}`);
+    }
+
+    await prisma.conversationMessage.update({
+      where: { id: messageId },
+      data: {
+        deliveryStatus: 'FAILED',
+        failedAt: new Date(),
+        deliveryError: 'Failed to deliver message via Telegram bot API',
+      },
+    });
+    return;
+  }
+
+  // Standard Email / Outbox dispatch
+  try {
+    await queueMessageDispatch({
+      messageId,
+      organizationId,
+      leadId,
+      recipientEmail: lead.email ?? undefined,
+      channel,
+      content,
+      actorEmail,
+    });
+    processOutboxJobs({ batchSize: 5 }).catch((err) =>
+      logger.error(`[Outbox Worker Error] Failed processing message dispatch: ${err.message}`),
+    );
+  } catch (queueErr: any) {
+    logger.error(`[Outbox Error] Failed to queue message dispatch: ${queueErr.message}`);
+  }
+}
+
 export async function handleAdvisorMessage(params: {
   leadId: string;
   organizationId: string;
@@ -129,27 +208,20 @@ export async function handleAdvisorMessage(params: {
       senderId,
       content,
       approvalStatus: 'APPROVED',
+      deliveryStatus: 'SENDING',
     },
   });
 
-  // Enqueue outbound message into durable transactional outbox
-  try {
-    await queueMessageDispatch({
-      messageId: advisorMsg.id,
-      organizationId: orgId,
-      leadId,
-      recipientEmail: lead.email ?? undefined,
-      channel,
-      content,
-      actorEmail: senderEmail ?? senderId,
-    });
-    // Immediately process outbox asynchronously
-    processOutboxJobs({ batchSize: 5 }).catch((err) =>
-      logger.error(`[Outbox Worker Error] Failed processing advisor message dispatch: ${err.message}`),
-    );
-  } catch (queueErr: any) {
-    logger.error(`[Outbox Error] Failed to queue advisor message dispatch: ${queueErr.message}`);
-  }
+  // Outbound dispatch: Direct to Telegram if lead is from Telegram, otherwise queue to email outbox
+  await dispatchOutboundMessage({
+    messageId: advisorMsg.id,
+    leadId,
+    organizationId: orgId,
+    channel,
+    content,
+    actorEmail: senderEmail ?? senderId,
+    lead,
+  });
 
   const updatedMsg = await prisma.conversationMessage.findUnique({
     where: { id: advisorMsg.id },
@@ -248,24 +320,22 @@ export async function handleCustomerMessage(params: {
     try {
       const lead = await prisma.lead.findFirst({
         where: { id: leadId, organizationId: orgId },
-        select: { id: true, email: true },
+        select: { id: true, email: true, externalId: true },
       });
 
-      await queueMessageDispatch({
-        messageId: aiMsg.id,
-        organizationId: orgId,
-        leadId,
-        recipientEmail: lead?.email ?? undefined,
-        channel: thread.channel,
-        content: aiMsg.content,
-        actorEmail: 'ai_sales_agent',
-      });
-
-      processOutboxJobs({ batchSize: 5 }).catch((err) =>
-        logger.error(`[Outbox Worker Error] Failed processing autonomous AI message dispatch: ${err.message}`),
-      );
-    } catch (queueErr: any) {
-      logger.error(`[Outbox Error] Failed to queue autonomous AI message dispatch: ${queueErr.message}`);
+      if (lead) {
+        await dispatchOutboundMessage({
+          messageId: aiMsg.id,
+          leadId,
+          organizationId: orgId,
+          channel: thread.channel,
+          content: aiMsg.content,
+          actorEmail: 'ai_sales_agent',
+          lead,
+        });
+      }
+    } catch (dispatchErr: any) {
+      logger.error(`[Conversation Dispatch Error] Failed to dispatch autopilot message: ${dispatchErr.message}`);
     }
   }
 
@@ -487,25 +557,22 @@ export async function reviewAiMessage(params: {
     try {
       const lead = await prisma.lead.findFirst({
         where: { id: existing.thread.leadId, organizationId },
-        select: { id: true, email: true },
+        select: { id: true, email: true, externalId: true },
       });
 
-      await queueMessageDispatch({
-        messageId,
-        organizationId,
-        leadId: existing.thread.leadId,
-        recipientEmail: lead?.email ?? undefined,
-        channel: existing.thread.channel,
-        content: updated.content,
-        actorEmail,
-      });
-
-      // Immediately process outbox asynchronously
-      processOutboxJobs({ batchSize: 5 }).catch((err) =>
-        logger.error(`[Outbox Worker Error] Failed processing approved AI draft dispatch: ${err.message}`),
-      );
+      if (lead) {
+        await dispatchOutboundMessage({
+          messageId,
+          leadId: existing.thread.leadId,
+          organizationId,
+          channel: existing.thread.channel,
+          content: updated.content,
+          actorEmail,
+          lead,
+        });
+      }
     } catch (queueErr: any) {
-      logger.error(`[Outbox Error] Failed to queue approved AI draft dispatch: ${queueErr.message}`);
+      logger.error(`[Outbox Error] Failed to dispatch approved AI draft: ${queueErr.message}`);
     }
   }
 

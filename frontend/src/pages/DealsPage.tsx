@@ -13,7 +13,6 @@ import {
   Loader2,
   AlertTriangle,
   Inbox,
-  Download,
   Calendar as CalendarIcon,
   Layers,
   CheckCircle2,
@@ -42,8 +41,8 @@ import {
 type ViewMode = 'table' | 'kanban';
 
 export function DealsPage() {
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [deals, setDeals] = useState<Deal[]>(() => dealsApi.getCached() || []);
+  const [loading, setLoading] = useState(() => !dealsApi.getCached());
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'CLOSED' | 'CANCELLED'>('ALL');
@@ -128,10 +127,10 @@ export function DealsPage() {
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                 viewMode === 'table'
-                  ? 'bg-[#1A1A22] text-[#C9A961] shadow-2xs border border-white/[0.08]'
-                  : 'text-[#9A9AA5] hover:text-[#F5F5F7]'
+                  ? 'bg-[#1A1A22] text-[#C9A961] shadow-2xs border-white/[0.08]'
+                  : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
               }`}
             >
               <List className="h-3.5 w-3.5" />
@@ -140,10 +139,10 @@ export function DealsPage() {
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                 viewMode === 'kanban'
-                  ? 'bg-[#1A1A22] text-[#C9A961] shadow-2xs border border-white/[0.08]'
-                  : 'text-[#9A9AA5] hover:text-[#F5F5F7]'
+                  ? 'bg-[#1A1A22] text-[#C9A961] shadow-2xs border-white/[0.08]'
+                  : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
               }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -151,13 +150,6 @@ export function DealsPage() {
             </button>
           </div>
 
-          <button
-            onClick={() => alert('Exporting transaction pipeline summary (CSV)...')}
-            className="btn-stripe-secondary text-xs"
-          >
-            <Download className="h-3.5 w-3.5 text-[#9A9AA5]" />
-            <span>Export</span>
-          </button>
           <Link to="/upload" className="btn-stripe-primary text-xs">
             <Plus className="h-3.5 w-3.5" />
             <span>Ingest Contract PDF</span>
@@ -392,7 +384,7 @@ export function DealsPage() {
 
       {/* ── VIEW 1: High-Density Enterprise Table ── */}
       {!loading && deals.length > 0 && viewMode === 'table' && (
-        <div className="stripe-card overflow-hidden bg-[#141418] border border-white/[0.08] rounded-2xl shadow-xl">
+        <div key={activeTab} className="stripe-card overflow-hidden bg-[#141418] border border-white/[0.08] rounded-2xl shadow-xl min-h-[420px] smooth-transition">
           <Table>
             <TableHeader>
               <TableRow className="border-b border-white/[0.08] bg-[#181820]">
@@ -407,7 +399,7 @@ export function DealsPage() {
             <TableBody>
               {filteredDeals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-xs text-[#9A9AA5]">
+                  <TableCell colSpan={6} className="text-center py-24 text-xs text-[#9A9AA5]">
                     No transactions found matching query "{searchQuery}".
                   </TableCell>
                 </TableRow>
@@ -541,7 +533,7 @@ export function DealsPage() {
 
       {/* ── VIEW 2: Rich Kanban Board Pipeline ── */}
       {!loading && deals.length > 0 && viewMode === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div key={activeTab} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-[420px] smooth-transition">
           {kanbanStages.map((stage) => (
             <div key={stage.id} className="stripe-card p-3.5 bg-[#0E0E12] border border-white/[0.08] rounded-2xl flex flex-col min-h-[500px]">
               {/* Stage Column Header */}

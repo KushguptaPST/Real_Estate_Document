@@ -86,13 +86,26 @@ export const authApi = {
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
 
+let _dealsCache: Deal[] | null = null;
+
 export const dealsApi = {
-  list: () => request<Deal[]>('/deals'),
-  get:  (id: string) => request<Deal>(`/deals/${id}`),
-  create: (data: CreateDealInput) =>
-    request<Deal>('/deals', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<CreateDealInput>) =>
-    request<Deal>(`/deals/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  list: async () => {
+    const data = await request<Deal[]>('/deals');
+    _dealsCache = data;
+    return data;
+  },
+  getCached: () => _dealsCache,
+  get: (id: string) => request<Deal>(`/deals/${id}`),
+  create: async (data: CreateDealInput) => {
+    const deal = await request<Deal>('/deals', { method: 'POST', body: JSON.stringify(data) });
+    _dealsCache = null;
+    return deal;
+  },
+  update: async (id: string, data: Partial<CreateDealInput>) => {
+    const deal = await request<Deal>(`/deals/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    _dealsCache = null;
+    return deal;
+  },
 };
 
 // ── Documents ─────────────────────────────────────────────────────────────────
@@ -245,6 +258,12 @@ export const leadsApi = {
     request<SiteVisit[]>(`/leads/${id}/site-visits`),
   scheduleSiteVisit: (id: string, data: ScheduleSiteVisitInput) =>
     request<SiteVisit>(`/leads/${id}/site-visits`, { method: 'POST', body: JSON.stringify(data) }),
+  getProposals: (id: string) =>
+    request<any[]>(`/leads/${id}/proposals`),
+  acceptProposal: (id: string, proposalId: string) =>
+    request<any>(`/leads/${id}/proposals/${proposalId}/accept`, { method: 'POST' }),
+  rejectProposal: (id: string, proposalId: string) =>
+    request<any>(`/leads/${id}/proposals/${proposalId}/reject`, { method: 'POST' }),
   updateRequirements: (id: string, data: any) =>
     request<any>(`/leads/${id}/requirements`, { method: 'PATCH', body: JSON.stringify(data) }),
   extractRequirements: (id: string, enquiryText: string) =>

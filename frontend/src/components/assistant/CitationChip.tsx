@@ -1,6 +1,5 @@
 import type { Citation } from '@/types';
-import { FileText, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Badge } from '../ui/badge';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface Props {
   citation: Citation;
@@ -16,19 +15,19 @@ export function CitationChip({ citation, onClick, isActive = false }: Props) {
     <button
       type="button"
       onClick={() => onClick?.(citation)}
-      className={`group text-left p-2.5 rounded-lg border transition-all text-xs w-full block cursor-pointer ${
+      className={`group text-left p-3.5 rounded-2xl border transition-all duration-200 text-xs w-full block cursor-pointer ${
         isActive
-          ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900 shadow-xs'
-          : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50 shadow-2xs'
+          ? 'border-[#C9A961] bg-[#C9A961]/15 ring-1 ring-[#C9A961]/50 shadow-[0_0_20px_rgba(201,169,97,0.2)]'
+          : 'border-white/10 hover:border-[#C9A961]/50 bg-[#14141C] hover:bg-[#1A1A24] shadow-sm hover:-translate-y-0.5'
       }`}
     >
       {/* Top Header Row */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-900 min-w-0">
-          <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded bg-slate-900 text-white font-mono text-[10px] font-bold">
+        <div className="flex items-center gap-2 font-semibold text-[#F5F5F7] min-w-0">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-[#C9A961] text-[#0A0A0B] font-mono text-[10px] font-bold shadow-xs">
             {citation.id}
           </span>
-          <span className="truncate text-slate-800 text-xs font-semibold">
+          <span className="truncate text-[#F5F5F7] text-xs font-semibold">
             {isDoc
               ? citation.documentName || 'Contract Document'
               : isDeadline
@@ -38,15 +37,15 @@ export function CitationChip({ citation, onClick, isActive = false }: Props) {
         </div>
 
         {citation.pageNumber && (
-          <Badge variant="neutral" className="font-mono text-[10px] px-1.5 py-0">
+          <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-[#A0A0B0]">
             Page {citation.pageNumber}
-          </Badge>
+          </span>
         )}
       </div>
 
       {/* Section Header */}
       {citation.section && (
-        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-[#C9A961]">
           <span>&sect;</span>
           <span className="truncate">{citation.section}</span>
         </div>
@@ -54,30 +53,30 @@ export function CitationChip({ citation, onClick, isActive = false }: Props) {
 
       {/* Quoted Text Callout */}
       {citation.quote && (
-        <div className="mt-1.5 border-l-2 border-slate-400 bg-slate-50 p-2 rounded-r text-[11px] font-mono text-slate-700 italic line-clamp-3 leading-relaxed border border-l-slate-400 border-slate-200/60">
+        <div className="mt-2.5 border-l-2 border-l-[#C9A961] bg-[#0E0E14] p-3 rounded-r-xl text-[11px] font-mono text-[#D8D8E2] italic line-clamp-3 leading-relaxed border border-white/5 shadow-inner">
           &ldquo;{citation.quote}&rdquo;
         </div>
       )}
 
       {/* Bottom Status & Action */}
-      <div className="mt-2 flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
+      <div className="mt-3 flex items-center justify-between text-[11px] pt-2.5 border-t border-white/10">
         <div className="flex items-center gap-1.5">
           {citation.isConfirmed && (
-            <Badge variant="success" className="text-[10px] px-1 py-0">
-              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30">
+              <CheckCircle2 className="h-3 w-3 mr-0.5" />
               Verified Quote
-            </Badge>
+            </span>
           )}
           {citation.isOcr && (
-            <Badge variant="warning" className="text-[10px] px-1 py-0">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
               OCR
-            </Badge>
+            </span>
           )}
         </div>
 
-        <span className="text-slate-900 font-semibold group-hover:text-slate-700 flex items-center gap-1 text-[11px]">
+        <span className="text-[#C9A961] font-semibold group-hover:text-[#DFBF77] flex items-center gap-1 text-[11px] transition-colors">
           <span>Jump to Page</span>
-          <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+          <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
         </span>
       </div>
     </button>

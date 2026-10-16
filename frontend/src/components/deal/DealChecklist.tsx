@@ -19,9 +19,18 @@ interface Props {
   deadlines: Deadline[];
   notifSettings: NotificationSetting | null;
   onConfirmAll?: () => Promise<void>;
+  documentCount?: number;
+  onUploadClick?: () => void;
 }
 
-export function DealChecklist({ dealId, deadlines, notifSettings, onConfirmAll }: Props) {
+export function DealChecklist({
+  dealId,
+  deadlines,
+  notifSettings,
+  onConfirmAll,
+  documentCount = 0,
+  onUploadClick,
+}: Props) {
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -34,7 +43,7 @@ export function DealChecklist({ dealId, deadlines, notifSettings, onConfirmAll }
   const hasRecipients = (notifSettings?.recipients?.length ?? 0) > 0;
   const alertsEnabled = notifSettings?.enabled ?? false;
 
-  const step1 = true;
+  const step1 = documentCount > 0;
   const step2 = allDeadlinesConfirmed;
   const step3 = hasRecipients && alertsEnabled;
   const step4 = totalDeadlines > 0;
@@ -88,21 +97,50 @@ export function DealChecklist({ dealId, deadlines, notifSettings, onConfirmAll }
       {!collapsed && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3.5">
           {/* Step 1: Upload */}
-          <div className="bg-[#0D0D11] border border-white/[0.08] rounded-xl p-3.5 flex flex-col justify-between hover:border-[#C9A961]/30 transition-all">
+          <div
+            className={`bg-[#0D0D11] border rounded-xl p-3.5 flex flex-col justify-between transition-all ${
+              step1 ? 'border-white/[0.08] hover:border-[#C9A961]/30' : 'border-[#C9A961]/40 bg-[#C9A961]/5'
+            }`}
+          >
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6E6E7A]">Step 1</span>
-                <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wider ${
+                    step1 ? 'text-[#6E6E7A]' : 'text-[#C9A961]'
+                  }`}
+                >
+                  Step 1
+                </span>
+                {step1 ? (
+                  <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-[#C9A961]" />
+                )}
               </div>
-              <h4 className="text-xs font-semibold text-[#F5F5F7] mt-1">Contract Ingested</h4>
+              <h4 className="text-xs font-semibold text-[#F5F5F7] mt-1">
+                {step1 ? 'Contract Ingested' : 'Upload Contract'}
+              </h4>
               <p className="text-[11px] text-[#9A9AA5] mt-0.5">
-                PDF parsed, text indexed, and clauses identified by AI.
+                {step1
+                  ? `${documentCount} agreement(s) parsed & clauses indexed.`
+                  : 'Upload executed PDF agreement to compute deadlines.'}
               </p>
             </div>
-            <span className="mt-3 text-[10px] font-medium text-[#34D399] flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              <span>Verified &bull; Ingested</span>
-            </span>
+            {step1 ? (
+              <span className="mt-3 text-[10px] font-medium text-[#34D399] flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                <span>Verified &bull; Ingested</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onUploadClick}
+                className="mt-3 text-[10px] font-semibold text-[#C9A961] hover:text-[#D4B774] inline-flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>Upload Document</span>
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            )}
           </div>
 
           {/* Step 2: Milestone Confirmation */}

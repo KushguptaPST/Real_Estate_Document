@@ -47,7 +47,9 @@ function ProtectedLayout() {
         <TopHeader />
         <main className="flex-1 p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           <Breadcrumbs />
-          <Outlet />
+          <div key={location.pathname} className="smooth-transition">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

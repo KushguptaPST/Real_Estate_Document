@@ -10,11 +10,10 @@ import {
   Mail,
   FileCheck,
   History,
-  BookOpen,
   Calendar,
   AlertTriangle,
 } from 'lucide-react';
-import { AgentPlaybookModal } from './AgentPlaybookModal';
+import { DealReportModal } from './DealReportModal';
 import { Badge } from '../ui/badge';
 
 interface Props {
@@ -24,7 +23,7 @@ interface Props {
 }
 
 export function DealHeader({ deal, notifSettings, activeTab }: Props) {
-  const [playbookOpen, setPlaybookOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const location = useLocation();
 
   if (!deal) return null;
@@ -44,17 +43,6 @@ export function DealHeader({ deal, notifSettings, activeTab }: Props) {
   return (
     <>
       <div className="space-y-3">
-        {/* Breadcrumbs */}
-        <nav className="flex items-center gap-1.5 text-xs text-[#6E6E7A]">
-          <Link to="/deals" className="hover:text-[#C9A961] transition-colors">
-            Portfolio
-          </Link>
-          <ChevronRight className="h-3 w-3 text-[#4A4A55]" />
-          <span className="font-semibold text-[#F5F5F7] truncate">
-            {deal.propertyAddress}
-          </span>
-        </nav>
-
         {/* Command Center Frosted Glass Card */}
         <div className="glass-panel rounded-2xl p-5 shadow-xl bg-[#141418] border border-white/[0.08]">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -108,46 +96,39 @@ export function DealHeader({ deal, notifSettings, activeTab }: Props) {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+            <div className="flex items-center gap-2.5 self-start lg:self-center shrink-0">
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="px-3.5 py-1.5 rounded-full bg-[#181820] hover:bg-[#202028] text-white text-xs font-medium flex items-center gap-1.5 border border-white/[0.08] transition-all cursor-pointer"
+                onClick={() => setReportOpen(true)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#C9A961]/15 via-[#C9A961]/10 to-transparent hover:from-[#C9A961]/25 hover:via-[#C9A961]/20 hover:to-[#C9A961]/10 text-[#F5F5F7] hover:text-white text-xs font-semibold flex items-center gap-2 border border-[#C9A961]/35 hover:border-[#C9A961]/60 shadow-[0_2px_12px_rgba(201,169,97,0.12)] transition-all cursor-pointer"
+                title="Preview and export official transaction & contingency PDF report"
               >
                 <Sparkles className="h-3.5 w-3.5 text-[#C9A961]" />
                 <span>Export PDF Report</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlaybookOpen(true)}
-                className="px-3.5 py-1.5 rounded-full bg-[#181820] hover:bg-[#202028] text-[#9A9AA5] hover:text-white text-xs font-medium flex items-center gap-1.5 border border-white/[0.08] transition-all cursor-pointer"
-              >
-                <BookOpen className="h-3.5 w-3.5 text-[#C9A961]" />
-                <span>Agent Playbook</span>
               </button>
             </div>
           </div>
 
           {/* Unified Sub-Navigation Sticky Tab Bar */}
-          <div className="mt-4 -mb-1 flex items-center gap-1.5 overflow-x-auto border-t border-white/[0.08] pt-3 no-scrollbar text-xs font-medium">
+          <div className="mt-4 -mb-1 flex items-center gap-1.5 overflow-x-auto border-t border-white/10 pt-3 no-scrollbar text-xs font-medium">
             <Link
               to={`/deals/${deal.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all ${
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all cursor-pointer ${
                 currentTab === 'milestones'
-                  ? 'bg-[#1A1A22] text-[#C9A961] font-semibold border border-white/[0.08] shadow-xs'
-                  : 'text-[#9A9AA5] hover:bg-white/[0.04] hover:text-[#F5F5F7]'
+                  ? 'bg-gradient-to-r from-[#C9A961]/20 via-[#C9A961]/15 to-[#C9A961]/10 text-white font-bold border border-[#C9A961]/50 shadow-[0_0_15px_rgba(201,169,97,0.18)]'
+                  : 'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7]'
               }`}
             >
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className={`h-3.5 w-3.5 ${currentTab === 'milestones' ? 'text-[#C9A961]' : 'text-[#6E6E7A]'}`} />
               <span>Milestones</span>
             </Link>
 
             <Link
               to={`/deals/${deal.id}/assistant`}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all ${
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all cursor-pointer ${
                 currentTab === 'assistant'
-                  ? 'bg-[#1A1A22] text-[#C9A961] font-semibold border border-white/[0.08] shadow-xs'
-                  : 'text-[#9A9AA5] hover:bg-white/[0.04] hover:text-[#F5F5F7]'
+                  ? 'bg-gradient-to-r from-[#C9A961]/20 via-[#C9A961]/15 to-[#C9A961]/10 text-white font-bold border border-[#C9A961]/50 shadow-[0_0_15px_rgba(201,169,97,0.18)]'
+                  : 'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7]'
               }`}
             >
               <Sparkles className={`h-3.5 w-3.5 ${currentTab === 'assistant' ? 'text-[#C9A961]' : 'text-[#6E6E7A]'}`} />
@@ -156,44 +137,49 @@ export function DealHeader({ deal, notifSettings, activeTab }: Props) {
 
             <Link
               to={`/deals/${deal.id}/notifications`}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all ${
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all cursor-pointer ${
                 currentTab === 'notifications'
-                  ? 'bg-[#1A1A22] text-[#C9A961] font-semibold border border-white/[0.08] shadow-xs'
-                  : 'text-[#9A9AA5] hover:bg-white/[0.04] hover:text-[#F5F5F7]'
+                  ? 'bg-gradient-to-r from-[#C9A961]/20 via-[#C9A961]/15 to-[#C9A961]/10 text-white font-bold border border-[#C9A961]/50 shadow-[0_0_15px_rgba(201,169,97,0.18)]'
+                  : 'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7]'
               }`}
             >
-              <Mail className="h-3.5 w-3.5" />
+              <Mail className={`h-3.5 w-3.5 ${currentTab === 'notifications' ? 'text-[#C9A961]' : 'text-[#6E6E7A]'}`} />
               <span>Email &amp; Alerts</span>
             </Link>
 
             <Link
               to={`/deals/${deal.id}/review`}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all ${
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all cursor-pointer ${
                 currentTab === 'documents'
-                  ? 'bg-[#1A1A22] text-[#C9A961] font-semibold border border-white/[0.08] shadow-xs'
-                  : 'text-[#9A9AA5] hover:bg-white/[0.04] hover:text-[#F5F5F7]'
+                  ? 'bg-gradient-to-r from-[#C9A961]/20 via-[#C9A961]/15 to-[#C9A961]/10 text-white font-bold border border-[#C9A961]/50 shadow-[0_0_15px_rgba(201,169,97,0.18)]'
+                  : 'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7]'
               }`}
             >
-              <FileCheck className="h-3.5 w-3.5" />
+              <FileCheck className={`h-3.5 w-3.5 ${currentTab === 'documents' ? 'text-[#C9A961]' : 'text-[#6E6E7A]'}`} />
               <span>Clause Verification</span>
             </Link>
 
             <Link
               to={`/audit?dealId=${deal.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-all ${
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all cursor-pointer ${
                 currentTab === 'audit'
-                  ? 'bg-[#1A1A22] text-[#C9A961] font-semibold border border-white/[0.08] shadow-xs'
-                  : 'text-[#9A9AA5] hover:bg-white/[0.04] hover:text-[#F5F5F7]'
+                  ? 'bg-gradient-to-r from-[#C9A961]/20 via-[#C9A961]/15 to-[#C9A961]/10 text-white font-bold border border-[#C9A961]/50 shadow-[0_0_15px_rgba(201,169,97,0.18)]'
+                  : 'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7]'
               }`}
             >
-              <History className="h-3.5 w-3.5" />
+              <History className={`h-3.5 w-3.5 ${currentTab === 'audit' ? 'text-[#C9A961]' : 'text-[#6E6E7A]'}`} />
               <span>Audit History</span>
             </Link>
           </div>
         </div>
       </div>
 
-      <AgentPlaybookModal isOpen={playbookOpen} onClose={() => setPlaybookOpen(false)} />
+      <DealReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        deal={deal}
+        notifSettings={notifSettings}
+      />
     </>
   );
 }

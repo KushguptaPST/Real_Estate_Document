@@ -55,8 +55,10 @@ import {
   Briefcase,
   ExternalLink,
   ShieldCheck,
+  IndianRupee,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
 
 export function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -121,6 +123,7 @@ export function LeadDetailPage() {
   const [minBedrooms, setMinBedrooms] = useState<number | ''>('');
   const [possessionTimeline, setPossessionTimeline] = useState('');
   const [savingReqs, setSavingReqs] = useState(false);
+  const [processingProposalId, setProcessingProposalId] = useState<string | null>(null);
 
   // Conversation Chat State
   const [advisorMessage, setAdvisorMessage] = useState('');
@@ -219,29 +222,29 @@ export function LeadDetailPage() {
       case 'CALLS':
         return {
           label: 'Call',
-          badgeClass: 'bg-indigo-50 text-indigo-700 border-[#C9A961]/30',
-          dotClass: 'bg-indigo-50 border-indigo-500 text-[#C9A961]',
+          badgeClass: 'bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/30',
+          dotClass: 'bg-[#181820] border-[#C9A961] text-[#C9A961]',
           icon: PhoneCall,
         };
       case 'TASKS':
         return {
           label: 'Task',
-          badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
-          dotClass: 'bg-sky-50 border-sky-500 text-sky-600',
+          badgeClass: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+          dotClass: 'bg-[#181820] border-cyan-500 text-cyan-400',
           icon: CheckSquare,
         };
       case 'VISITS':
         return {
           label: 'Site Visit',
-          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-          dotClass: 'bg-emerald-50 border-emerald-500 text-emerald-600',
+          badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+          dotClass: 'bg-[#181820] border-emerald-500 text-emerald-400',
           icon: Building2,
         };
       case 'OWNERSHIP':
         return {
           label: 'Ownership',
-          badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
-          dotClass: 'bg-amber-50 border-amber-500 text-amber-600',
+          badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+          dotClass: 'bg-[#181820] border-amber-500 text-amber-400',
           icon: UserCheck,
         };
       default:
@@ -358,17 +361,17 @@ export function LeadDetailPage() {
   function getOutcomeBadge(outcome: CallOutcome) {
     switch (outcome) {
       case 'CONNECTED':
-        return { label: 'Connected', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Connected', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
       case 'CALLBACK_REQUESTED':
-        return { label: 'Callback Requested', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Callback Requested', bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };
       case 'VOICEMAIL':
-        return { label: 'Left Voicemail', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: 'Left Voicemail', bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' };
       case 'NO_ANSWER':
         return { label: 'No Answer', bg: 'bg-[#1E1E26] text-[#D1D1DB] border-white/[0.08]' };
       case 'BUSY':
         return { label: 'Line Busy', bg: 'bg-[#1E1E26] text-[#D1D1DB] border-white/[0.08]' };
       case 'WRONG_NUMBER':
-        return { label: 'Wrong Number', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: 'Wrong Number', bg: 'bg-rose-500/15 text-rose-400 border-rose-500/30' };
       case 'OTHER':
       default:
         return { label: 'Other', bg: 'bg-[#1E1E26] text-[#D1D1DB] border-white/[0.08]' };
@@ -476,15 +479,15 @@ export function LeadDetailPage() {
   function getTaskTypeBadge(type: LeadTaskType) {
     switch (type) {
       case 'CALL':
-        return { label: 'Call', icon: PhoneCall, bg: 'bg-indigo-50 text-indigo-700 border-[#C9A961]/30' };
+        return { label: 'Call', icon: PhoneCall, bg: 'bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/30' };
       case 'MESSAGE':
-        return { label: 'Message', icon: MessageSquare, bg: 'bg-blue-50 text-blue-700 border-blue-200' };
+        return { label: 'Message', icon: MessageSquare, bg: 'bg-sky-500/15 text-sky-400 border-sky-500/30' };
       case 'SITE_VISIT':
-        return { label: 'Site Visit', icon: Building2, bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Site Visit', icon: Building2, bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
       case 'SEND_DETAILS':
-        return { label: 'Send Details', icon: Send, bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: 'Send Details', icon: Send, bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' };
       case 'DOCUMENT_FOLLOW_UP':
-        return { label: 'Doc Follow-Up', icon: FileCheck, bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Doc Follow-Up', icon: FileCheck, bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };
       case 'OTHER':
       default:
         return { label: 'Other', icon: CheckSquare, bg: 'bg-[#1E1E26] text-[#D1D1DB] border-white/[0.08]' };
@@ -494,11 +497,11 @@ export function LeadDetailPage() {
   function getTaskPriorityBadge(priority: string) {
     switch (priority) {
       case 'URGENT':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
+        return 'bg-rose-500/20 text-rose-300 border-rose-500/40';
       case 'HIGH':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       case 'MEDIUM':
-        return 'bg-sky-50 text-sky-700 border-sky-200';
+        return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
       case 'LOW':
       default:
         return 'bg-[#1E1E26] text-[#9A9AA5] border-white/[0.08]';
@@ -508,13 +511,13 @@ export function LeadDetailPage() {
   function getSiteVisitStatusBadge(status: SiteVisitStatus) {
     switch (status) {
       case 'SCHEDULED':
-        return { label: 'Scheduled', bg: 'bg-sky-50 text-sky-700 border-sky-200' };
+        return { label: 'Scheduled', bg: 'bg-sky-500/15 text-sky-400 border-sky-500/30' };
       case 'COMPLETED':
-        return { label: 'Completed', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Completed', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' };
       case 'CANCELLED':
         return { label: 'Cancelled', bg: 'bg-[#1E1E26] text-[#9A9AA5] border-white/[0.08]' };
       case 'NO_SHOW':
-        return { label: 'No Show', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'No Show', bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' };
     }
   }
 
@@ -673,6 +676,37 @@ export function LeadDetailPage() {
 
   useEffect(() => {
     if (id) loadLeadData();
+  }, [id]);
+
+  // Real-time polling for conversation thread (status updates, new Telegram messages, takeover state)
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(async () => {
+      try {
+        const updatedThread = await conversationsApi.getThread(id);
+        setThread((prev: any) => {
+          if (!prev) return updatedThread;
+          const prevMsgs = prev.messages || [];
+          const newMsgs = updatedThread.messages || [];
+          const statusChanged =
+            prevMsgs.length > 0 &&
+            newMsgs.length > 0 &&
+            prevMsgs[prevMsgs.length - 1]?.deliveryStatus !== newMsgs[newMsgs.length - 1]?.deliveryStatus;
+          if (
+            prevMsgs.length !== newMsgs.length ||
+            statusChanged ||
+            prev.isHumanTakeover !== updatedThread.isHumanTakeover ||
+            prev.state !== updatedThread.state
+          ) {
+            return updatedThread;
+          }
+          return prev;
+        });
+      } catch {
+        // silent polling catch
+      }
+    }, 3000);
+    return () => clearInterval(interval);
   }, [id]);
 
   async function loadLeadData() {
@@ -890,6 +924,70 @@ export function LeadDetailPage() {
     }
   }
 
+  async function handleAcceptProposal(proposal: any) {
+    if (!id || processingProposalId) return;
+    try {
+      setProcessingProposalId(proposal.id);
+      setActionFeedback(null);
+      await leadsApi.acceptProposal(id, proposal.id);
+
+      // Populate local form fields immediately
+      const pc = proposal.proposedChanges;
+      if (pc) {
+        if (pc.minBudget != null && pc.minBudget !== '') setMinBudget(Number(pc.minBudget));
+        if (pc.maxBudget != null && pc.maxBudget !== '') setMaxBudget(Number(pc.maxBudget));
+        if (pc.locations && Array.isArray(pc.locations) && pc.locations.length > 0) {
+          setLocations(pc.locations.join(', '));
+        }
+        if (pc.propertyType) setPropertyType(pc.propertyType);
+        if (pc.minBedrooms != null && pc.minBedrooms !== '') setMinBedrooms(Number(pc.minBedrooms));
+        if (pc.timeline) setPossessionTimeline(pc.timeline);
+      }
+
+      setActionFeedback({
+        type: 'success',
+        text: 'Applied & confirmed AI requirement proposal into database!',
+      });
+
+      // Reload lead, matches, and memory
+      const [updatedMatches, updatedLead] = await Promise.all([
+        propertiesApi.refreshLeadMatches(id).catch(() => null),
+        leadsApi.get(id).catch(() => null),
+      ]);
+      if (updatedMatches?.matches) setMatches(updatedMatches.matches);
+      if (updatedLead) setLead(updatedLead);
+      await reloadMemory();
+    } catch (err: any) {
+      setActionFeedback({
+        type: 'error',
+        text: err.message || 'Failed to apply proposal',
+      });
+    } finally {
+      setProcessingProposalId(null);
+    }
+  }
+
+  async function handleRejectProposal(proposalId: string) {
+    if (!id || processingProposalId) return;
+    try {
+      setProcessingProposalId(proposalId);
+      setActionFeedback(null);
+      await leadsApi.rejectProposal(id, proposalId);
+      setActionFeedback({
+        type: 'success',
+        text: 'Dismissed proposal.',
+      });
+      await reloadMemory();
+    } catch (err: any) {
+      setActionFeedback({
+        type: 'error',
+        text: err.message || 'Failed to dismiss proposal',
+      });
+    } finally {
+      setProcessingProposalId(null);
+    }
+  }
+
   async function handleSendAdvisorMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!id || !advisorMessage.trim()) return;
@@ -1016,8 +1114,8 @@ export function LeadDetailPage() {
 
   if (error || !lead) {
     return (
-      <div className="rounded-2xl bg-rose-50 border border-rose-200 p-6 text-center text-rose-700">
-        <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
+      <div className="rounded-2xl bg-rose-500/10 border border-rose-500/30 p-6 text-center text-rose-300">
+        <AlertTriangle className="h-6 w-6 mx-auto mb-2 text-rose-400" />
         {error || 'Lead not found'}
       </div>
     );
@@ -1114,10 +1212,10 @@ export function LeadDetailPage() {
         </button>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-[#9A9AA5]">Status:</span>
-          <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-500 text-white">
+          <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
             {lead.status}
           </span>
-          <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-amber-100 text-amber-800 border border-amber-200">
+          <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
             {lead.priority} Priority
           </span>
         </div>
@@ -1128,21 +1226,21 @@ export function LeadDetailPage() {
         <div
           className={`p-3 rounded-xl text-xs flex items-center justify-between border ${
             actionFeedback.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
               : actionFeedback.type === 'warning'
-              ? 'bg-amber-50 text-amber-800 border-amber-200'
-              : 'bg-rose-50 text-rose-800 border-rose-200'
+              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
           }`}
         >
           <div className="flex items-center gap-2">
-            {actionFeedback.type === 'success' && <Check className="h-4 w-4 text-emerald-600" />}
-            {actionFeedback.type === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-600" />}
-            {actionFeedback.type === 'error' && <AlertCircle className="h-4 w-4 text-rose-600" />}
+            {actionFeedback.type === 'success' && <Check className="h-4 w-4 text-emerald-400" />}
+            {actionFeedback.type === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-400" />}
+            {actionFeedback.type === 'error' && <AlertCircle className="h-4 w-4 text-rose-400" />}
             <span className="font-medium">{actionFeedback.text}</span>
           </div>
           <button
             onClick={() => setActionFeedback(null)}
-            className="text-xs font-bold hover:opacity-75"
+            className="text-xs font-bold hover:opacity-75 text-[#9A9AA5] hover:text-white"
           >
             ✕
           </button>
@@ -1151,9 +1249,9 @@ export function LeadDetailPage() {
 
       {/* ── Stagnant Inactivity Warning ── */}
       {lead.isInactiveWarning && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3.5 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-2.5">
-            <Clock className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <Clock className="h-4 w-4 text-amber-400 flex-shrink-0" />
             <div>
               <span className="font-bold">Attention — Inactivity Warning:</span> No qualifying advisor activity has been recorded on this lead for{' '}
               <span className="font-extrabold">{lead.daysSinceLastActivity} days</span>. Owner review recommended.
@@ -1162,7 +1260,7 @@ export function LeadDetailPage() {
           {currentUser?.role === 'OWNER' && (
             <button
               onClick={() => setShowReassignModal(true)}
-              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors w-fit"
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors w-fit"
             >
               Reassign Lead
             </button>
@@ -1224,7 +1322,7 @@ export function LeadDetailPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 ${
                 thread?.isHumanTakeover
                   ? 'bg-amber-600 text-white hover:bg-amber-500'
-                  : 'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold hover:bg-indigo-500'
+                  : 'btn-stripe-primary text-xs'
               }`}
             >
               {togglingTakeover && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -1239,30 +1337,30 @@ export function LeadDetailPage() {
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-[#9A9AA5] uppercase tracking-wider">Current Advisor:</span>
           {lead.assignedUser ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#635bff] bg-indigo-50 px-3 py-1 rounded-full border border-[#C9A961]/25">
-              <UserCheck className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#C9A961] bg-[#C9A961]/10 px-3 py-1 rounded-full border border-[#C9A961]/30">
+              <UserCheck className="h-3.5 w-3.5 text-[#C9A961]" />
               {lead.assignedUser.name || lead.assignedUser.email}
               {lead.assignedUserId === currentUser?.id && ' (You)'}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 border-dashed">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30 border-dashed">
               <Inbox className="h-3.5 w-3.5" />
               Unassigned Pool
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Deal Link or Convert Button */}
           {lead.deal ? (
             <Link
               to={`/deals/${lead.deal.id}`}
-              className="btn-stripe-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all"
               title="View converted deal"
             >
-              <Briefcase className="h-3.5 w-3.5 text-emerald-600" />
+              <Briefcase className="h-3.5 w-3.5 text-emerald-400" />
               View Deal
-              <ExternalLink className="h-3 w-3 text-emerald-600" />
+              <ExternalLink className="h-3 w-3 text-emerald-400" />
             </Link>
           ) : lead.status !== 'LOST' ? (
             <button
@@ -1273,7 +1371,7 @@ export function LeadDetailPage() {
                   ? 'Only the assigned advisor or organization owner can convert this lead'
                   : 'Convert qualified lead to an active deal'
               }
-              className="btn-stripe-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
               <Briefcase className="h-3.5 w-3.5" />
               Convert to Deal
@@ -1289,9 +1387,9 @@ export function LeadDetailPage() {
                 ? 'Only the assigned advisor or organization owner can record calls for this lead'
                 : 'Record manual phone call'
             }
-            className="btn-stripe-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 bg-[#181820] text-[#F5F5F7] border border-white/[0.08] hover:border-[#C9A961]/40 hover:text-[#C9A961] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
-            <PhoneCall className="h-3.5 w-3.5" />
+            <PhoneCall className="h-3.5 w-3.5 text-[#C9A961]" />
             Log Call
           </button>
 
@@ -1300,7 +1398,7 @@ export function LeadDetailPage() {
             <button
               onClick={handleClaim}
               disabled={claiming}
-              className="btn-stripe-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-xs"
+              className="btn-stripe-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5 shadow-xs"
             >
               {claiming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
               Claim Lead
@@ -1312,7 +1410,7 @@ export function LeadDetailPage() {
             (currentUser?.role === 'OWNER' || lead.assignedUserId === currentUser?.id) && (
               <button
                 onClick={() => setShowReleaseModal(true)}
-                className="btn-stripe-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 text-[#D1D1DB] hover:text-rose-600"
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 bg-[#181820] text-[#D1D1DB] border border-white/[0.08] hover:text-rose-400 hover:border-rose-500/40 transition-all cursor-pointer"
                 title="Release back to unassigned pool"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -1324,10 +1422,10 @@ export function LeadDetailPage() {
           {currentUser?.role === 'OWNER' && (
             <button
               onClick={() => setShowReassignModal(true)}
-              className="btn-stripe-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 text-[#635bff] border-[#C9A961]/30 hover:bg-indigo-50"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 bg-[#181820] text-[#9A9AA5] border border-white/[0.08] hover:text-[#F5F5F7] hover:border-white/20 transition-all cursor-pointer"
               title="Reassign to another advisor"
             >
-              <UserCheck className="h-3.5 w-3.5" />
+              <UserCheck className="h-3.5 w-3.5 text-[#C9A961]" />
               Reassign Advisor
             </button>
           )}
@@ -1345,27 +1443,61 @@ export function LeadDetailPage() {
               Structured Requirements
             </h2>
 
+            {(() => {
+              const pendingReqProposals = memoryData?.memory?.requirements?.pendingProposals;
+              if (!pendingReqProposals || pendingReqProposals.length === 0) return null;
+              const latest = pendingReqProposals[0];
+              return (
+                <div className="mb-3.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      {pendingReqProposals.length} AI Proposal{pendingReqProposals.length > 1 ? 's' : ''} Ready
+                    </span>
+                    <span className="text-[11px] text-[#9A9AA5] block truncate mt-0.5">
+                      Apply latest criteria to this form & database
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptProposal(latest)}
+                    disabled={!!processingProposalId}
+                    className="px-2.5 py-1 rounded-lg bg-[#C9A961] hover:bg-[#DFBF77] text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                  >
+                    <Check className="h-3 w-3" />
+                    {processingProposalId === latest?.id ? 'Applying...' : 'Apply Latest'}
+                  </button>
+                </div>
+              );
+            })()}
+
             <form onSubmit={handleSaveRequirements} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-[#D1D1DB] mb-1">Min Budget ($)</label>
+                  <label className="block font-semibold text-[#D1D1DB] mb-1">Min Budget (₹ INR)</label>
                   <input
                     type="number"
-                    placeholder="e.g. 400000"
+                    placeholder="e.g. 15000000 (₹1.5 Cr)"
                     value={minBudget}
                     onChange={(e) => setMinBudget(e.target.value ? Number(e.target.value) : '')}
                     className="w-full rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
+                  {typeof minBudget === 'number' && minBudget > 0 && (
+                    <span className="text-[10px] text-[#C9A961] font-mono mt-0.5 block">{formatIndianPrice(minBudget)}</span>
+                  )}
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#D1D1DB] mb-1">Max Budget ($)</label>
+                  <label className="block font-semibold text-[#D1D1DB] mb-1">Max Budget (₹ INR)</label>
                   <input
                     type="number"
-                    placeholder="e.g. 750000"
+                    placeholder="e.g. 25000000 (₹2.5 Cr)"
                     value={maxBudget}
                     onChange={(e) => setMaxBudget(e.target.value ? Number(e.target.value) : '')}
                     className="w-full rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
+                  {typeof maxBudget === 'number' && maxBudget > 0 && (
+                    <span className="text-[10px] text-[#C9A961] font-mono mt-0.5 block">{formatIndianPrice(maxBudget)}</span>
+                  )}
                 </div>
               </div>
 
@@ -1389,6 +1521,8 @@ export function LeadDetailPage() {
                     className="w-full rounded-lg border border-white/[0.08] px-2 py-1.5 text-xs focus:border-[#C9A961] focus:outline-none"
                   >
                     <option value="">Any Type</option>
+                    <option value="APARTMENT">Apartment</option>
+                    <option value="VILLA">Villa</option>
                     <option value="CONDO">Condo</option>
                     <option value="SINGLE_FAMILY">Single Family</option>
                     <option value="TOWNHOUSE">Townhouse</option>
@@ -1420,7 +1554,7 @@ export function LeadDetailPage() {
               <button
                 type="submit"
                 disabled={savingReqs}
-                className="w-full rounded-xl bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors flex items-center justify-center gap-1.5"
+                className="w-full btn-stripe-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
               >
                 {savingReqs && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Save &amp; Recalculate Matches
@@ -1548,7 +1682,7 @@ export function LeadDetailPage() {
                         </div>
 
                         {visit.outcomeNotes && (
-                          <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 text-[11px]">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 text-[11px]">
                             <span className="font-bold">Outcome: </span>
                             {visit.outcomeNotes}
                           </div>
@@ -1566,19 +1700,19 @@ export function LeadDetailPage() {
                           <div className="flex items-center gap-1.5 pt-1">
                             <button
                               onClick={() => handleOpenOutcomeModal(visit)}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-bold text-[10px] transition-colors"
+                              className="px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 font-bold text-[10px] transition-colors"
                             >
                               Complete Outcome
                             </button>
                             <button
                               onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 font-semibold text-[10px] transition-colors"
+                              className="px-2 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 font-semibold text-[10px] transition-colors"
                             >
                               Reschedule
                             </button>
                             <button
                               onClick={() => handleMarkNoShow(visit)}
-                              className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 font-semibold text-[10px] transition-colors"
+                              className="px-2 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 font-semibold text-[10px] transition-colors"
                             >
                               No-Show
                             </button>
@@ -1602,7 +1736,7 @@ export function LeadDetailPage() {
           <div className="rounded-2xl bg-[#141418] border border-white/[0.08] p-5 shadow-xs space-y-3">
             <h2 className="text-sm font-bold text-white flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <History className="h-4 w-4 text-[#635bff]" />
+                <History className="h-4 w-4 text-[#C9A961]" />
                 Assignment History
               </span>
               <span className="text-[11px] text-[#9A9AA5] font-medium">
@@ -1681,10 +1815,10 @@ export function LeadDetailPage() {
               <div
                 className={`rounded-2xl border p-5 shadow-xs transition-all ${
                   (activeEscalation?.urgency || openEscalationTask?.priority) === 'URGENT'
-                    ? 'border-rose-200 bg-rose-50/50'
+                    ? 'border-rose-500/30 bg-rose-500/10'
                     : (activeEscalation?.urgency || openEscalationTask?.priority) === 'HIGH'
-                    ? 'border-amber-200 bg-amber-50/50'
-                    : 'border-[#C9A961]/25 bg-indigo-50/40'
+                    ? 'border-amber-500/30 bg-amber-500/10'
+                    : 'border-[#C9A961]/30 bg-[#181820]'
                 }`}
               >
                 {/* Header */}
@@ -1693,8 +1827,8 @@ export function LeadDetailPage() {
                     <div
                       className={`p-2 rounded-xl ${
                         (activeEscalation?.urgency || openEscalationTask?.priority) === 'URGENT'
-                          ? 'bg-rose-100 text-rose-700'
-                          : 'bg-amber-100 text-amber-700'
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                       }`}
                     >
                       <ShieldAlert className="h-5 w-5" />
@@ -1705,10 +1839,10 @@ export function LeadDetailPage() {
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                             (activeEscalation?.urgency || openEscalationTask?.priority) === 'URGENT'
-                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
                               : (activeEscalation?.urgency || openEscalationTask?.priority) === 'HIGH'
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                              : 'bg-indigo-100 text-indigo-800 border border-[#C9A961]/30'
+                              ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                              : 'bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30'
                           }`}
                         >
                           {activeEscalation?.urgency || openEscalationTask?.priority || 'HIGH'} URGENCY
@@ -1723,7 +1857,7 @@ export function LeadDetailPage() {
                   {/* Status Badge */}
                   <div className="flex items-center gap-1.5">
                     {thread?.isHumanTakeover ? (
-                      <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
+                      <span className="text-[11px] font-semibold text-amber-300 bg-amber-500/15 px-2.5 py-1 rounded-full border border-amber-500/30 flex items-center gap-1">
                         <ShieldAlert className="h-3 w-3" /> Takeover Active
                       </span>
                     ) : (
@@ -1763,7 +1897,7 @@ export function LeadDetailPage() {
                       <button
                         type="button"
                         onClick={() => setExpandedBrief(!expandedBrief)}
-                        className="text-xs font-semibold text-[#C9A961] hover:text-indigo-800 flex items-center gap-1 transition-colors"
+                        className="text-xs font-semibold text-[#C9A961] hover:text-[#d8b870] flex items-center gap-1 transition-colors"
                       >
                         {expandedBrief ? 'Hide Detailed Evidence Brief' : 'View Grounded Context & Proposals Brief'}
                       </button>
@@ -1774,7 +1908,7 @@ export function LeadDetailPage() {
                             <span className="font-bold text-[#D1D1DB]">Confirmed Requirements: </span>
                             <span className="text-[#9A9AA5]">
                               {activeBrief.confirmedRequirements
-                                ? `Budget: $${activeBrief.confirmedRequirements.minBudget?.toLocaleString()} - $${activeBrief.confirmedRequirements.maxBudget?.toLocaleString()} | Locations: ${activeBrief.confirmedRequirements.preferredLocations?.join(', ') || 'Any'} | Beds: ${activeBrief.confirmedRequirements.minBedrooms ?? 'Any'}`
+                                ? `${activeBrief.confirmedRequirements.minBudget != null || activeBrief.confirmedRequirements.maxBudget != null ? `Budget: ${activeBrief.confirmedRequirements.minBudget ? formatIndianPrice(activeBrief.confirmedRequirements.minBudget) : '₹0'} - ${activeBrief.confirmedRequirements.maxBudget ? formatIndianPrice(activeBrief.confirmedRequirements.maxBudget) : 'No max'}` : 'Budget: Flexible'} | Locations: ${activeBrief.confirmedRequirements.preferredLocations?.join(', ') || 'Any'} | Beds: ${activeBrief.confirmedRequirements.minBedrooms ?? 'Any'}`
                                 : 'None confirmed yet in database'}
                             </span>
                           </div>
@@ -1813,7 +1947,7 @@ export function LeadDetailPage() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 ${
                         thread?.isHumanTakeover
                           ? 'bg-amber-600 text-white hover:bg-amber-500'
-                          : 'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold hover:bg-indigo-500'
+                          : 'btn-stripe-primary text-xs'
                       }`}
                     >
                       {togglingTakeover && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -1837,7 +1971,7 @@ export function LeadDetailPage() {
                       <button
                         onClick={() => handleReviewAiMessage(latestEscalationMsg.id, 'APPROVED')}
                         disabled={reviewingMessageId === latestEscalationMsg.id}
-                        className="px-2.5 py-1.5 rounded-lg bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold text-xs font-semibold hover:bg-indigo-500 disabled:opacity-50 flex items-center gap-1"
+                        className="btn-stripe-primary text-xs px-2.5 py-1.5 flex items-center gap-1 disabled:opacity-50"
                       >
                         {reviewingMessageId === latestEscalationMsg.id && <Loader2 className="h-3 w-3 animate-spin" />}
                         <Check className="h-3 w-3" /> Approve Draft
@@ -1845,7 +1979,7 @@ export function LeadDetailPage() {
                       <button
                         onClick={() => handleReviewAiMessage(latestEscalationMsg.id, 'REJECTED')}
                         disabled={reviewingMessageId === latestEscalationMsg.id}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-semibold hover:bg-rose-200 disabled:opacity-50"
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-semibold hover:bg-rose-500/25 disabled:opacity-50"
                       >
                         Discard
                       </button>
@@ -1871,27 +2005,27 @@ export function LeadDetailPage() {
             const triggerLabels: Record<string, { label: string; badge: string }> = {
               UNANSWERED_QUESTION: {
                 label: 'Unanswered Buyer Question',
-                badge: 'bg-rose-50 text-rose-700 border-rose-200',
+                badge: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
               },
               COMPLETED_VISIT_FOLLOW_UP: {
                 label: 'Post-Walkthrough Feedback Due',
-                badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
               },
               VISIT_INTEREST_UNSCHEDULED: {
                 label: 'Tour Interest Needs Scheduling',
-                badge: 'bg-sky-50 text-sky-700 border-sky-200',
+                badge: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
               },
               NEW_MATCHING_INVENTORY: {
                 label: 'New Matching Inventory Ready',
-                badge: 'bg-purple-50 text-purple-700 border-purple-200',
+                badge: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
               },
               INACTIVE_LEAD_CHECKIN: {
                 label: 'Inactive Lead Periodic Check-in',
-                badge: 'bg-amber-50 text-amber-700 border-amber-200',
+                badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
               },
               ADVISOR_COMMITMENT_DUE: {
                 label: 'Advisor Commitment Due',
-                badge: 'bg-indigo-50 text-indigo-700 border-[#C9A961]/30',
+                badge: 'bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/30',
               },
             };
 
@@ -1899,15 +2033,17 @@ export function LeadDetailPage() {
 
             return (
               <div
-                className={`rounded-2xl border p-4 shadow-xs transition-all ${
+                className={`rounded-2xl border p-5 shadow-sm transition-all relative overflow-hidden ${
                   rec.shouldFollowUp
-                    ? 'bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 border-[#C9A961]/30/80 ring-1 ring-indigo-500/10'
-                    : 'bg-[#181820]/60 border-white/[0.08] text-[#9A9AA5]'
+                    ? 'bg-[#141418] border-[#C9A961]/35 ring-1 ring-[#C9A961]/20'
+                    : 'bg-[#141418] border-white/[0.08] text-[#9A9AA5]'
                 }`}
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A961]/50 to-transparent" />
+
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30 shadow-2xs">
                       <Sparkles className="h-4 w-4" />
                     </span>
                     <div>
@@ -1915,17 +2051,17 @@ export function LeadDetailPage() {
                         Follow-Up Recommendation
                         {rec.priority && (
                           <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold uppercase ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
                               rec.priority === 'HIGH' || rec.priority === 'URGENT'
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-[#252530] text-[#D1D1DB]'
+                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                : 'bg-[#181820] text-[#D1D1DB] border-white/[0.08]'
                             }`}
                           >
                             {rec.priority}
                           </span>
                         )}
                       </h3>
-                      <p className="text-[11px] text-[#9A9AA5] font-medium">
+                      <p className="text-[11px] text-[#9A9AA5] font-medium mt-0.5">
                         Deterministic trigger analysis &amp; multi-day lead nurturing
                       </p>
                     </div>
@@ -1933,38 +2069,41 @@ export function LeadDetailPage() {
 
                   {triggerConfig && (
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${triggerConfig.badge}`}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${triggerConfig.badge}`}
                     >
                       {triggerConfig.label}
                     </span>
                   )}
                 </div>
 
-                <div className="text-xs space-y-2 mt-2.5">
-                  <div className="p-2.5 rounded-xl bg-[#181820] border border-white/[0.08]">
-                    <p className="font-semibold text-[#F5F5F7]">{rec.reason}</p>
-                    <p className="text-[11px] text-[#9A9AA5] mt-1">
+                <div className="text-xs space-y-3 mt-3">
+                  <div className="p-3.5 rounded-xl bg-[#181820] border border-white/[0.08]">
+                    <p className="font-semibold text-[#F5F5F7] leading-relaxed">{rec.reason}</p>
+                    <p className="text-[11px] text-[#9A9AA5] mt-1.5">
                       <span className="font-bold text-[#C9A961]">Action: </span>
                       {rec.recommendedAction}
                     </p>
                   </div>
 
                   {rec.evidence && rec.evidence.length > 0 && (
-                    <div className="text-[11px] text-[#9A9AA5] pl-2 border-l-2 border-indigo-300 space-y-0.5">
-                      <span className="font-bold text-[#D1D1DB] block">Underlying Evidence:</span>
-                      {rec.evidence.map((ev: string, idx: number) => (
-                        <div key={idx} className="flex items-start gap-1">
-                          <span className="text-indigo-500 font-bold">•</span>
-                          <span>{ev}</span>
-                        </div>
-                      ))}
+                    <div className="text-[11px] text-[#9A9AA5] pl-3 border-l-2 border-[#C9A961]/50 space-y-1 py-0.5">
+                      <span className="font-bold text-[#D1D1DB] block mb-1">Underlying Evidence:</span>
+                      {rec.evidence.map((ev: string, idx: number) => {
+                        const cleanEv = ev.replace(/\$undefined\s*-\s*\$undefined/, 'Flexible budget');
+                        return (
+                          <div key={idx} className="flex items-start gap-1.5">
+                            <span className="text-[#C9A961] font-bold">•</span>
+                            <span className="text-[#D1D1DB]">{cleanEv}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
                   <div className="flex items-center justify-between text-[11px] text-[#9A9AA5] pt-1">
                     <span>
                       Proposed Due:{' '}
-                      <strong className="text-[#D1D1DB]">
+                      <strong className="text-[#F5F5F7] font-mono">
                         {new Date(rec.suggestedDueDate).toLocaleString([], {
                           month: 'short',
                           day: 'numeric',
@@ -1974,8 +2113,8 @@ export function LeadDetailPage() {
                       </strong>
                     </span>
                     {rec.alreadyPlanned && (
-                      <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      <span className="inline-flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400" />
                         Task Already Open
                       </span>
                     )}
@@ -1983,15 +2122,15 @@ export function LeadDetailPage() {
 
                   {/* Suggested Draft Content Box */}
                   {rec.suggestedDraftContent && (
-                    <div className="p-2.5 rounded-xl bg-indigo-50/50 border border-[#C9A961]/25 text-[11px] space-y-1.5">
+                    <div className="p-3 rounded-xl bg-[#101014] border border-[#C9A961]/25 text-[11px] space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-indigo-900 flex items-center gap-1">
+                        <span className="font-bold text-[#F5F5F7] flex items-center gap-1.5">
                           <Bot className="h-3.5 w-3.5 text-[#C9A961]" />
                           Prepared Customer Draft (Pending Approval)
                         </span>
-                        <span className="text-[10px] text-[#C9A961] italic">No autonomous dispatch</span>
+                        <span className="text-[10px] text-[#C9A961] italic font-medium">No autonomous dispatch</span>
                       </div>
-                      <p className="text-[#D1D1DB] bg-[#181820] p-2 rounded-lg border border-[#C9A961]/25 italic">
+                      <p className="text-[#F5F5F7] bg-[#181820] p-3 rounded-xl border border-white/[0.08] italic text-xs leading-relaxed">
                         "{rec.suggestedDraftContent}"
                       </p>
                     </div>
@@ -2004,7 +2143,7 @@ export function LeadDetailPage() {
                         <button
                           onClick={handleCreateFollowUpTask}
                           disabled={planningFollowUp || !canManageTasks}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold hover:bg-indigo-500 transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                          className="btn-stripe-primary text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                         >
                           {planningFollowUp && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                           <CheckSquare className="h-3.5 w-3.5" />
@@ -2022,11 +2161,11 @@ export function LeadDetailPage() {
                     </div>
 
                     {pendingDraftMsg && (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleReviewAiMessage(pendingDraftMsg.id, 'APPROVED')}
                           disabled={reviewingMessageId === pendingDraftMsg.id}
-                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 disabled:opacity-50 flex items-center gap-1"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50 flex items-center gap-1 transition-all cursor-pointer"
                         >
                           {reviewingMessageId === pendingDraftMsg.id && <Loader2 className="h-3 w-3 animate-spin" />}
                           <Check className="h-3 w-3" /> Approve Draft
@@ -2034,7 +2173,7 @@ export function LeadDetailPage() {
                         <button
                           onClick={() => handleReviewAiMessage(pendingDraftMsg.id, 'REJECTED')}
                           disabled={reviewingMessageId === pendingDraftMsg.id}
-                          className="px-2.5 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-semibold hover:bg-rose-200 disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 transition-all cursor-pointer"
                         >
                           Discard
                         </button>
@@ -2064,6 +2203,7 @@ export function LeadDetailPage() {
                 </div>
               ) : (
                 thread?.messages?.map((msg: any) => {
+                  if (msg.senderType === 'AI' && !msg.content?.trim()) return null;
                   const isCustomer = msg.senderType === 'CUSTOMER';
                   const isAi = msg.senderType === 'AI';
                   return (
@@ -2076,20 +2216,20 @@ export function LeadDetailPage() {
                           isCustomer
                             ? 'bg-[#1E1E26] text-white'
                             : isAi
-                            ? 'bg-indigo-50 text-indigo-950 border border-[#C9A961]/30'
-                            : 'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold'
+                            ? 'bg-[#181820] text-indigo-100 border border-indigo-500/30'
+                            : 'bg-gradient-to-r from-[#C9A961] to-[#E5C985] text-[#0A0A0B] font-semibold'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5 text-[10px] font-semibold">
                           <div className="flex items-center gap-1.5">
                             <span className="opacity-80">{msg.senderType}</span>
                             {isAi && msg.approvalStatus === 'PENDING_APPROVAL' && (
-                              <span className="text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded text-[9px]">
+                              <span className="text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded text-[9px]">
                                 Pending Approval
                               </span>
                             )}
                             {isAi && msg.approvalStatus === 'APPROVED' && (
-                              <span className="text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.2 rounded text-[9px]">
+                              <span className="text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded text-[9px]">
                                 Approved
                               </span>
                             )}
@@ -2099,32 +2239,32 @@ export function LeadDetailPage() {
                           {!isCustomer && msg.deliveryStatus && msg.deliveryStatus !== 'NOT_APPLICABLE' && (
                             <div className="flex items-center gap-1">
                               {msg.deliveryStatus === 'QUEUED' && (
-                                <span className="text-amber-800 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <Clock className="h-2.5 w-2.5 animate-pulse" /> Outbox Queued
                                 </span>
                               )}
                               {msg.deliveryStatus === 'SENDING' && (
-                                <span className="text-blue-800 bg-blue-100/90 border border-blue-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-blue-300 bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <Loader2 className="h-2.5 w-2.5 animate-spin" /> Sending...
                                 </span>
                               )}
                               {msg.deliveryStatus === 'SENT' && (
-                                <span className="text-sky-800 bg-sky-100/90 border border-sky-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-sky-300 bg-sky-500/15 border border-sky-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <Send className="h-2.5 w-2.5" /> Dispatched
                                 </span>
                               )}
                               {msg.deliveryStatus === 'DELIVERED' && (
-                                <span className="text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <CheckCircle2 className="h-2.5 w-2.5" /> Delivered
                                 </span>
                               )}
                               {msg.deliveryStatus === 'FAILED' && (
-                                <span className="text-rose-800 bg-rose-100/90 border border-rose-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-rose-300 bg-rose-500/15 border border-rose-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <AlertCircle className="h-2.5 w-2.5" /> Failed
                                 </span>
                               )}
                               {msg.deliveryStatus === 'RETRY_PENDING' && (
-                                <span className="text-orange-800 bg-orange-100/90 border border-orange-300 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
+                                <span className="text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-1">
                                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Retry Pending
                                 </span>
                               )}
@@ -2135,8 +2275,8 @@ export function LeadDetailPage() {
 
                         {/* Delivery Failure Notice & Authorized Retry Button */}
                         {!isCustomer && msg.deliveryStatus === 'FAILED' && (
-                          <div className="mt-2 pt-2 border-t border-rose-200/50 flex flex-col gap-1.5">
-                            <div className="text-[10px] text-rose-800 bg-rose-50 border border-rose-200 rounded p-1.5">
+                          <div className="mt-2 pt-2 border-t border-rose-500/30 flex flex-col gap-1.5">
+                            <div className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/25 rounded p-1.5">
                               <span className="font-semibold">Delivery Issue:</span> {msg.deliveryError || 'Failed to dispatch to recipient'}
                             </div>
                             <button
@@ -2156,11 +2296,11 @@ export function LeadDetailPage() {
 
                         {/* AI Suggested Approval Buttons */}
                         {isAi && msg.approvalStatus === 'PENDING_APPROVAL' && (
-                          <div className="mt-2 pt-2 border-t border-[#C9A961]/30/60 flex items-center gap-2">
+                          <div className="mt-2 pt-2 border-t border-[#C9A961]/30 flex items-center gap-2">
                             <button
                               onClick={() => handleReviewAiMessage(msg.id, 'APPROVED')}
                               disabled={reviewingMessageId === msg.id}
-                              className="px-2 py-1 rounded bg-[#C9A961] text-[#0A0A0B] hover:bg-[#D4B872] font-semibold text-[10px] font-bold hover:bg-indigo-500 disabled:opacity-50 flex items-center gap-1"
+                              className="btn-stripe-primary text-[10px] px-2 py-1 flex items-center gap-1 disabled:opacity-50"
                             >
                               {reviewingMessageId === msg.id && <Loader2 className="h-3 w-3 animate-spin" />}
                               <Check className="h-3 w-3" /> Approve Draft
@@ -2168,7 +2308,7 @@ export function LeadDetailPage() {
                             <button
                               onClick={() => handleReviewAiMessage(msg.id, 'REJECTED')}
                               disabled={reviewingMessageId === msg.id}
-                              className="px-2 py-1 rounded bg-rose-100 text-rose-700 text-[10px] font-bold hover:bg-rose-200 disabled:opacity-50"
+                              className="px-2 py-1 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold hover:bg-rose-500/25 disabled:opacity-50"
                             >
                               Discard
                             </button>
@@ -2188,12 +2328,12 @@ export function LeadDetailPage() {
                 placeholder={thread?.isHumanTakeover ? "Type message as Advisor..." : "Send advisor reply (will activate takeover)..."}
                 value={advisorMessage}
                 onChange={(e) => setAdvisorMessage(e.target.value)}
-                className="flex-1 rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                className="flex-1 rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={sendingAdvisorMessage || !advisorMessage.trim()}
-                className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                className="btn-stripe-primary text-xs px-3.5 py-2 flex items-center gap-1.5 disabled:opacity-50"
               >
                 {sendingAdvisorMessage ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2207,57 +2347,6 @@ export function LeadDetailPage() {
             </form>
           </div>
 
-          {/* ── Demo / Development Only: Customer Inquiry Simulation Panel ── */}
-          {!import.meta.env.PROD && (
-            <div className="rounded-2xl bg-amber-50/60 border border-amber-200/80 p-4 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase tracking-wider">
-                    Dev / Demo Only
-                  </span>
-                  <h3 className="text-xs font-bold text-amber-950">
-                    Customer Inquiry Simulator
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSimulator(!showSimulator)}
-                  className="text-[11px] font-medium text-amber-800 hover:text-amber-900 underline"
-                >
-                  {showSimulator ? 'Hide Simulator' : 'Show Simulator'}
-                </button>
-              </div>
-              <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                Injects simulated customer text into the thread to test AI qualification and draft generation. This tool is disabled in production.
-              </p>
-              {showSimulator && (
-                <form onSubmit={handleSimulateCustomerMessage} className="pt-2 flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter simulated buyer inquiry (e.g. 'Looking for 3BHK in Austin under $800k')..."
-                    value={simulatedCustomerMessage}
-                    onChange={(e) => setSimulatedCustomerMessage(e.target.value)}
-                    className="flex-1 rounded-xl border border-amber-500/40 bg-[#181820] px-3 py-2 text-xs text-[#F5F5F7] focus:border-amber-500 focus:outline-none placeholder:text-[#6E6E7A]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sendingSimulatedMessage || !simulatedCustomerMessage.trim()}
-                    className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-500 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
-                  >
-                    {sendingSimulatedMessage ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>Simulate Inquiry</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
           {/* ── Follow-Up Tasks & Reminders Card ── */}
           <div className="rounded-2xl bg-[#141418] border border-white/[0.08] p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
@@ -2267,7 +2356,7 @@ export function LeadDetailPage() {
                   Follow-Up Tasks &amp; Reminders
                 </h2>
                 {tasks.some((t) => t.status === 'OPEN' && (t.isOverdue || new Date(t.dueDate).getTime() < Date.now())) && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 animate-pulse">
                     Overdue
                   </span>
                 )}
@@ -2279,7 +2368,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={handleOpenAddTaskModal}
                   disabled={!canManageTasks}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-[#635bff] border border-[#C9A961]/30 hover:bg-indigo-100 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30 hover:bg-[#C9A961]/25 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!canManageTasks ? 'Only assigned advisor or owner can create tasks' : 'Schedule new follow-up task'}
                 >
                   <Plus className="h-3 w-3" />
@@ -2321,7 +2410,7 @@ export function LeadDetailPage() {
                 {canManageTasks && taskTabFilter !== 'COMPLETED' && (
                   <button
                     onClick={handleOpenAddTaskModal}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#635bff] hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#C9A961] hover:underline"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Create a follow-up task for this lead
@@ -2341,9 +2430,9 @@ export function LeadDetailPage() {
                       key={t.id}
                       className={`p-3 rounded-xl border text-xs space-y-1.5 transition-colors ${
                         isOverdue
-                          ? 'border-rose-200 bg-rose-50/40'
+                          ? 'border-rose-500/30 bg-rose-500/10'
                           : t.status === 'COMPLETED'
-                          ? 'border-emerald-200 bg-emerald-50/20'
+                          ? 'border-emerald-500/30 bg-emerald-500/10'
                           : t.status === 'CANCELLED'
                           ? 'border-white/[0.08] bg-[#181820]/30 opacity-75'
                           : 'border-white/[0.08] bg-[#181820]/60 hover:bg-[#181820]'
@@ -2359,12 +2448,12 @@ export function LeadDetailPage() {
                             {t.priority}
                           </span>
                           {isOverdue && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-100 text-rose-700 border border-rose-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-500/15 text-rose-300 border border-rose-500/30">
                               <AlertTriangle className="h-3 w-3" /> Overdue
                             </span>
                           )}
                           {t.status === 'COMPLETED' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                               <CheckCircle2 className="h-3 w-3" /> Completed
                             </span>
                           )}
@@ -2374,7 +2463,7 @@ export function LeadDetailPage() {
                             </span>
                           )}
                           {t.callLogId && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-50 text-indigo-700 border border-[#C9A961]/25">
+                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
                               From Call Log
                             </span>
                           )}
@@ -2386,7 +2475,7 @@ export function LeadDetailPage() {
                             <button
                               onClick={() => handleCompleteTask(t.id)}
                               disabled={completingTaskId === t.id}
-                              className="px-2 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                              className="px-2 py-1 text-[11px] font-bold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors flex items-center gap-1 disabled:opacity-50"
                               title="Mark task completed"
                             >
                               {completingTaskId === t.id ? (
@@ -2399,7 +2488,7 @@ export function LeadDetailPage() {
                             <button
                               onClick={() => handleCancelTask(t.id)}
                               disabled={cancellingTaskId === t.id}
-                              className="p-1 rounded-lg text-[#6E6E7A] hover:text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                              className="p-1 rounded-lg text-[#6E6E7A] hover:text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
                               title="Cancel task"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -2426,7 +2515,7 @@ export function LeadDetailPage() {
                       </div>
 
                       {t.status === 'COMPLETED' && t.completedAt && (
-                        <div className="text-[10px] text-emerald-700 bg-emerald-50/60 px-2 py-1 rounded border border-emerald-100 flex items-center justify-between">
+                        <div className="text-[10px] text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 flex items-center justify-between">
                           <span>Completed by: {t.completedUser?.name || t.completedUser?.email || 'Advisor'}</span>
                           <span>{new Date(t.completedAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
@@ -2452,7 +2541,7 @@ export function LeadDetailPage() {
                 <button
                   onClick={handleOpenLogCallModal}
                   disabled={!canLogCall}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-[#635bff] border border-[#C9A961]/30 hover:bg-indigo-100 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30 hover:bg-[#C9A961]/25 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   title={!canLogCall ? 'Only assigned advisor or owner can record calls' : 'Record new phone call'}
                 >
                   <Phone className="h-3 w-3" />
@@ -2467,7 +2556,7 @@ export function LeadDetailPage() {
                 {canLogCall && (
                   <button
                     onClick={handleOpenLogCallModal}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#635bff] hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#C9A961] hover:underline"
                   >
                     <PhoneCall className="h-3.5 w-3.5" />
                     Record your first call with this lead
@@ -2488,11 +2577,11 @@ export function LeadDetailPage() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
                           {isInbound ? (
-                            <span className="inline-flex items-center gap-1 text-teal-700 font-bold text-[11px]">
-                              <PhoneIncoming className="h-3.5 w-3.5 text-teal-600" /> Inbound
+                            <span className="inline-flex items-center gap-1 text-teal-400 font-bold text-[11px]">
+                              <PhoneIncoming className="h-3.5 w-3.5 text-teal-400" /> Inbound
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-indigo-700 font-bold text-[11px]">
+                            <span className="inline-flex items-center gap-1 text-[#C9A961] font-bold text-[11px]">
                               <PhoneOutgoing className="h-3.5 w-3.5 text-[#C9A961]" /> Outbound
                             </span>
                           )}
@@ -2522,12 +2611,12 @@ export function LeadDetailPage() {
                       )}
 
                       {c.followUpNeeded && (
-                        <div className="flex items-center justify-between gap-1.5 text-[10px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-md border border-amber-200/60">
+                        <div className="flex items-center justify-between gap-1.5 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1.5 rounded-md border border-amber-500/25">
                           <div className="flex items-center gap-1.5">
-                            <Calendar className="h-3 w-3 text-amber-600" />
+                            <Calendar className="h-3 w-3 text-amber-400" />
                             <span>Follow-up Scheduled</span>
                             {c.followUpDate && (
-                              <span className="text-amber-700 font-normal">
+                              <span className="text-amber-400 font-normal">
                                 • Due: {new Date(c.followUpDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
@@ -2536,12 +2625,12 @@ export function LeadDetailPage() {
                             <span
                               className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
                                 c.followUpTask.status === 'COMPLETED'
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                                   : c.followUpTask.status === 'CANCELLED'
                                   ? 'bg-[#1E1E26] text-[#9A9AA5] border-white/[0.08]'
                                   : (c.followUpTask.isOverdue || new Date(c.followUpTask.dueDate).getTime() < Date.now())
-                                  ? 'bg-rose-100 text-rose-800 border-rose-200'
-                                  : 'bg-indigo-100 text-indigo-800 border-[#C9A961]/30'
+                                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                  : 'bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/30'
                               }`}
                             >
                               Task: {c.followUpTask.status === 'OPEN' && (c.followUpTask.isOverdue || new Date(c.followUpTask.dueDate).getTime() < Date.now()) ? 'OVERDUE' : c.followUpTask.status}
@@ -2550,7 +2639,7 @@ export function LeadDetailPage() {
                             <button
                               onClick={handleOpenAddTaskModal}
                               disabled={!canManageTasks}
-                              className="text-[9px] font-bold text-indigo-700 hover:underline disabled:opacity-50"
+                              className="text-[9px] font-bold text-[#C9A961] hover:underline disabled:opacity-50"
                             >
                               + Create Task
                             </button>
@@ -2576,12 +2665,15 @@ export function LeadDetailPage() {
               </h2>
               <div className="flex items-center gap-1.5">
                 {memoryData?.memory?.eligibility?.eligibleForFollowUp ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Active Lead
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    Bot Follow-Up: Active
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                    Suppressed
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                    title={memoryData?.memory?.eligibility?.ineligibilityReason || 'Human takeover is active'}
+                  >
+                    Bot Follow-Up: Paused
                   </span>
                 )}
                 <button
@@ -2596,7 +2688,7 @@ export function LeadDetailPage() {
             </div>
 
             {memoryError ? (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
                 {memoryError}
               </div>
             ) : !memoryData ? (
@@ -2606,13 +2698,13 @@ export function LeadDetailPage() {
             ) : (
               <div className="space-y-3 text-xs">
                 {/* 1. Confirmed Database Facts (Authoritative DB) */}
-                <div className="p-3 rounded-xl border border-emerald-200/80 bg-emerald-50/20 space-y-1.5">
+                <div className="p-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[#F5F5F7] flex items-center gap-1 text-[11px]">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                       Confirmed Requirements
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                       Authoritative DB
                     </span>
                   </div>
@@ -2621,8 +2713,9 @@ export function LeadDetailPage() {
                       <div>
                         <span className="text-[#9A9AA5] font-medium">Budget: </span>
                         <strong>
-                          ${memoryData.memory.requirements.confirmed.minBudget?.toLocaleString() ?? 'Any'} – $
-                          {memoryData.memory.requirements.confirmed.maxBudget?.toLocaleString() ?? 'Any'}
+                          {memoryData.memory.requirements.confirmed.minBudget != null || memoryData.memory.requirements.confirmed.maxBudget != null
+                            ? `${memoryData.memory.requirements.confirmed.minBudget ? formatIndianPrice(memoryData.memory.requirements.confirmed.minBudget) : '₹0'} – ${memoryData.memory.requirements.confirmed.maxBudget ? formatIndianPrice(memoryData.memory.requirements.confirmed.maxBudget) : 'No max'}`
+                            : 'Flexible / Any budget'}
                         </strong>
                       </div>
                       <div>
@@ -2655,20 +2748,77 @@ export function LeadDetailPage() {
 
                 {/* 2. Pending Proposals (Pending Approval) */}
                 {memoryData.memory.requirements?.pendingProposals?.length > 0 && (
-                  <div className="p-3 rounded-xl border border-amber-200/80 bg-amber-50/30 space-y-1.5">
+                  <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-900 text-[11px]">
+                      <span className="font-bold text-amber-300 text-[11px]">
                         Pending Requirement Proposals ({memoryData.memory.requirements.pendingProposals.length})
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         Pending Proposal
                       </span>
                     </div>
-                    <div className="space-y-1.5 pt-1">
+                    <div className="space-y-2 pt-1">
                       {memoryData.memory.requirements.pendingProposals.map((p: any) => (
-                        <div key={p.id} className="text-[11px] bg-[#181820] p-2 rounded-lg border border-amber-500/30 space-y-0.5">
-                          <p className="font-semibold text-[#F5F5F7]">{p.reason}</p>
+                        <div key={p.id} className="text-[11px] bg-[#181820] p-2.5 rounded-xl border border-amber-500/30 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold text-[#F5F5F7] text-xs">{p.reason}</p>
+                            <span className="text-[10px] text-[#9A9AA5]">{new Date(p.createdAt).toLocaleDateString()}</span>
+                          </div>
+
+                          {/* Extracted criteria breakdown */}
+                          <div className="grid grid-cols-2 gap-1.5 bg-[#101014] p-2 rounded-lg border border-white/5 text-[10.5px]">
+                            {(p.proposedChanges?.minBudget || p.proposedChanges?.maxBudget) && (
+                              <div className="col-span-2">
+                                <span className="text-[#9A9AA5]">Budget: </span>
+                                <span className="font-mono text-[#C9A961] font-bold">
+                                  {p.proposedChanges.minBudget ? formatIndianPrice(p.proposedChanges.minBudget) : '₹0'} – {p.proposedChanges.maxBudget ? formatIndianPrice(p.proposedChanges.maxBudget) : 'No max'}
+                                </span>
+                              </div>
+                            )}
+                            {p.proposedChanges?.locations?.length > 0 && (
+                              <div>
+                                <span className="text-[#9A9AA5]">Locations: </span>
+                                <span className="text-[#F5F5F7] font-medium">{p.proposedChanges.locations.join(', ')}</span>
+                              </div>
+                            )}
+                            {(p.proposedChanges?.minBedrooms || p.proposedChanges?.propertyType) && (
+                              <div>
+                                <span className="text-[#9A9AA5]">Beds/Type: </span>
+                                <span className="text-[#F5F5F7] font-medium">
+                                  {p.proposedChanges.minBedrooms ? `${p.proposedChanges.minBedrooms} Beds` : ''} {p.proposedChanges.propertyType || ''}
+                                </span>
+                              </div>
+                            )}
+                            {p.proposedChanges?.timeline && (
+                              <div>
+                                <span className="text-[#9A9AA5]">Timeline: </span>
+                                <span className="text-[#F5F5F7] font-medium">{p.proposedChanges.timeline}</span>
+                              </div>
+                            )}
+                          </div>
+
                           <p className="text-[10px] text-[#9A9AA5] italic">"{p.sourceEvidence}"</p>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptProposal(p)}
+                              disabled={processingProposalId === p.id}
+                              className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {processingProposalId === p.id ? 'Applying...' : 'Apply & Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectProposal(p.id)}
+                              disabled={processingProposalId === p.id}
+                              className="py-1.5 px-2.5 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <X className="h-3.5 w-3.5" /> Dismiss
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2695,9 +2845,9 @@ export function LeadDetailPage() {
                               {new Date(v.startAt).toLocaleDateString()} • {v.status}
                             </div>
                           </div>
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                            v.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-                            v.status === 'CANCELLED' ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800'
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase border ${
+                            v.status === 'COMPLETED' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
+                            v.status === 'CANCELLED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
                           }`}>
                             {v.provenance === 'CONFIRMED_VISIT' ? 'CONFIRMED' : v.status}
                           </span>
@@ -2712,13 +2862,13 @@ export function LeadDetailPage() {
                   {memoryData.memory.siteVisits?.pendingProposals?.length > 0 && (
                     <div className="pt-1 border-t border-white/[0.08]">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-indigo-700">Proposed Tour Slots</span>
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-[#C9A961]/30">
+                        <span className="text-[10px] font-bold text-indigo-400">Proposed Tour Slots</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
                           PROPOSED (NOT BOOKED)
                         </span>
                       </div>
                       {memoryData.memory.siteVisits.pendingProposals.map((pv: any, i: number) => (
-                        <div key={i} className="text-[10px] text-[#9A9AA5] bg-indigo-50/40 p-1.5 rounded border border-[#C9A961]/25">
+                        <div key={i} className="text-[10px] text-[#D1D1DB] bg-[#181820] p-1.5 rounded border border-white/[0.08]">
                           Proposed slot: {pv.proposedSlot} ({pv.status})
                         </div>
                       ))}
@@ -2736,10 +2886,10 @@ export function LeadDetailPage() {
                   </div>
 
                   {memoryData.memory.conversationState?.unansweredQuestion?.isUnanswered ? (
-                    <div className="bg-rose-50 p-2 rounded-lg border border-rose-200 text-[11px] text-rose-800 space-y-0.5">
+                    <div className="bg-rose-500/10 p-2 rounded-lg border border-rose-500/25 text-[11px] text-rose-300 space-y-0.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold">Unanswered Question</span>
-                        <span className="text-[10px] font-bold text-rose-600">
+                        <span className="text-[10px] font-bold text-rose-400">
                           {memoryData.memory.conversationState.unansweredQuestion.hoursPending}h pending
                         </span>
                       </div>
@@ -2788,13 +2938,13 @@ export function LeadDetailPage() {
                         <h4 className="font-bold text-white">{m.property.title}</h4>
                         <p className="text-[11px] text-[#9A9AA5]">{m.property.address}, {m.property.city}</p>
                       </div>
-                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                         {Math.round(m.matchScore * 100)}% Match
                       </span>
                     </div>
 
                     <div className="text-[#D1D1DB] font-semibold flex items-center gap-3 text-[11px]">
-                      <span>${m.property.price.toLocaleString()}</span>
+                      <span title={formatIndianPriceFull(m.property.price)}>{formatIndianPrice(m.property.price)}</span>
                       <span>•</span>
                       <span>{m.property.bedrooms} Beds / {m.property.bathrooms} Baths</span>
                     </div>
@@ -2802,14 +2952,14 @@ export function LeadDetailPage() {
                     {/* ── Verified Match Reasons ── */}
                     <div className="text-[11px] text-[#9A9AA5] bg-[#181820] p-2 rounded-lg border border-white/[0.06] space-y-1">
                       <p className="font-bold text-[#F5F5F7] flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Match Breakdown:
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Match Breakdown:
                       </p>
                       <p className="whitespace-pre-wrap text-[10.5px] leading-relaxed">{m.matchReason}</p>
                     </div>
 
                     {/* ── Failed Soft Criteria Tags ── */}
                     {m.failedCriteria?.length > 0 && (
-                      <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-md border border-amber-500/30">
+                      <div className="text-[10px] text-amber-300 bg-amber-500/10 p-1.5 rounded-md border border-amber-500/25">
                         <span className="font-bold">Unmet Preference:</span> {m.failedCriteria.join('; ')}
                       </div>
                     )}
@@ -2828,7 +2978,7 @@ export function LeadDetailPage() {
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Activity className="h-5 w-5 text-[#C9A961]" />
               Unified Activity Timeline
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-[#C9A961]/30">
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30">
                 {timelineTotal} {timelineTotal === 1 ? 'event' : 'events'}
               </span>
             </h2>
@@ -2879,9 +3029,9 @@ export function LeadDetailPage() {
 
         {/* Loading / Error / Empty States */}
         {timelineError ? (
-          <div className="p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center justify-between">
+          <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-rose-600" />
+              <AlertCircle className="h-4 w-4 text-rose-400" />
               <span>{timelineError}</span>
             </div>
             <button
@@ -3143,8 +3293,8 @@ export function LeadDetailPage() {
 
             {/* Error Banner */}
             {callFormError && (
-              <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
                 <div className="font-medium">{callFormError}</div>
               </div>
             )}
@@ -3161,7 +3311,7 @@ export function LeadDetailPage() {
                     onClick={() => setCallDirection('OUTBOUND')}
                     className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       callDirection === 'OUTBOUND'
-                        ? 'border-[#635bff] bg-indigo-50/70 text-[#635bff]'
+                        ? 'border-[#C9A961] bg-[#C9A961]/15 text-[#C9A961]'
                         : 'border-white/[0.08] bg-[#181820] text-[#D1D1DB] hover:bg-[#1E1E26]'
                     }`}
                   >
@@ -3173,7 +3323,7 @@ export function LeadDetailPage() {
                     onClick={() => setCallDirection('INBOUND')}
                     className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                       callDirection === 'INBOUND'
-                        ? 'border-teal-500 bg-teal-50/70 text-teal-700'
+                        ? 'border-teal-500/50 bg-teal-500/15 text-teal-300'
                         : 'border-white/[0.08] bg-[#181820] text-[#D1D1DB] hover:bg-[#1E1E26]'
                     }`}
                   >
@@ -3191,7 +3341,7 @@ export function LeadDetailPage() {
                 <select
                   value={callOutcome}
                   onChange={(e) => setCallOutcome(e.target.value as CallOutcome)}
-                  className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                 >
                   <option value="CONNECTED">Connected (Spoke with Lead)</option>
                   <option value="CALLBACK_REQUESTED">Callback Requested</option>
@@ -3215,7 +3365,7 @@ export function LeadDetailPage() {
                     onChange={(e) => setCallTimestamp(e.target.value)}
                     max={getLocalIsoString(new Date(Date.now() + 5 * 60 * 1000))}
                     required
-                    className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
                 </div>
                 <div>
@@ -3229,7 +3379,7 @@ export function LeadDetailPage() {
                     placeholder="e.g. 180 (for 3m)"
                     value={callDurationSeconds}
                     onChange={(e) => setCallDurationSeconds(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
                 </div>
               </div>
@@ -3239,7 +3389,7 @@ export function LeadDetailPage() {
                 <label className="block font-semibold text-[#D1D1DB] mb-1">
                   Call Notes{' '}
                   {callOutcome === 'OTHER' ? (
-                    <span className="text-rose-600 font-bold">* (Required for "Other")</span>
+                    <span className="text-rose-400 font-bold">* (Required for "Other")</span>
                   ) : (
                     <span className="text-[#6E6E7A] font-normal">(Optional)</span>
                   )}
@@ -3253,7 +3403,7 @@ export function LeadDetailPage() {
                       ? 'Detailed notes required to explain the "Other" outcome...'
                       : 'Discussion points, customer sentiment, budget updates, next steps...'
                   }
-                  className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                 />
               </div>
 
@@ -3264,7 +3414,7 @@ export function LeadDetailPage() {
                     type="checkbox"
                     checked={callFollowUpNeeded}
                     onChange={(e) => setCallFollowUpNeeded(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-[#635bff] focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-300 accent-[#C9A961]"
                   />
                   <span>Follow-up required for this lead</span>
                 </label>
@@ -3298,7 +3448,7 @@ export function LeadDetailPage() {
                 <button
                   type="submit"
                   disabled={loggingCall}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#635bff] text-white text-xs font-bold hover:bg-[#5247db] flex items-center gap-1.5 disabled:opacity-50"
+                  className="btn-stripe-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {loggingCall && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Save Call Log
@@ -3328,8 +3478,8 @@ export function LeadDetailPage() {
 
             <form onSubmit={handleCreateTask} className="mt-4 space-y-4 text-xs">
               {taskFormError && (
-                <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="p-3 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
                   <span>{taskFormError}</span>
                 </div>
               )}
@@ -3345,7 +3495,7 @@ export function LeadDetailPage() {
                   placeholder="e.g. Call lead to discuss 3BHK site visit options"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                 />
               </div>
 
@@ -3396,7 +3546,7 @@ export function LeadDetailPage() {
                     required
                     value={taskDueDate}
                     onChange={(e) => setTaskDueDate(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
                 </div>
                 {isOrgOwner && orgMembers.length > 0 ? (
@@ -3441,7 +3591,7 @@ export function LeadDetailPage() {
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
                   placeholder="Specific follow-up instructions, customer questions to answer, units to show..."
-                  className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                 />
               </div>
 
@@ -3457,7 +3607,7 @@ export function LeadDetailPage() {
                 <button
                   type="submit"
                   disabled={savingTask}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#635bff] text-white text-xs font-bold hover:bg-[#5247db] flex items-center gap-1.5 disabled:opacity-50"
+                  className="btn-stripe-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {savingTask && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Schedule Task
@@ -3486,8 +3636,8 @@ export function LeadDetailPage() {
 
             <form onSubmit={handleScheduleVisit} className="mt-4 space-y-4 text-xs">
               {visitFormError && (
-                <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="p-3 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
                   <span>{visitFormError}</span>
                 </div>
               )}
@@ -3512,7 +3662,7 @@ export function LeadDetailPage() {
                   <option value="">No specific property / General Showing</option>
                   {allProperties.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.title} (${p.price.toLocaleString()} • {p.city})
+                      {p.title} ({formatIndianPrice(p.price)} • {p.city})
                     </option>
                   ))}
                 </select>
@@ -3568,12 +3718,12 @@ export function LeadDetailPage() {
                     <Loader2 className="h-3 w-3 animate-spin" /> Checking...
                   </span>
                 ) : availabilityStatus?.available ? (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Slot Available
+                  <span className="text-emerald-300 font-bold flex items-center gap-1 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Slot Available
                   </span>
                 ) : availabilityStatus && !availabilityStatus.available ? (
-                  <span className="text-rose-700 font-bold flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                    <XCircle className="h-3 w-3 text-rose-600" /> Overlap Conflict
+                  <span className="text-rose-300 font-bold flex items-center gap-1 bg-rose-500/15 px-2 py-0.5 rounded border border-rose-500/30">
+                    <XCircle className="h-3 w-3 text-rose-400" /> Overlap Conflict
                   </span>
                 ) : (
                   <span className="text-[#6E6E7A]">Select time to verify</span>
@@ -3676,8 +3826,8 @@ export function LeadDetailPage() {
 
             <form onSubmit={handleRescheduleVisit} className="mt-4 space-y-4 text-xs">
               {rescheduleError && (
-                <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <div className="p-3 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
                   <span>{rescheduleError}</span>
                 </div>
               )}
@@ -3923,27 +4073,27 @@ export function LeadDetailPage() {
 
             {convertSuccess ? (
               <div className="mt-5 space-y-4 text-xs">
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
                   <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                     Deal #{convertSuccess.deal.id.slice(0, 8)} Created
                   </div>
-                  <p className="text-xs text-emerald-700 mb-3">
-                    Lead <span className="font-semibold">{lead?.fullName}</span> has been converted to an active deal.
+                  <p className="text-xs text-emerald-300/90 mb-3">
+                    Lead <span className="font-semibold text-white">{lead?.fullName}</span> has been converted to an active deal.
                   </p>
 
-                  <div className="bg-[#181820] rounded-lg p-3 space-y-1.5 border border-emerald-100 text-xs text-[#D1D1DB]">
+                  <div className="bg-[#181820] rounded-lg p-3 space-y-1.5 border border-emerald-500/20 text-xs text-[#D1D1DB]">
                     <div className="flex justify-between">
                       <span className="text-[#9A9AA5]">Property Address:</span>
                       <span className="font-semibold">{convertSuccess.deal.propertyAddress}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[#9A9AA5]">Status:</span>
-                      <span className="font-semibold text-emerald-700">{convertSuccess.deal.status}</span>
+                      <span className="font-semibold text-emerald-400">{convertSuccess.deal.status}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[#9A9AA5]">Contingency Pipeline:</span>
-                      <span className="font-semibold text-indigo-700">
+                      <span className="font-semibold text-[#C9A961]">
                         {convertSuccess.contingencyInitialization?.status || 'PENDING_DOCUMENT_UPLOAD'}
                       </span>
                     </div>
@@ -3973,7 +4123,7 @@ export function LeadDetailPage() {
                   </button>
                   <Link
                     to={`/deals/${convertSuccess.deal.id}`}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5"
+                    className="btn-stripe-primary text-xs px-4 py-2 flex items-center gap-1.5"
                   >
                     Go to Deal
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -3998,24 +4148,24 @@ export function LeadDetailPage() {
 
                 {/* Qualification Guidance */}
                 {['NEW', 'CONTACTED'].includes(lead?.status || '') ? (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-semibold">Early Stage Lead:</span> This lead is in stage{' '}
                       <span className="font-bold">{lead?.status}</span>. Converting prior to full qualification requires an explicit override reason.
                     </div>
                   </div>
                 ) : (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
                     <span>Lead stage qualifies for deal conversion under standard policy.</span>
                   </div>
                 )}
 
                 {/* Error Banner */}
                 {convertError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
                     <span>{convertError}</span>
                   </div>
                 )}
@@ -4038,7 +4188,7 @@ export function LeadDetailPage() {
                           }
                         }
                       }}
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                     >
                       <option value="">-- None (Manual Address) --</option>
                       {allProperties.map((p) => (
@@ -4061,7 +4211,7 @@ export function LeadDetailPage() {
                     value={convertAddress}
                     onChange={(e) => setConvertAddress(e.target.value)}
                     placeholder="e.g. 742 Evergreen Terrace, Springfield, OR"
-                    className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                   />
                 </div>
 
@@ -4074,7 +4224,7 @@ export function LeadDetailPage() {
                       value={convertBuyerName}
                       onChange={(e) => setConvertBuyerName(e.target.value)}
                       placeholder="e.g. John Doe"
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -4084,7 +4234,7 @@ export function LeadDetailPage() {
                       value={convertSellerName}
                       onChange={(e) => setConvertSellerName(e.target.value)}
                       placeholder="e.g. Jane Smith"
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -4099,7 +4249,7 @@ export function LeadDetailPage() {
                       type="datetime-local"
                       value={convertAcceptanceDate}
                       onChange={(e) => setConvertAcceptanceDate(e.target.value)}
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -4107,7 +4257,7 @@ export function LeadDetailPage() {
                     <select
                       value={convertTimezone}
                       onChange={(e) => setConvertTimezone(e.target.value)}
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
                     >
                       <option value="America/New_York">Eastern (America/New_York)</option>
                       <option value="America/Chicago">Central (America/Chicago)</option>
@@ -4119,22 +4269,22 @@ export function LeadDetailPage() {
 
                 {/* Early Stage Override */}
                 {['NEW', 'CONTACTED'].includes(lead?.status || '') && (
-                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 space-y-2">
+                  <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/25 space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={eligibilityOverride}
                         onChange={(e) => setEligibilityOverride(e.target.checked)}
-                        className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                        className="rounded border-amber-500/40 accent-amber-500"
                       />
-                      <span className="font-semibold text-amber-900">
+                      <span className="font-semibold text-amber-300">
                         Confirm eligibility override for this lead
                       </span>
                     </label>
 
                     {eligibilityOverride && (
                       <div>
-                        <label className="block font-semibold text-amber-900 mb-1">
+                        <label className="block font-semibold text-amber-300 mb-1">
                           Override Justification <span className="text-rose-500">*</span>
                         </label>
                         <textarea
@@ -4165,7 +4315,7 @@ export function LeadDetailPage() {
                   <button
                     type="submit"
                     disabled={converting}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5 disabled:opacity-50"
+                    className="btn-stripe-primary text-xs px-4 py-2 flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {converting ? (
                       <>

@@ -27,7 +27,7 @@ const TEMPLATE_NAMES: Record<string, string> = {
   'docs_received': 'Contract Received Notice',
 };
 
-function StatusBadge({ status }: { status: EmailLog['status'] }) {
+function StatusBadge({ status, error }: { status: EmailLog['status']; error?: string | null }) {
   switch (status) {
     case 'DELIVERED':
       return (
@@ -45,10 +45,17 @@ function StatusBadge({ status }: { status: EmailLog['status'] }) {
       );
     case 'BOUNCED':
       return (
-        <Badge variant="destructive" className="gap-1 text-[11px] font-medium">
-          <XCircle className="h-3 w-3" />
-          <span>Bounced</span>
-        </Badge>
+        <div className="flex flex-col gap-0.5">
+          <Badge variant="destructive" className="gap-1 text-[11px] font-medium cursor-help" title={error || 'Email bounced'}>
+            <XCircle className="h-3 w-3" />
+            <span>Bounced</span>
+          </Badge>
+          {error && (
+            <span className="text-[10px] text-rose-400 line-clamp-1 max-w-[220px]" title={error}>
+              {error}
+            </span>
+          )}
+        </div>
       );
     case 'DROPPED':
       return (
@@ -129,7 +136,7 @@ export function EmailLogTable({ logs, loading, onRefresh }: Props) {
                   {log.deadline?.label ?? 'General Transaction Notice'}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={log.status} />
+                  <StatusBadge status={log.status} error={log.errorMessage} />
                 </TableCell>
                 <TableCell className="text-right text-xs font-mono text-muted-foreground whitespace-nowrap">
                   {formatAuditTimestamp(log.sentAt)}

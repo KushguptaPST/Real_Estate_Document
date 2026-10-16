@@ -16,12 +16,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { Deadline, Deal } from '@/types';
+import type { Deadline, Deal, NotificationSetting } from '@/types';
+import { notificationsApi } from '@/services/api';
 
 export function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const dealId = id!;
   const [deal, setDeal] = useState<Deal | null>(null);
+  const [notifSettings, setNotifSettings] = useState<NotificationSetting | null>(null);
   const { deadlines, loading, error, refetch } = useDeadlines(dealId);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -30,6 +32,11 @@ export function ReviewPage() {
     dealsApi
       .get(dealId)
       .then(setDeal)
+      .catch(() => {});
+
+    notificationsApi
+      .getSettings(dealId)
+      .then(setNotifSettings)
       .catch(() => {});
   }, [dealId]);
 
@@ -54,9 +61,9 @@ export function ReviewPage() {
   const confirmed = deadlines.filter((d) => d.status !== 'PENDING');
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto">
       {/* Unified Command Center Header & Tab Navigation */}
-      <DealHeader deal={deal} activeTab="documents" />
+      <DealHeader deal={deal} notifSettings={notifSettings} activeTab="documents" />
 
       <div>
         <div className="flex items-center gap-2 mb-1">

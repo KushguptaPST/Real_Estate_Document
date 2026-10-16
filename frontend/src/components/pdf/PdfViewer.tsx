@@ -36,6 +36,7 @@ interface Props {
   filename?: string;
   initialPage?: number;
   highlightQuote?: string;
+  jumpTrigger?: number;
   documents?: Doc[];
   selectedDocId?: string;
   onSelectDoc?: (docId: string) => void;
@@ -48,6 +49,7 @@ export function PdfViewer({
   filename = 'Document.pdf',
   initialPage = 1,
   highlightQuote,
+  jumpTrigger,
   documents = [],
   selectedDocId,
   onSelectDoc,
@@ -57,6 +59,7 @@ export function PdfViewer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [numPages, setNumPages] = useState(0);
@@ -74,12 +77,51 @@ export function PdfViewer({
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
-  // Synchronize initialPage changes
+  // Synchronize initialPage changes or jumpTrigger
   useEffect(() => {
-    if (initialPage > 0 && initialPage !== currentPage) {
+    if (initialPage > 0) {
       setCurrentPage(initialPage);
     }
-  }, [initialPage]);
+  }, [initialPage, jumpTrigger]);
+
+  // Automatic Quote Page Discovery:
+  // When a highlight quote is set, ensure we are on the page containing the quote
+  useEffect(() => {
+    if (!pdfDoc || !highlightQuote?.trim()) return;
+
+    let isMounted = true;
+    const cleanQuote = highlightQuote.trim();
+
+    async function findPageForQuote() {
+      if (!pdfDoc) return;
+      try {
+        // 1. First check if the quote is already on the current page
+        const curPageObj = await pdfDoc.getPage(currentPage);
+        const curText = await curPageObj.getTextContent();
+        const curMatches = findMatchingItemIndices(curText.items as any[], cleanQuote);
+        if (curMatches.length > 0) return; // Already on the matching page!
+
+        // 2. Scan all other pages in the PDF
+        for (let p = 1; p <= pdfDoc.numPages; p++) {
+          if (p === currentPage) continue;
+          const pageObj = await pdfDoc.getPage(p);
+          const text = await pageObj.getTextContent();
+          const matches = findMatchingItemIndices(text.items as any[], cleanQuote);
+          if (matches.length > 0 && isMounted) {
+            setCurrentPage(p);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Auto-jump to quote page lookup failed:', err);
+      }
+    }
+
+    findPageForQuote();
+    return () => {
+      isMounted = false;
+    };
+  }, [pdfDoc, highlightQuote, jumpTrigger]);
 
   // Smooth Auto-Scroll to highlighted clause
   useEffect(() => {
@@ -102,7 +144,6 @@ export function PdfViewer({
 
     const loadingTask = pdfjsLib.getDocument({
       url: fileUrl,
-      cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
       cMapPacked: true,
     });
 
@@ -135,6 +176,13 @@ export function PdfViewer({
     setRendering(true);
     setHighlightBoxes([]);
 
+    if (renderTaskRef.current) {
+      try {
+        renderTaskRef.current.cancel();
+      } catch {}
+      renderTaskRef.current = null;
+    }
+
     pdfDoc
       .getPage(currentPage)
       .then(async (page) => {
@@ -161,7 +209,14 @@ export function PdfViewer({
         };
 
         const renderTask = page.render(renderContext);
-        await renderTask.promise;
+        renderTaskRef.current = renderTask;
+
+        try {
+          await renderTask.promise;
+        } catch (renderErr: any) {
+          if (renderErr?.name === 'RenderingCancelledException') return;
+          throw renderErr;
+        }
 
         if (isCancelled) return;
 
@@ -221,7 +276,7 @@ export function PdfViewer({
         setRendering(false);
       })
       .catch((err) => {
-        if (!isCancelled) {
+        if (!isCancelled && err?.name !== 'RenderingCancelledException') {
           console.warn('Page render error:', err);
           setRendering(false);
         }
@@ -229,6 +284,12 @@ export function PdfViewer({
 
     return () => {
       isCancelled = true;
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {}
+        renderTaskRef.current = null;
+      }
     };
   }, [pdfDoc, currentPage, scale, highlightQuote, searchQuery]);
 
@@ -284,29 +345,29 @@ export function PdfViewer({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col h-full glass-panel rounded-2xl overflow-hidden shadow-sm ${className}`}
+      className={`flex flex-col h-full bg-[#101014] border border-white/10 rounded-2xl overflow-hidden shadow-2xl ${className}`}
     >
       {/* Top Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white/50 border-b border-slate-200/70 text-xs text-slate-700 select-none backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#16161D] border-b border-white/10 text-xs text-[#F5F5F7] select-none backdrop-blur-md">
         {/* Document Switcher & Info */}
         <div className="flex items-center gap-2 max-w-xs truncate">
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-slate-900 text-white shadow-2xs shrink-0 ring-1 ring-white/20">
-            <FileText className="h-3.5 w-3.5 text-sky-400" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#1E1E26] text-[#C9A961] shadow-sm shrink-0 border border-white/10">
+            <FileText className="h-3.5 w-3.5 text-[#C9A961]" />
           </div>
           {documents.length > 1 && onSelectDoc ? (
             <select
               value={selectedDocId}
               onChange={(e) => onSelectDoc(e.target.value)}
-              className="glass-badge text-slate-800 rounded-xl px-2.5 py-1 text-xs font-semibold focus:ring-1 focus:ring-slate-900 truncate cursor-pointer shadow-2xs"
+              className="bg-[#1A1A22] text-[#F5F5F7] border border-white/10 rounded-xl px-2.5 py-1 text-xs font-semibold focus:border-[#C9A961] focus:outline-none truncate cursor-pointer shadow-sm"
             >
               {documents.map((d) => (
-                <option key={d.id} value={d.id}>
+                <option key={d.id} value={d.id} className="bg-[#141418] text-[#F5F5F7]">
                   {d.filename}
                 </option>
               ))}
             </select>
           ) : (
-            <span className="font-semibold text-slate-800 truncate" title={filename}>
+            <span className="font-semibold text-[#F5F5F7] truncate" title={filename}>
               {filename}
             </span>
           )}
@@ -318,25 +379,25 @@ export function PdfViewer({
             type="button"
             onClick={handlePrevPage}
             disabled={currentPage <= 1 || loading}
-            className="p-1.5 rounded-xl glass-badge text-slate-600 hover:text-slate-900 disabled:opacity-30 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl bg-[#1A1A22] border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 disabled:opacity-30 transition-all cursor-pointer"
             title="Previous Page"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
 
-          <div className="flex items-center gap-1 glass-badge px-2.5 py-1 rounded-xl shadow-2xs">
-            <span className="text-[11px] font-medium text-slate-500">Page</span>
-            <span className="text-[11px] font-bold font-mono text-slate-900 px-0.5">
+          <div className="flex items-center gap-1 bg-[#1A1A22] border border-white/10 px-2.5 py-1 rounded-xl shadow-sm">
+            <span className="text-[11px] font-medium text-[#9A9AA5]">Page</span>
+            <span className="text-[11px] font-bold font-mono text-[#F5F5F7] px-0.5">
               {currentPage}
             </span>
-            <span className="text-[11px] text-slate-400">of {numPages || 1}</span>
+            <span className="text-[11px] text-[#6E6E7A]">of {numPages || 1}</span>
           </div>
 
           <button
             type="button"
             onClick={handleNextPage}
             disabled={currentPage >= numPages || loading}
-            className="p-1.5 rounded-xl glass-badge text-slate-600 hover:text-slate-900 disabled:opacity-30 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl bg-[#1A1A22] border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 disabled:opacity-30 transition-all cursor-pointer"
             title="Next Page"
           >
             <ChevronRight className="h-4 w-4" />
@@ -351,8 +412,8 @@ export function PdfViewer({
             onClick={() => setShowSearch(!showSearch)}
             className={`p-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
               showSearch || searchQuery
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'glass-badge hover:bg-white/90 text-slate-600 shadow-2xs'
+                ? 'bg-[#C9A961] text-[#0A0A0B] shadow-sm font-bold'
+                : 'bg-[#1A1A22] hover:bg-[#22222E] text-[#9A9AA5] hover:text-[#F5F5F7] border border-white/10'
             }`}
             title="Search in document"
           >
@@ -360,22 +421,22 @@ export function PdfViewer({
           </button>
 
           {/* Zoom Controls */}
-          <div className="flex items-center gap-0.5 glass-badge rounded-xl p-0.5 shadow-2xs">
+          <div className="flex items-center gap-0.5 bg-[#1A1A22] border border-white/10 rounded-xl p-0.5 shadow-sm">
             <button
               type="button"
               onClick={() => setScale((s) => Math.max(0.6, s - 0.15))}
-              className="p-1 rounded-lg hover:bg-white/80 text-slate-600 cursor-pointer"
+              className="p-1 rounded-lg hover:bg-white/5 text-[#9A9AA5] hover:text-[#F5F5F7] cursor-pointer"
               title="Zoom Out"
             >
               <Minus className="h-3 w-3" />
             </button>
-            <span className="font-mono text-[11px] font-semibold text-slate-700 px-1.5">
+            <span className="font-mono text-[11px] font-semibold text-[#F5F5F7] px-1.5">
               {Math.round(scale * 100)}%
             </span>
             <button
               type="button"
               onClick={() => setScale((s) => Math.min(2.5, s + 0.15))}
-              className="p-1 rounded-lg hover:bg-white/80 text-slate-600 cursor-pointer"
+              className="p-1 rounded-lg hover:bg-white/5 text-[#9A9AA5] hover:text-[#F5F5F7] cursor-pointer"
               title="Zoom In"
             >
               <Plus className="h-3 w-3" />
@@ -386,35 +447,35 @@ export function PdfViewer({
 
       {/* In-Document Search Bar */}
       {showSearch && (
-        <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-200/70 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+        <div className="px-4 py-2.5 bg-[#14141A] border-b border-white/10 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
           <div className="flex items-center gap-2 flex-1 max-w-sm">
-            <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <Search className="h-3.5 w-3.5 text-[#C9A961] shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search contract terms..."
-              className="w-full glass-input rounded-xl px-3 py-1 text-slate-800 text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 shadow-2xs"
+              className="w-full bg-[#0E0E12] border border-white/10 rounded-xl px-3 py-1.5 text-[#F5F5F7] text-xs placeholder-[#5E5E6C] focus:outline-none focus:border-[#C9A961] shadow-inner"
               autoFocus
             />
           </div>
 
           {searchResults.length > 0 && (
-            <div className="flex items-center gap-2 text-slate-600">
+            <div className="flex items-center gap-2 text-[#9A9AA5]">
               <span className="text-[11px] font-medium">
                 Page {searchResults[currentMatchIndex]} ({currentMatchIndex + 1} of {searchResults.length} matches)
               </span>
               <button
                 type="button"
                 onClick={prevSearchMatch}
-                className="p-1 rounded-lg glass-badge text-slate-600 cursor-pointer"
+                className="p-1 rounded-lg bg-[#1A1A22] border border-white/10 text-[#F5F5F7] cursor-pointer hover:border-[#C9A961]/40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={nextSearchMatch}
-                className="p-1 rounded-lg glass-badge text-slate-600 cursor-pointer"
+                className="p-1 rounded-lg bg-[#1A1A22] border border-white/10 text-[#F5F5F7] cursor-pointer hover:border-[#C9A961]/40"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -425,21 +486,24 @@ export function PdfViewer({
 
       {/* Citation Highlight Focus Banner */}
       {highlightQuote && (
-        <div className="px-4 py-2.5 bg-amber-50/80 border-b border-amber-200/80 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
-          <div className="flex items-start gap-2 min-w-0">
-            <Sparkles className="h-3.5 w-3.5 text-amber-700 shrink-0 mt-0.5" />
+        <div className="px-4 py-2.5 bg-[#1C170E]/95 border-b border-[#C9A961]/30 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#C9A961]/20 text-[#C9A961] shrink-0 mt-0.5 border border-[#C9A961]/30 shadow-xs">
+              <Sparkles className="h-3.5 w-3.5" />
+            </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-amber-900 text-[10px] uppercase tracking-wide">
+                <span className="font-bold text-[#E8C575] text-[10px] uppercase tracking-wider">
                   Active Citation Reference
                 </span>
                 {highlightBoxes.length > 0 && (
-                  <Badge variant="warning" className="glass-badge text-[9px] px-1.5 py-0">
-                    Highlighted
-                  </Badge>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C9A961]/20 border border-[#C9A961]/40 px-2 py-0.5 text-[9px] font-semibold text-[#E8C575]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961] animate-pulse" />
+                    In-Situ Highlighted
+                  </span>
                 )}
               </div>
-              <p className="font-mono text-amber-950 text-[11px] mt-0.5 italic line-clamp-2">
+              <p className="font-mono text-[#F5F5F7] text-[11px] mt-0.5 italic line-clamp-2">
                 &ldquo;{highlightQuote}&rdquo;
               </p>
             </div>
@@ -449,7 +513,7 @@ export function PdfViewer({
             <button
               type="button"
               onClick={onClearHighlight}
-              className="p-1 rounded-lg glass-badge text-amber-800 hover:text-amber-950 transition-colors cursor-pointer"
+              className="p-1 rounded-lg bg-white/5 border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 transition-colors cursor-pointer"
               title="Clear Highlight"
             >
               <X className="h-3.5 w-3.5" />
@@ -461,25 +525,26 @@ export function PdfViewer({
       {/* Document Viewport */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto p-6 flex items-center justify-center relative bg-slate-100"
+        className="flex-1 overflow-auto p-6 flex items-center justify-center relative bg-[#0C0C10] shadow-inner"
       >
         {loading && (
-          <div className="flex flex-col items-center gap-2 text-slate-500 text-xs py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
-            <span className="font-medium">Loading document pages&hellip;</span>
+          <div className="flex flex-col items-center gap-3 text-[#9A9AA5] text-xs py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
+            <span className="font-medium text-[#F5F5F7]">Rendering contractual document&hellip;</span>
+            <span className="text-[11px] text-[#6E6E7A]">Parsing vector layers and annotations</span>
           </div>
         )}
 
         {error && !loading && (
-          <div className="flex flex-col items-center gap-2 text-rose-600 text-xs max-w-sm text-center py-16">
-            <AlertTriangle className="h-5 w-5" />
+          <div className="flex flex-col items-center gap-2 text-rose-400 text-xs max-w-sm text-center py-16 bg-rose-500/10 border border-rose-500/20 rounded-2xl p-6">
+            <AlertTriangle className="h-6 w-6 text-rose-400" />
             <span className="font-medium">{error}</span>
           </div>
         )}
 
         {!loading && !error && pdfDoc && (
-          <div className="relative shadow-lg rounded bg-white border border-slate-200 transition-transform duration-150">
-            <canvas ref={canvasRef} className="block rounded" />
+          <div className="relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] rounded-xl bg-white ring-1 ring-white/15 transition-transform duration-150">
+            <canvas ref={canvasRef} className="block rounded-xl" />
 
             {/* In-Situ Highlighter Overlay */}
             {highlightBoxes.length > 0 && (
@@ -494,7 +559,7 @@ export function PdfViewer({
                       width: `${box.width}px`,
                       height: `${box.height}px`,
                     }}
-                    className="bg-amber-300/40 border-b-2 border-amber-500 rounded-xs ring-1 ring-amber-400/40 shadow-xs"
+                    className="bg-[#C9A961]/35 border-b-2 border-[#C9A961] rounded-xs ring-1 ring-[#C9A961]/50 shadow-sm"
                     title={box.text}
                   />
                 ))}
@@ -502,8 +567,8 @@ export function PdfViewer({
             )}
 
             {rendering && (
-              <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center rounded">
-                <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
+                <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
               </div>
             )}
           </div>

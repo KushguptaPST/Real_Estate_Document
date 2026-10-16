@@ -90,9 +90,22 @@ export function verifyCitations(input: VerificationInput): VerificationResult {
       if (citation.deadlineId && validDeadlineIds.has(citation.deadlineId)) {
         const newId = nextId++;
         validCitationIdMap.set(citation.id, newId);
+
+        let pageNum = citation.pageNumber;
+        let docId = citation.documentId;
+        if (!pageNum && citation.quote) {
+          const chunkMatch = chunks.find(c => isQuotePresentOnPage(citation.quote!, c.content));
+          if (chunkMatch) {
+            pageNum = chunkMatch.pageNumber;
+            docId = docId || chunkMatch.documentId;
+          }
+        }
+
         verifiedCitations.push({
           ...citation,
           id: newId,
+          pageNumber: pageNum,
+          documentId: docId,
           isConfirmed: citation.isConfirmed ?? true,
         });
       } else {

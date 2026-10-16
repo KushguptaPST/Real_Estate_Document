@@ -7,20 +7,13 @@ import { PdfViewer } from '@/components/pdf/PdfViewer';
 import { ChatWindow } from '@/components/assistant/ChatWindow';
 import { DealHeader } from '@/components/deal/DealHeader';
 import {
-  ChevronRight,
   FileText,
   AlertTriangle,
   Loader2,
-  Building2,
-  ShieldCheck,
-  Mail,
-  Sparkles,
   Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import type { Deal, Document as Doc, Citation, NotificationSetting } from '@/types';
-import { formatDate } from '@/utils/date';
 
 export function AssistantPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +26,7 @@ export function AssistantPage() {
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [targetPage, setTargetPage] = useState<number>(1);
   const [highlightQuote, setHighlightQuote] = useState<string | undefined>();
+  const [jumpTrigger, setJumpTrigger] = useState<number>(0);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,18 +120,62 @@ export function AssistantPage() {
   const handleCitationClick = (citation: Citation) => {
     focusCitation(citation);
 
-    if (citation.sourceType === 'document') {
-      if (citation.documentId && citation.documentId !== selectedDocId) {
-        setSelectedDocId(citation.documentId);
-      }
-      if (citation.pageNumber) {
-        setTargetPage(citation.pageNumber);
-      }
-      if (citation.quote) {
-        setHighlightQuote(citation.quote);
+    let docId = citation.documentId;
+    let pageNum = citation.pageNumber;
+
+    // Resolve pageNumber and documentId from deal.deadlines if tied to a deadline
+    if (citation.deadlineId && deal?.deadlines) {
+      const matched = deal.deadlines.find((d) => d.id === citation.deadlineId);
+      if (matched?.clause) {
+        if (!pageNum && matched.clause.pageNumber) {
+          pageNum = matched.clause.pageNumber;
+        }
+        if (!docId && matched.clause.documentId) {
+          docId = matched.clause.documentId;
+        }
       }
     }
+
+    // Default to current document or first available document
+    if (!docId && documents.length > 0) {
+      docId = selectedDocId || documents[0].id;
+    }
+
+    if (docId && docId !== selectedDocId) {
+      setSelectedDocId(docId);
+    }
+
+    if (pageNum) {
+      setTargetPage(pageNum);
+    }
+
+    if (citation.quote) {
+      setHighlightQuote(citation.quote);
+    }
+
+    // Force trigger PDF viewer to synchronize to target page and quote
+    setJumpTrigger(Date.now());
   };
+
+  // Enrich message citations with pageNumber from deal.deadlines if missing
+  const enrichedMessages = messages.map((msg) => {
+    if (!msg.citations || !deal?.deadlines) return msg;
+    const enrichedCitations = msg.citations.map((c) => {
+      if (c.pageNumber) return c;
+      if (c.deadlineId) {
+        const d = deal.deadlines?.find((dl) => dl.id === c.deadlineId);
+        if (d?.clause?.pageNumber) {
+          return {
+            ...c,
+            pageNumber: d.clause.pageNumber,
+            documentId: c.documentId || d.clause.documentId,
+          };
+        }
+      }
+      return c;
+    });
+    return { ...msg, citations: enrichedCitations };
+  });
 
   const currentDoc = documents.find((d) => d.id === selectedDocId);
 
@@ -158,20 +196,20 @@ export function AssistantPage() {
         {/* Left Pane: Interactive PDF Viewer (7 cols / 58% width) */}
         <div className="lg:col-span-7 h-full flex flex-col min-h-[460px] lg:min-h-0">
           {loadingDocs ? (
-            <div className="rounded-xl border border-border/70 bg-card h-full flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs shadow-2xs">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="rounded-2xl border border-white/10 bg-[#141418] h-full flex flex-col items-center justify-center gap-2 text-[#9A9AA5] text-xs shadow-xl">
+              <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
               <span>Loading transaction contract documents...</span>
             </div>
           ) : documents.length === 0 ? (
-            <div className="rounded-xl border border-border/70 bg-card h-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-3 shadow-2xs">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground border border-border/60">
+            <div className="rounded-2xl border border-white/10 bg-[#141418] h-full flex flex-col items-center justify-center p-8 text-center text-[#9A9AA5] space-y-3 shadow-xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-[#C9A961] border border-white/10">
                 <FileText className="h-6 w-6" />
               </div>
-              <h4 className="text-sm font-semibold text-foreground">No Contract Documents Uploaded</h4>
-              <p className="text-xs max-w-xs text-muted-foreground">
+              <h4 className="text-sm font-semibold text-[#F5F5F7]">No Contract Documents Uploaded</h4>
+              <p className="text-xs max-w-xs text-[#9A9AA5]">
                 Upload the purchase agreement or counter offer PDF to enable deep citation-grounded viewing.
               </p>
-              <Button asChild size="sm" className="text-xs gap-1.5">
+              <Button asChild size="sm" className="text-xs gap-1.5 bg-[#C9A961] text-[#0A0A0B] hover:bg-[#DFBF77]">
                 <Link to="/upload">
                   <Plus className="h-3.5 w-3.5" />
                   <span>Upload Purchase Agreement</span>
@@ -184,6 +222,7 @@ export function AssistantPage() {
               filename={currentDoc?.filename || 'Purchase_Agreement.pdf'}
               initialPage={targetPage}
               highlightQuote={highlightQuote}
+              jumpTrigger={jumpTrigger}
               documents={documents}
               selectedDocId={selectedDocId}
               onSelectDoc={setSelectedDocId}
@@ -196,7 +235,7 @@ export function AssistantPage() {
         {/* Right Pane: AI Assistant Chat & Deal Intelligence (5 cols / 42% width) */}
         <div className="lg:col-span-5 h-full flex flex-col min-h-[460px] lg:min-h-0">
           <ChatWindow
-            messages={messages}
+            messages={enrichedMessages}
             loading={assistantLoading}
             streamingStage={streamingStage}
             streamingMessage={streamingMessage}

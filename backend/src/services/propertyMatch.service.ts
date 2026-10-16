@@ -23,6 +23,19 @@ export interface MatchCalculationResult {
  * 2. Applies soft scoring for locations, amenities, price targets, and bedrooms.
  * 3. Returns and persists top matches with explicit reasons scoped strictly to organizationId.
  */
+function formatIndianPrice(amount: number | null | undefined): string {
+  if (amount == null || isNaN(amount) || amount === 0) return '₹0';
+  if (amount >= 10_000_000) {
+    const cr = (amount / 10_000_000).toFixed(2).replace(/\.00$/, '');
+    return `₹${cr} Cr`;
+  }
+  if (amount >= 100_000) {
+    const lakh = (amount / 100_000).toFixed(2).replace(/\.00$/, '');
+    return `₹${lakh} Lakh`;
+  }
+  return `₹${amount.toLocaleString('en-IN')}`;
+}
+
 export async function computeMatchesForLead(leadId: string, organizationId: string): Promise<MatchCalculationResult[]> {
   const orgId = requireOrgId(organizationId);
   const lead = await getLeadDetails(leadId, orgId);
@@ -32,6 +45,7 @@ export async function computeMatchesForLead(leadId: string, organizationId: stri
 
   if (!req) {
     logger.info(`[Property Matcher] No requirements recorded for lead ${leadId}. Returning empty matches.`);
+    await prisma.propertyMatch.deleteMany({ where: { leadId, organizationId: orgId } });
     return [];
   }
 
@@ -66,9 +80,24 @@ export async function computeMatchesForLead(leadId: string, organizationId: stri
     const matchReasons: string[] = [];
     const failedCriteria: string[] = [];
 
-    // Hard filter verified bullet
-    matchReasons.push(`Price ($${property.price.toLocaleString()}) is within maximum budget ceiling ($${(req.maxBudget || 0).toLocaleString()})`);
-    matchReasons.push(`Bedrooms (${property.bedrooms}) meet minimum requirement (${req.minBedrooms || 1})`);
+    // Budget check
+    if (req.maxBudget && req.maxBudget > 0) {
+      matchReasons.push(`Price (${formatIndianPrice(property.price)}) is within maximum budget ceiling (${formatIndianPrice(req.maxBudget)})`);
+      if (property.price <= req.maxBudget * 0.95) {
+        score += 0.15;
+        const savings = req.maxBudget - property.price;
+        matchReasons.push(`Priced below budget ceiling (${formatIndianPrice(savings)} savings)`);
+      }
+    } else {
+      matchReasons.push(`Flexible budget (Property priced at ${formatIndianPrice(property.price)})`);
+    }
+
+    // Bedroom check
+    if (req.minBedrooms && req.minBedrooms > 0) {
+      matchReasons.push(`Bedrooms (${property.bedrooms}) meet minimum requirement (${req.minBedrooms} Beds)`);
+    } else {
+      matchReasons.push(`Bedrooms: ${property.bedrooms} Beds available`);
+    }
 
     // Location Check (+0.25)
     if (req.preferredLocations && req.preferredLocations.length > 0) {
@@ -80,12 +109,6 @@ export async function computeMatchesForLead(leadId: string, organizationId: stri
       } else {
         failedCriteria.push(`Location (${property.city}) is not in requested list (${req.preferredLocations.join(', ')})`);
       }
-    }
-
-    // Price Sweet Spot (+0.15)
-    if (req.maxBudget && property.price <= req.maxBudget * 0.95) {
-      score += 0.15;
-      matchReasons.push(`Priced 5%+ below budget ceiling ($${(req.maxBudget - property.price).toLocaleString()} savings)`);
     }
 
     // Bedroom Exact Fit (+0.1)
@@ -111,8 +134,11 @@ export async function computeMatchesForLead(leadId: string, organizationId: stri
   // Sort descending by score
   results.sort((a, b) => b.matchScore - a.matchScore);
 
+  const topMatches = results.slice(0, 10);
+  const topMatchIds = topMatches.map((r) => r.property.id);
+
   // 3. Persist top matches to database with organizationId
-  for (const res of results.slice(0, 10)) {
+  for (const res of topMatches) {
     await prisma.propertyMatch.upsert({
       where: {
         leadId_propertyId: {
@@ -138,6 +164,15 @@ export async function computeMatchesForLead(leadId: string, organizationId: stri
       },
     });
   }
+
+  // Remove stale matches that no longer satisfy the updated filter
+  await prisma.propertyMatch.deleteMany({
+    where: {
+      leadId,
+      organizationId: orgId,
+      propertyId: { notIn: topMatchIds },
+    },
+  });
 
   return results;
 }

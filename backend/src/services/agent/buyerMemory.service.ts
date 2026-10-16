@@ -629,7 +629,11 @@ export function evaluateFollowUpNeed(memory: PersistentBuyerMemory): FollowUpRec
         suggestedDueDate: new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString(),
         evidence: [
           `Last activity was on ${new Date(lastActivityMs).toLocaleDateString()} (${daysInactive} days ago)`,
-          `Confirmed preferences: $${memory.requirements.confirmed.minBudget?.toLocaleString()} - $${memory.requirements.confirmed.maxBudget?.toLocaleString()} in ${memory.requirements.confirmed.preferredLocations.join(', ') || 'Any'}`,
+          `Confirmed preferences: ${
+            memory.requirements.confirmed.minBudget || memory.requirements.confirmed.maxBudget
+              ? `$${(memory.requirements.confirmed.minBudget ?? 0).toLocaleString()} - $${(memory.requirements.confirmed.maxBudget ?? 'No max').toLocaleString()}`
+              : 'Flexible budget'
+          } in ${memory.requirements.confirmed.preferredLocations.join(', ') || 'Any location'}`,
         ],
         suggestedDraftContent: `Hi ${memory.fullName}, I hope you're having a great week! I'm checking in to see how your home search is progressing and if you would like an updated list of properties.`,
         requiresAdvisorReview: true,

@@ -25,6 +25,7 @@ import {
   Mail,
   Building2,
   DollarSign,
+  IndianRupee,
   ChevronRight,
   Filter,
   FileSpreadsheet,
@@ -50,6 +51,7 @@ import {
   Activity,
   MapPin,
 } from 'lucide-react';
+import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
 
 export function LeadsPage() {
   const navigate = useNavigate();
@@ -455,31 +457,34 @@ export function LeadsPage() {
       {/* ── Unified Metric Ribbon (Always Live Data) ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Active Pipeline */}
-        <div className="luxury-card p-4.5 bg-[#141418] border border-white/[0.08] rounded-2xl hover:border-[#C9A961]/40 transition-all shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-mono font-medium text-[#9A9AA5] uppercase tracking-wider">Total Active Leads</span>
-              <div className="text-2xl font-bold text-white mt-1 font-mono">{totalLeadsCount}</div>
-              <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-1.5">
-                <TrendingUp className="h-3 w-3" /> Live Pipeline Sync
-              </span>
+        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/30 transition-all flex flex-col justify-between min-h-[136px] shadow-sm group">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Total Active Leads</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#181820] text-[#C9A961] border border-[#C9A961]/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+              <Users className="h-5 w-5" />
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#181820] text-[#C9A961] border border-[#C9A961]/25">
-              <Users className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <div className="text-2xl font-black text-[#F5F5F7] font-mono tracking-tight">{totalLeadsCount}</div>
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>Live Pipeline Sync</span>
             </div>
           </div>
         </div>
 
         {/* New Inbound Queue */}
-        <div className="luxury-card p-4.5 bg-[#141418] border border-white/[0.08] rounded-2xl hover:border-emerald-500/40 transition-all shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-mono font-medium text-[#9A9AA5] uppercase tracking-wider">New Inbound Queue</span>
-              <div className="text-2xl font-bold text-emerald-400 mt-1 font-mono">{newLeadsCount}</div>
-              <span className="text-[11px] text-[#9A9AA5] mt-1.5 block">Awaiting First Contact</span>
+        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-emerald-500/40 transition-all flex flex-col justify-between min-h-[136px] shadow-sm group">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">New Inbound Queue</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+              <Sparkles className="h-5 w-5" />
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-              <Sparkles className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">{newLeadsCount}</div>
+            <div className="mt-1.5 text-[11px] text-[#9A9AA5]">
+              Awaiting First Contact
             </div>
           </div>
         </div>
@@ -487,61 +492,64 @@ export function LeadsPage() {
         {/* Action Queue Alerts & Deadlines */}
         <div
           onClick={() => setPoolTab('ACTION_QUEUE')}
-          className={`luxury-card p-4.5 rounded-2xl transition-all cursor-pointer border shadow-sm ${
+          className={`glass-panel rounded-2xl p-5 transition-all cursor-pointer flex flex-col justify-between min-h-[136px] border shadow-sm group ${
             (actionQueueSummary?.overdueCount ?? 0) > 0
-              ? 'bg-[#181214] border-rose-500/35 hover:border-rose-500/60 ring-1 ring-rose-500/20'
-              : 'bg-[#141418] border-white/[0.08] hover:border-amber-500/40'
+              ? 'bg-[#181214] border-rose-500/40 hover:border-rose-500/70 ring-1 ring-rose-500/20'
+              : 'bg-[#141418] border-white/[0.08] hover:border-[#C9A961]/40'
           }`}
           title="Click to view Action Queue"
         >
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-mono font-medium text-[#9A9AA5] uppercase tracking-wider">Action Queue Alerts</span>
-              <div className="text-2xl font-bold font-mono mt-1 flex items-center gap-2">
-                <span className={(actionQueueSummary?.overdueCount ?? 0) > 0 ? 'text-rose-400' : 'text-white'}>
-                  {actionQueueSummary?.totalActive ?? 0}
-                </span>
-                {(actionQueueSummary?.overdueCount ?? 0) > 0 && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse">
-                    {actionQueueSummary?.overdueCount} Overdue
-                  </span>
-                )}
-              </div>
-              <span className={`text-[11px] font-semibold mt-1.5 flex items-center gap-1 ${
-                (actionQueueSummary?.overdueCount ?? 0) > 0 ? 'text-rose-400' : 'text-[#9A9AA5]'
-              }`}>
-                {(actionQueueSummary?.overdueCount ?? 0) > 0 ? (
-                  <>
-                    <AlertTriangle className="h-3 w-3" /> Requires immediate action
-                  </>
-                ) : (
-                  'All tasks & tours on schedule'
-                )}
-              </span>
-            </div>
-            <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Action Queue Alerts</span>
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl border group-hover:scale-105 transition-transform shadow-2xs shrink-0 ${
               (actionQueueSummary?.overdueCount ?? 0) > 0
                 ? 'bg-rose-500/10 text-rose-400 border-rose-500/25'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                : 'bg-[#C9A961]/10 text-[#C9A961] border-[#C9A961]/25'
             }`}>
-              <Zap className="h-4.5 w-4.5" />
+              <Zap className="h-5 w-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black font-mono tracking-tight flex items-center gap-2">
+              <span className={(actionQueueSummary?.overdueCount ?? 0) > 0 ? 'text-rose-400' : 'text-[#F5F5F7]'}>
+                {actionQueueSummary?.totalActive ?? 0}
+              </span>
+              {(actionQueueSummary?.overdueCount ?? 0) > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse">
+                  {actionQueueSummary?.overdueCount} Overdue
+                </span>
+              )}
+            </div>
+            <div className={`mt-1.5 text-[11px] font-semibold flex items-center gap-1.5 ${
+              (actionQueueSummary?.overdueCount ?? 0) > 0 ? 'text-rose-400' : 'text-[#9A9AA5]'
+            }`}>
+              {(actionQueueSummary?.overdueCount ?? 0) > 0 ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Requires immediate action</span>
+                </>
+              ) : (
+                <span>All tasks &amp; tours on schedule</span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Autonomous AI Advisor */}
-        <div className="luxury-card p-4.5 bg-[#141418] border border-white/[0.08] rounded-2xl hover:border-cyan-500/40 transition-all shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-mono font-medium text-[#9A9AA5] uppercase tracking-wider">Autonomous AI Copilot</span>
-              <div className="text-2xl font-bold text-cyan-400 mt-1 font-mono flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                24/7 Active
-              </div>
-              <span className="text-[11px] text-[#9A9AA5] mt-1.5 block">Telegram &amp; Voice Synthesis</span>
+        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-cyan-500/40 transition-all flex flex-col justify-between min-h-[136px] shadow-sm group">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Autonomous AI Copilot</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+              <Bot className="h-5 w-5" />
             </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-              <Bot className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <div className="text-2xl font-black text-cyan-400 font-mono tracking-tight flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              24/7 Active
+            </div>
+            <div className="mt-1.5 text-[11px] text-[#9A9AA5]">
+              Telegram &amp; Voice Synthesis
             </div>
           </div>
         </div>
@@ -774,12 +782,13 @@ export function LeadsPage() {
       </div>
 
       {/* ── Content States ── */}
-      {poolTab === 'ACTION_QUEUE' ? (
-        <div className="space-y-4">
+      <div key={poolTab} className="smooth-transition min-h-[480px]">
+        {poolTab === 'ACTION_QUEUE' ? (
+          <div className="space-y-4">
           {/* Action Command Toolbar: Category Pills + Live Search */}
-          <div className="p-3.5 flex flex-col md:flex-row items-center justify-between gap-3 bg-[#141418] border border-white/[0.08] rounded-2xl shadow-sm">
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
+          <div className="p-3 px-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-[#141418] border border-white/[0.08] rounded-2xl shadow-sm">
+            {/* Category Filter Pills (Single scrollable row, never wraps awkwardly) */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 shrink min-w-0">
               {(
                 [
                   { id: 'all', label: 'All Action Items', count: actionQueueSummary?.totalActive ?? 0, icon: Zap },
@@ -798,22 +807,22 @@ export function LeadsPage() {
                   <button
                     key={b.id}
                     onClick={() => setQueueBucket(b.id)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`shrink-0 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
                       active
                         ? b.id === 'overdue'
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-xs'
+                          ? 'bg-rose-500/15 text-rose-300 border border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
                           : b.id === 'attention'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                          : 'bg-[#C9A961]/20 text-[#C9A961] border border-[#C9A961]/40 shadow-xs'
+                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+                          : 'bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/40 shadow-[0_0_12px_rgba(201,169,97,0.15)]'
                         : isOverdueAlert
                         ? 'bg-rose-500/10 text-rose-400 border border-rose-500/25 hover:border-rose-500/40'
-                        : 'bg-[#181820] text-[#9A9AA5] border border-white/[0.08] hover:text-white hover:border-white/20'
+                        : 'bg-[#101014] text-[#9A9AA5] border border-white/[0.08] hover:text-[#F5F5F7] hover:border-white/20 hover:bg-[#181820]'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
                     <span>{b.label}</span>
                     <span
-                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono leading-none ${
                         active
                           ? 'bg-white/10 text-white font-bold'
                           : isOverdueAlert
@@ -828,27 +837,27 @@ export function LeadsPage() {
               })}
             </div>
 
-            {/* Quick Action Search & Refresh */}
-            <div className="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-end">
-              <div className="relative flex-1 md:w-56">
+            {/* Quick Action Search, Timezone Badge & Refresh Button */}
+            <div className="flex items-center gap-2.5 w-full xl:w-auto justify-between xl:justify-end shrink-0">
+              <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9A9AA5]" />
                 <input
                   type="text"
                   placeholder="Filter actions by lead, property..."
                   value={actionSearch}
                   onChange={(e) => setActionSearch(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] pl-8.5 pr-3 py-1.5 text-xs text-[#F5F5F7] placeholder:text-[#6E6E7A] focus:border-[#C9A961] focus:outline-none transition-all"
+                  className="w-full h-9 rounded-xl border border-white/[0.08] bg-[#101014] pl-9 pr-3 text-xs text-[#F5F5F7] placeholder:text-[#6E6E7A] focus:border-[#C9A961] focus:ring-1 focus:ring-[#C9A961]/30 focus:outline-none transition-all"
                 />
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[11px] text-[#9A9AA5] font-mono hidden xl:inline">
+                <span className="h-9 px-2.5 rounded-xl bg-[#101014] border border-white/[0.08] text-[10px] font-mono text-[#9A9AA5] font-semibold flex items-center justify-center shrink-0">
                   {actionQueueData?.timezone || 'UTC'}
                 </span>
                 <button
                   onClick={() => fetchActionQueue(queueBucket)}
                   disabled={loadingQueue}
-                  className="p-1.5 rounded-xl border border-white/[0.08] bg-[#181820] text-[#9A9AA5] hover:text-[#C9A961] hover:border-[#C9A961]/40 transition-colors cursor-pointer"
+                  className="h-9 w-9 rounded-xl border border-white/[0.08] bg-[#101014] text-[#9A9AA5] hover:text-[#C9A961] hover:border-[#C9A961]/40 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   title="Refresh Action Queue"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${loadingQueue ? 'animate-spin text-[#C9A961]' : ''}`} />
@@ -1049,7 +1058,9 @@ export function LeadsPage() {
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className="text-xs font-mono font-bold text-[#C9A961]">${item.property.price.toLocaleString()}</span>
+                                  <span className="text-xs font-mono font-bold text-[#C9A961]" title={formatIndianPriceFull(item.property.price)}>
+                                    {formatIndianPrice(item.property.price)}
+                                  </span>
                                   <span className="block text-[10px] text-emerald-400 font-medium">MLS Verified</span>
                                 </div>
                               </div>
@@ -1405,7 +1416,7 @@ export function LeadsPage() {
                               {visit.property.title}
                             </p>
                             <p className="text-[10px] text-[#9A9AA5] mt-1 font-mono">
-                              {visit.property.address}, {visit.property.city} • ${visit.property.price.toLocaleString()}
+                              {visit.property.address}, {visit.property.city} • {formatIndianPrice(visit.property.price)}
                             </p>
                           </div>
                         )}
@@ -1573,11 +1584,11 @@ export function LeadsPage() {
                   <div className="rounded-xl bg-[#181820]/90 p-3 border border-white/[0.06] space-y-2 text-xs">
                     <div className="flex items-center justify-between font-semibold text-[11px]">
                       <span className="flex items-center gap-1 text-[#9A9AA5]">
-                        <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
+                        <IndianRupee className="h-3.5 w-3.5 text-emerald-400" />
                         Max Budget
                       </span>
-                      <span className="text-[#C9A961] font-bold font-mono">
-                        {req?.maxBudget ? `$${req.maxBudget.toLocaleString()}` : 'Flexible'}
+                      <span className="text-[#C9A961] font-bold font-mono" title={req?.maxBudget ? formatIndianPriceFull(req.maxBudget) : undefined}>
+                        {req?.maxBudget ? formatIndianPrice(req.maxBudget) : 'Flexible'}
                       </span>
                     </div>
 
@@ -1626,6 +1637,7 @@ export function LeadsPage() {
           })}
         </div>
       )}
+      </div>
 
       {/* ── Add Lead Modal ── */}
       {showAddModal && (

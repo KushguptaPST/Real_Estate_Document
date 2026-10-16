@@ -7,11 +7,12 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
-  DollarSign,
+  IndianRupee,
   User,
   Plus,
   FileText,
 } from 'lucide-react';
+import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
 
 interface TransactionTaskPanelProps {
   dealId: string;
@@ -154,8 +155,8 @@ export function TransactionTaskPanel({ dealId, documents }: TransactionTaskPanel
                     </span>
 
                     {task.amount && (
-                      <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                        <DollarSign className="h-3.5 w-3.5" /> ${task.amount.toLocaleString()}
+                      <span className="flex items-center gap-1 font-semibold text-emerald-600" title={formatIndianPriceFull(task.amount)}>
+                        <IndianRupee className="h-3.5 w-3.5" /> {formatIndianPrice(task.amount)}
                       </span>
                     )}
 

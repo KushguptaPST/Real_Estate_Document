@@ -25,7 +25,7 @@ export function DocsPage() {
               Brokerage Knowledge Base
             </span>
             <Badge variant="neutral" className="bg-[#C9A961]/10 text-[#C9A961] border border-[#C9A961]/20 font-mono text-[10px]">
-              Agent Playbook &amp; Rules
+              Compliance Standards &amp; Rules
             </Badge>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#F5F5F7] sm:text-3xl">

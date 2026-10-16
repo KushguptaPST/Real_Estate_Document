@@ -7,6 +7,7 @@ import { ActivityHistory } from '@/components/ActivityHistory';
 import { DealHeader } from '@/components/deal/DealHeader';
 import { DealChecklist } from '@/components/deal/DealChecklist';
 import { TransactionTaskPanel } from '@/components/deal/TransactionTaskPanel';
+import { UploadZone } from '@/components/UploadZone';
 import {
   ChevronRight,
   AlertTriangle,
@@ -19,6 +20,9 @@ import {
   Clock,
   Sparkles,
   ShieldCheck,
+  FileText,
+  UploadCloud,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,8 +39,9 @@ export function DealDetailPage() {
   const [notifSettings, setNotifSettings] = useState<NotificationSetting | null>(null);
   const [sendingSummary, setSendingSummary] = useState(false);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
+  const [showUploadZone, setShowUploadZone] = useState(false);
 
-  const { deadlines, loading, error, confirmDeadline } = useDeadlines(dealId);
+  const { deadlines, loading, error, confirmDeadline, refetch } = useDeadlines(dealId);
 
   useEffect(() => {
     dealsApi
@@ -59,12 +64,14 @@ export function DealDetailPage() {
 
   const handleConfirmAll = async () => {
     const pendingDeadlines = deadlines.filter((d) => d.status === 'PENDING');
-    for (const d of pendingDeadlines) {
-      await confirmDeadline(d.id, {
-        confirmedDate: d.computedDate,
-        activate: true,
-      });
-    }
+    await Promise.all(
+      pendingDeadlines.map((d) =>
+        confirmDeadline(d.id, {
+          confirmedDate: d.computedDate,
+          activate: true,
+        }),
+      ),
+    );
     // Refresh deal & notifications
     notificationsApi.getSettings(dealId).then(setNotifSettings).catch(() => {});
   };
@@ -87,8 +94,23 @@ export function DealDetailPage() {
     }
   };
 
+  const handleUploadSuccess = async () => {
+    refetch();
+    try {
+      const updatedDeal = await dealsApi.get(dealId);
+      setDeal(updatedDeal);
+      const updatedSettings = await notificationsApi.getSettings(dealId).catch(() => null);
+      if (updatedSettings) setNotifSettings(updatedSettings);
+    } catch (e) {
+      console.error(e);
+    }
+    setShowUploadZone(false);
+    setSummaryMessage('Contract uploaded and processed! Contingency milestones and clauses extracted.');
+    setTimeout(() => setSummaryMessage(null), 5000);
+  };
+
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto transition-opacity duration-200">
       {/* Unified Command Center Header & Tab Navigation */}
       <DealHeader deal={deal} notifSettings={notifSettings} activeTab="milestones" />
 
@@ -100,8 +122,8 @@ export function DealDetailPage() {
       )}
 
       {summaryMessage && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-50/80 dark:bg-emerald-950/40 p-4 text-xs text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-4 text-xs text-emerald-300 ring-1 ring-emerald-500/20">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>{summaryMessage}</span>
         </div>
       )}
@@ -112,7 +134,94 @@ export function DealDetailPage() {
         deadlines={deadlines}
         notifSettings={notifSettings}
         onConfirmAll={handleConfirmAll}
+        documentCount={deal?.documents?.length ?? 0}
+        onUploadClick={() => setShowUploadZone(true)}
       />
+
+      {/* ── Deal Documents & Contract Ingestion ── */}
+      <div id="deal-documents-section" className="rounded-2xl border border-white/[0.08] bg-[#141418] p-5 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-white tracking-tight uppercase">
+                  Deal Contract &amp; Legal Documents
+                </h3>
+                <Badge variant={(deal?.documents?.length ?? 0) > 0 ? 'success' : 'warning'} className="text-[10px]">
+                  {(deal?.documents?.length ?? 0) > 0
+                    ? `${deal?.documents?.length} Ingested`
+                    : 'Action Required: No Contract Uploaded'}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-[#9A9AA5] mt-0.5">
+                {(deal?.documents?.length ?? 0) > 0
+                  ? 'Executed agreements, counter-offers, and addenda indexed by the AI contingency parser.'
+                  : 'Upload your purchase agreement PDF to compute binding contingency milestones and alert triggers.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUploadZone(!showUploadZone)}
+              className="h-8 px-3 text-xs gap-1.5 border-white/[0.08] text-[#D1D1DB] hover:bg-white/5 cursor-pointer"
+            >
+              <UploadCloud className="h-3.5 w-3.5 text-[#C9A961]" />
+              <span>{showUploadZone ? 'Close Upload' : '+ Upload Agreement / Addendum'}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Upload Zone (Visible when 0 documents, or when toggled) */}
+        {(showUploadZone || (deal?.documents?.length ?? 0) === 0) && (
+          <div className="pt-1">
+            <UploadZone
+              dealId={dealId}
+              onSuccess={handleUploadSuccess}
+            />
+          </div>
+        )}
+
+        {/* Existing Documents Grid */}
+        {(deal?.documents?.length ?? 0) > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+            {deal?.documents?.map((doc: any) => (
+              <div
+                key={doc.id}
+                className="bg-[#0D0D11] border border-white/[0.08] rounded-xl p-3 flex items-center justify-between hover:border-[#C9A961]/30 transition-all"
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <div className="text-xs font-semibold text-white truncate max-w-[160px]" title={doc.fileName}>
+                      {doc.fileName}
+                    </div>
+                    <div className="text-[10px] text-[#9A9AA5]">
+                      {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB • ` : ''}
+                      {new Date(doc.uploadedAt || doc.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  to={`/deals/${dealId}/review`}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold text-[#C9A961] bg-[#C9A961]/10 hover:bg-[#C9A961]/20 transition-colors shrink-0"
+                >
+                  Clauses
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Automated Email Alerts Dispatch Bar */}
       <div className="rounded-xl border border-border/70 bg-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">

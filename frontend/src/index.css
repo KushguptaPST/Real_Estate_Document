@@ -47,6 +47,8 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
     color-scheme: dark;
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
   }
 
   body {
@@ -79,6 +81,22 @@
 }
 
 @layer components {
+  /* ── Smooth Page & Tab Transition ── */
+  @keyframes smoothFadeIn {
+    from {
+      opacity: 0.7;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .smooth-transition {
+    animation: smoothFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   /* ── Luxury Real Estate Design System Tokens ── */
   .stripe-nav {
     background-color: rgba(14, 14, 18, 0.85);
@@ -185,3 +203,81 @@
     scrollbar-width: none;
   }
 }
+
+/* ── Legal-Grade Real Estate PDF Print & Export Optimization ── */
+@media print {
+  @page {
+    size: portrait;
+    margin: 10mm 12mm;
+  }
+
+  html,
+  body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide entire application navigation & UI chrome */
+  aside,
+  header,
+  nav,
+  .no-print,
+  .print-hidden,
+  button,
+  input,
+  [role="dialog"] > div.no-print {
+    display: none !important;
+  }
+
+  /* When printing DealReportModal, promote it to take the full page */
+  .deal-report-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    inset: auto !important;
+    z-index: auto !important;
+    backdrop-filter: none !important;
+  }
+
+  .deal-report-modal-container {
+    max-width: 100% !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+  }
+
+  #printable-deal-report {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .page-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+

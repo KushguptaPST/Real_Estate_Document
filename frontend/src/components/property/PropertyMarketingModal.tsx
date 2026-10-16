@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 
+import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
+
 interface Props {
   property: {
     title: string;
@@ -33,11 +35,10 @@ export function PropertyMarketingModal({ property, isOpen, onClose }: Props) {
 
   if (!isOpen) return null;
 
-  const formattedPrice = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(property.price);
+  const formattedPrice = formatIndianPrice(property.price);
+  const fullPrice = formatIndianPriceFull(property.price);
+  const priceDisplay = `${formattedPrice} (${fullPrice})`;
+
 
   // AI Generated Marketing Copy Templates
   const copyTemplates = {
@@ -99,58 +100,58 @@ Contact Agent for Private Entry Code & Disclosures.`,
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#141418] rounded-2xl border border-white/10 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="p-6 bg-[#16161D] text-white flex items-center justify-between border-b border-white/10">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 text-[10px]">
+              <Badge variant="gold" className="text-[10px]">
                 AI Marketing Suite
               </Badge>
-              <span className="text-xs text-slate-400">{property.city}</span>
+              <span className="text-xs text-[#9A9AA5]">{property.city}</span>
             </div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Megaphone className="h-5 w-5 text-sky-400" /> {property.title}
+            <h2 className="text-lg font-bold text-[#F5F5F7] flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-[#C9A961]" /> {property.title}
             </h2>
-            <p className="text-xs text-slate-300 font-mono mt-0.5">{formattedPrice} • {property.address}</p>
+            <p className="text-xs text-[#9A9AA5] font-mono mt-0.5">{priceDisplay} • {property.address}</p>
           </div>
 
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10">
+          <button onClick={onClose} className="p-1 rounded-lg text-[#6E6E7A] hover:text-[#F5F5F7] hover:bg-white/5 transition-colors cursor-pointer">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-100 bg-slate-50 px-6 pt-3 gap-2 overflow-x-auto text-xs font-semibold">
+        <div className="flex border-b border-white/10 bg-[#101014] px-6 pt-3 gap-2 overflow-x-auto text-xs font-semibold">
           <button
             onClick={() => setActiveTab('INSTAGRAM')}
-            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'INSTAGRAM' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'INSTAGRAM' ? 'border-[#C9A961] text-[#C9A961] font-bold' : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
             }`}
           >
             <Share2 className="h-4 w-4" /> Social Post
           </button>
           <button
             onClick={() => setActiveTab('EMAIL')}
-            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'EMAIL' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'EMAIL' ? 'border-[#C9A961] text-[#C9A961] font-bold' : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
             }`}
           >
             <Mail className="h-4 w-4" /> Email Blast
           </button>
           <button
             onClick={() => setActiveTab('MLS')}
-            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'MLS' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'MLS' ? 'border-[#C9A961] text-[#C9A961] font-bold' : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
             }`}
           >
             <FileText className="h-4 w-4" /> MLS Copy
           </button>
           <button
             onClick={() => setActiveTab('FLYER')}
-            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'FLYER' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`pb-3 px-3 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'FLYER' ? 'border-[#C9A961] text-[#C9A961] font-bold' : 'border-transparent text-[#9A9AA5] hover:text-[#F5F5F7]'
             }`}
           >
             <Share2 className="h-4 w-4" /> Open House Flyer
@@ -160,20 +161,20 @@ Contact Agent for Private Entry Code & Disclosures.`,
         {/* Content Box */}
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-600" /> Generated {activeTab} Marketing Copy
+            <span className="text-xs font-bold text-[#F5F5F7] uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-[#C9A961]" /> Generated {activeTab} Marketing Copy
             </span>
 
             <button
               onClick={() => handleCopy(copyTemplates[activeTab], activeTab)}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1.5 rounded-xl bg-[#C9A961] hover:bg-[#DFBF77] text-[#0A0A0B] font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md cursor-pointer"
             >
               {copiedTab === activeTab ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copiedTab === activeTab ? 'Copied to Clipboard!' : 'Copy Copy'}
             </button>
           </div>
 
-          <div className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs leading-relaxed whitespace-pre-wrap border border-slate-800 select-all">
+          <div className="bg-[#0E0E12] text-[#F5F5F7] p-4 rounded-xl font-mono text-xs leading-relaxed whitespace-pre-wrap border border-white/10 select-all">
             {copyTemplates[activeTab]}
           </div>
         </div>
