@@ -14,7 +14,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const model = process.env['GEMINI_EMBEDDING_MODEL'] ?? 'text-embedding-004';
+  const model = process.env['GEMINI_EMBEDDING_MODEL'] ?? 'gemini-embedding-001';
 
   try {
     const cleanText = text.slice(0, 8000).replace(/\s+/g, ' ').trim();

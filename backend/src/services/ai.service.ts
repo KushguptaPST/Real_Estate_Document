@@ -86,19 +86,24 @@ export async function extractClausesFromPdf(filePath: string): Promise<Extractio
   ].filter(Boolean) as string[]));
 
 
-  const pdfData = await readFile(filePath, { encoding: 'base64' });
   const pdfTextResult = await extractTextFromPdf(filePath);
   const ai = new GoogleGenAI({ apiKey });
 
   logger.info(`[Gemini] Extracting contingency clauses from ${filePath} (${pdfTextResult.text.length} chars text layer)`);
 
-  const promptContents: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
-    { inlineData: { mimeType: 'application/pdf', data: pdfData } },
-  ];
+  const hasTextLayer = pdfTextResult.text.trim().length > 50;
+  const promptContents: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
 
-  if (pdfTextResult.text.trim().length > 30) {
+  if (hasTextLayer) {
+    // Fast path: text layer is already extracted locally in milliseconds!
     promptContents.push({
       text: `DOCUMENT TEXT LAYER:\n${pdfTextResult.text.slice(0, 50000)}`,
+    });
+  } else {
+    // Scanned image fallback: read base64 binary for multimodal vision OCR
+    const pdfData = await readFile(filePath, { encoding: 'base64' });
+    promptContents.push({
+      inlineData: { mimeType: 'application/pdf', data: pdfData },
     });
   }
 

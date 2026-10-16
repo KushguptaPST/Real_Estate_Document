@@ -68,7 +68,6 @@ export async function extractTransactionTasksFromPdf(filePath: string, dealId: s
     return createSampleTasks(dealId, documentId, baseDate, orgId);
   }
 
-  const pdfData = await readFile(filePath, { encoding: 'base64' });
   const textResult = await extractTextFromPdf(filePath);
   const ai = new GoogleGenAI({ apiKey });
 
@@ -83,13 +82,32 @@ For each task:
 5. amount: Monetary amount if explicitly stated (e.g., deposit amount in USD), else null.
 6. assignedToRole: "BUYER", "SELLER", "ESCROW_AGENT", or "LISTING_AGENT".`;
 
+  const hasTextLayer = textResult.text.trim().length > 50;
+  const promptContents: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+
+  if (hasTextLayer) {
+    promptContents.push({
+      text: `DOCUMENT TEXT LAYER:\n${textResult.text.slice(0, 45000)}`,
+    });
+  } else {
+    const pdfData = await readFile(filePath, { encoding: 'base64' });
+    promptContents.push({
+      inlineData: { mimeType: 'application/pdf', data: pdfData },
+    });
+  }
+
+  promptContents.push({ text: prompt });
+
+  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-3.6-flash';
   const candidateModels = Array.from(
     new Set(
       [
-        process.env['GEMINI_MODEL'],
+        envModel,
         'gemini-2.5-flash-lite',
         'gemini-3.5-flash-lite',
         'gemini-3.5-flash',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
       ].filter(Boolean) as string[],
     ),
   );
@@ -100,11 +118,7 @@ For each task:
     try {
       const response = await ai.models.generateContent({
         model,
-        contents: [
-          { inlineData: { mimeType: 'application/pdf', data: pdfData } },
-          { text: `TEXT LAYER:\n${textResult.text.slice(0, 40000)}` },
-          { text: prompt },
-        ],
+        contents: promptContents,
         config: {
           responseMimeType: 'application/json',
           responseJsonSchema: taskJsonSchema,

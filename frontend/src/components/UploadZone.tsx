@@ -10,9 +10,16 @@ interface Props {
 export function UploadZone({ dealId, onSuccess }: Props) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadStage, setUploadStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const stages = [
+    { title: 'Uploading & reading contract PDF...', sub: 'Fast-path local text extraction' },
+    { title: 'Extracting clauses & milestone tasks...', sub: 'Parallel Gemini 2.5/3.5 Flash AI pipeline' },
+    { title: 'Computing legal deadlines & statutory calendars...', sub: 'Deterministic WA/CA legal date engine' },
+  ];
 
   async function uploadFile(file: File) {
     if (file.type !== 'application/pdf') {
@@ -21,14 +28,21 @@ export function UploadZone({ dealId, onSuccess }: Props) {
     }
 
     setUploading(true);
+    setUploadStage(0);
     setError(null);
     setSuccess(false);
 
+    const interval = setInterval(() => {
+      setUploadStage((prev) => (prev < stages.length - 1 ? prev + 1 : prev));
+    }, 1200);
+
     try {
       await documentsApi.upload(dealId, file);
+      clearInterval(interval);
       setSuccess(true);
       onSuccess?.();
     } catch (err) {
+      clearInterval(interval);
       setError((err as Error).message);
     } finally {
       setUploading(false);
@@ -86,14 +100,21 @@ export function UploadZone({ dealId, onSuccess }: Props) {
 
       {uploading ? (
         <div className="mt-4 space-y-2">
-          <p className="text-sm font-semibold text-[#F5F5F7]">
-            Uploading &amp; indexing document&hellip;
+          <p className="text-sm font-semibold text-[#F5F5F7] animate-fade-in">
+            {stages[uploadStage]?.title}
           </p>
           <p className="text-xs text-[#9A9AA5]">
-            Running deterministic OCR, extracting clauses, and pinning page citations.
+            {stages[uploadStage]?.sub}
           </p>
-          <div className="mx-auto mt-3 h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#C9A961] to-[#DFBF77]" />
+          <div className="flex justify-center items-center gap-1.5 pt-1">
+            {stages.map((_, idx) => (
+              <span
+                key={idx}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  idx <= uploadStage ? 'w-8 bg-[#C9A961]' : 'w-2 bg-white/10'
+                }`}
+              />
+            ))}
           </div>
         </div>
       ) : success ? (

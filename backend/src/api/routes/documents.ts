@@ -78,14 +78,21 @@ router.post(
       },
     });
 
-    // ── Gemini extraction pipeline ───────────────────────────────────────
-    logger.info(`[Pipeline] Starting extraction for document ${document.id}`);
+    // ── Gemini extraction pipeline (Parallelized) ────────────────────────
+    logger.info(`[Pipeline] Starting parallel clause & milestone task extraction for document ${document.id}`);
 
     await prisma.auditLog.create({
       data: { dealId, organizationId: orgId, action: 'EXTRACTION_STARTED', entityType: 'Document', entityId: document.id, actor: 'system' },
     });
 
-    const extraction = await extractClausesFromPdf(file.path);
+    const [extraction, _tasks] = await Promise.all([
+      extractClausesFromPdf(file.path),
+      extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
+        logger.warn(`[Pipeline] Task extraction failed: ${err.message}`);
+        return [];
+      }),
+    ]);
+
     const clauses = await Promise.all(
       extraction.clauses.map((clause) =>
         prisma.contingencyClause.create({
@@ -107,11 +114,6 @@ router.post(
 
     const baseAcceptanceDate = deal.acceptanceDate ?? new Date();
     const deadlines = await computeDeadlinesForDeal(dealId, baseAcceptanceDate, clauses, orgId);
-
-    // Extract non-contingency milestone tasks into TaskProposal queue
-    await extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
-      logger.warn(`[Pipeline] Task extraction failed: ${err.message}`);
-    });
 
     await prisma.auditLog.create({
       data: {
