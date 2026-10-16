@@ -591,15 +591,15 @@ export type PlanLeadFollowUpArgs = z.infer<typeof PlanLeadFollowUpArgsSchema>;
 export const AGENT_FUNCTION_DECLARATIONS = [
   {
     name: 'search_properties',
-    description: 'Search verified property inventory belonging to this real estate organization matching price, bedroom, or location criteria.',
+    description: 'Search verified property inventory belonging to this real estate organization matching price, bedroom, or location/micro-market/landmark criteria.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        minPrice: { type: 'NUMBER', description: 'Minimum price ceiling in USD (optional)' },
-        maxPrice: { type: 'NUMBER', description: 'Maximum price ceiling in USD (optional)' },
+        minPrice: { type: 'NUMBER', description: 'Minimum price in local currency amount (e.g. in India: 2.4 Cr = 24000000, 1.5 Cr = 15000000; or in US: 900000)' },
+        maxPrice: { type: 'NUMBER', description: 'Maximum price ceiling in local currency amount (e.g. in India: 2.4 Cr = 24000000, 2 Cr = 20000000; or in US: 900000)' },
         bedrooms: { type: 'INTEGER', description: 'Minimum number of bedrooms (optional)' },
-        city: { type: 'STRING', description: 'City name or neighborhood (optional)' },
-        searchQuery: { type: 'STRING', description: 'Keywords matching title or address (optional)' },
+        city: { type: 'STRING', description: 'City name, micro-market, neighborhood, or landmark (e.g. ITPL, Whitefield, Bengaluru)' },
+        searchQuery: { type: 'STRING', description: 'Keywords matching property name, landmark, or street address (optional)' },
       },
     },
   },
@@ -867,10 +867,29 @@ export async function executeAgentTool(
           };
         }
         const args = parsed.data;
+
+        // Auto-normalize prices if the AI passed raw Crores or Lakhs values (e.g. 2.4 instead of 24000000)
+        let normalizedMinPrice = args.minPrice;
+        let normalizedMaxPrice = args.maxPrice;
+        if (normalizedMinPrice && normalizedMinPrice > 0 && normalizedMinPrice < 100) {
+          normalizedMinPrice = Math.round(normalizedMinPrice * 10000000);
+        } else if (normalizedMinPrice && normalizedMinPrice >= 100 && normalizedMinPrice <= 1000) {
+          normalizedMinPrice = Math.round(normalizedMinPrice * 100000);
+        }
+        if (normalizedMaxPrice && normalizedMaxPrice > 0 && normalizedMaxPrice < 100) {
+          normalizedMaxPrice = Math.round(normalizedMaxPrice * 10000000);
+        } else if (normalizedMaxPrice && normalizedMaxPrice >= 100 && normalizedMaxPrice <= 1000) {
+          normalizedMaxPrice = Math.round(normalizedMaxPrice * 100000);
+        }
+
+        logger.info(
+          `[search_properties] Querying inventory for org ${context.organizationId}: city="${args.city ?? ''}", search="${args.searchQuery ?? ''}", maxPrice=${normalizedMaxPrice ?? 'none'}, bedrooms=${args.bedrooms ?? 'any'}`,
+        );
+
         const properties = await getProperties({
           search: args.searchQuery,
-          minPrice: args.minPrice,
-          maxPrice: args.maxPrice,
+          minPrice: normalizedMinPrice,
+          maxPrice: normalizedMaxPrice,
           bedrooms: args.bedrooms,
           city: args.city,
           organizationId: context.organizationId,

@@ -226,29 +226,49 @@ export async function getProperties(params: {
 }) {
   const { search, minPrice, maxPrice, bedrooms, city, organizationId } = params;
 
-  const whereClause: Record<string, unknown> = {
-    organizationId,
-    status: 'AVAILABLE',
-  };
+  const andConditions: any[] = [
+    { organizationId },
+    { status: 'AVAILABLE' },
+  ];
 
-  if (minPrice) whereClause['price'] = { gte: minPrice };
-  if (maxPrice) {
-    whereClause['price'] = { ...(whereClause['price'] as object), lte: maxPrice };
+  if (minPrice != null && minPrice > 0) {
+    andConditions.push({ price: { gte: minPrice } });
   }
-  if (bedrooms) whereClause['bedrooms'] = { gte: bedrooms };
-  if (city) whereClause['city'] = { contains: city, mode: 'insensitive' };
+  if (maxPrice != null && maxPrice > 0) {
+    andConditions.push({ price: { lte: maxPrice } });
+  }
+  if (bedrooms != null && bedrooms > 0) {
+    andConditions.push({ bedrooms: { gte: bedrooms } });
+  }
+
+  // Location / City matching:
+  // In real estate (especially in metros like Bengaluru), buyers and AI models often pass
+  // micro-markets, neighborhoods, or landmarks (e.g. "ITPL", "Whitefield", "Panathur", "ECC Road")
+  // as the "city" argument. Check across city, address, and title so landmarks like ITPL match.
+  if (city && city.trim().length > 0) {
+    const c = city.trim();
+    andConditions.push({
+      OR: [
+        { city: { contains: c, mode: 'insensitive' } },
+        { address: { contains: c, mode: 'insensitive' } },
+        { title: { contains: c, mode: 'insensitive' } },
+      ],
+    });
+  }
 
   if (search && search.trim().length > 0) {
     const q = search.trim();
-    whereClause['OR'] = [
-      { title: { contains: q, mode: 'insensitive' } },
-      { address: { contains: q, mode: 'insensitive' } },
-      { city: { contains: q, mode: 'insensitive' } },
-    ];
+    andConditions.push({
+      OR: [
+        { title: { contains: q, mode: 'insensitive' } },
+        { address: { contains: q, mode: 'insensitive' } },
+        { city: { contains: q, mode: 'insensitive' } },
+      ],
+    });
   }
 
   return prisma.property.findMany({
-    where: whereClause,
+    where: { AND: andConditions },
     orderBy: { createdAt: 'desc' },
   });
 }
