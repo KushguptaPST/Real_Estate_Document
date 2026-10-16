@@ -1377,22 +1377,6 @@ export function LeadDetailPage() {
               Convert to Deal
             </button>
           ) : null}
-
-          {/* Log Call button */}
-          <button
-            onClick={handleOpenLogCallModal}
-            disabled={!canLogCall}
-            title={
-              !canLogCall
-                ? 'Only the assigned advisor or organization owner can record calls for this lead'
-                : 'Record manual phone call'
-            }
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 bg-[#181820] text-[#F5F5F7] border border-white/[0.08] hover:border-[#C9A961]/40 hover:text-[#C9A961] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-          >
-            <PhoneCall className="h-3.5 w-3.5 text-[#C9A961]" />
-            Log Call
-          </button>
-
           {/* Claim button */}
           {!lead.assignedUserId && !['WON', 'LOST'].includes(lead.status) && (
             <button
@@ -2526,132 +2510,6 @@ export function LeadDetailPage() {
               </div>
             )}
           </div>
-
-          {/* ── Phone Call History Card ── */}
-          <div className="rounded-2xl bg-[#141418] border border-white/[0.08] p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
-              <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <PhoneCall className="h-4 w-4 text-[#C9A961]" />
-                Phone Call History
-              </h2>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-[#9A9AA5] font-medium">
-                  {callLogs.length} {callLogs.length === 1 ? 'call' : 'calls'}
-                </span>
-                <button
-                  onClick={handleOpenLogCallModal}
-                  disabled={!canLogCall}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30 hover:bg-[#C9A961]/25 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!canLogCall ? 'Only assigned advisor or owner can record calls' : 'Record new phone call'}
-                >
-                  <Phone className="h-3 w-3" />
-                  + Log Call
-                </button>
-              </div>
-            </div>
-
-            {callLogs.length === 0 ? (
-              <div className="rounded-xl bg-[#181820] p-5 text-center text-xs text-[#9A9AA5] border border-white/[0.06] space-y-2">
-                <p>No phone calls recorded yet.</p>
-                {canLogCall && (
-                  <button
-                    onClick={handleOpenLogCallModal}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#C9A961] hover:underline"
-                  >
-                    <PhoneCall className="h-3.5 w-3.5" />
-                    Record your first call with this lead
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                {callLogs.map((c) => {
-                  const badge = getOutcomeBadge(c.outcome);
-                  const durationStr = formatDuration(c.durationSeconds);
-                  const isInbound = c.direction === 'INBOUND';
-                  return (
-                    <div
-                      key={c.id}
-                      className="p-3 rounded-xl border border-white/[0.08] bg-[#181820]/60 text-xs space-y-1.5 hover:bg-[#181820] transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          {isInbound ? (
-                            <span className="inline-flex items-center gap-1 text-teal-400 font-bold text-[11px]">
-                              <PhoneIncoming className="h-3.5 w-3.5 text-teal-400" /> Inbound
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[#C9A961] font-bold text-[11px]">
-                              <PhoneOutgoing className="h-3.5 w-3.5 text-[#C9A961]" /> Outbound
-                            </span>
-                          )}
-                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${badge.bg}`}>
-                            {badge.label}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-[#6E6E7A]">
-                          {new Date(c.calledAt).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-[#9A9AA5]">
-                        <span>Advisor: {c.user?.name || c.user?.email || 'Unknown'}</span>
-                        {durationStr && <span className="font-medium text-[#9A9AA5]">Duration: {durationStr}</span>}
-                      </div>
-
-                      {c.notes && (
-                        <p className="text-[11px] text-[#F5F5F7] bg-[#181820] p-2 rounded-lg border border-white/[0.06] whitespace-pre-wrap">
-                          {c.notes}
-                        </p>
-                      )}
-
-                      {c.followUpNeeded && (
-                        <div className="flex items-center justify-between gap-1.5 text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-1.5 rounded-md border border-amber-500/25">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="h-3 w-3 text-amber-400" />
-                            <span>Follow-up Scheduled</span>
-                            {c.followUpDate && (
-                              <span className="text-amber-400 font-normal">
-                                • Due: {new Date(c.followUpDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            )}
-                          </div>
-                          {c.followUpTask ? (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
-                                c.followUpTask.status === 'COMPLETED'
-                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                                  : c.followUpTask.status === 'CANCELLED'
-                                  ? 'bg-[#1E1E26] text-[#9A9AA5] border-white/[0.08]'
-                                  : (c.followUpTask.isOverdue || new Date(c.followUpTask.dueDate).getTime() < Date.now())
-                                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                                  : 'bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/30'
-                              }`}
-                            >
-                              Task: {c.followUpTask.status === 'OPEN' && (c.followUpTask.isOverdue || new Date(c.followUpTask.dueDate).getTime() < Date.now()) ? 'OVERDUE' : c.followUpTask.status}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={handleOpenAddTaskModal}
-                              disabled={!canManageTasks}
-                              className="text-[9px] font-bold text-[#C9A961] hover:underline disabled:opacity-50"
-                            >
-                              + Create Task
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ── Right Column: AI Verified Property Matches (4 Cols) ── */}
@@ -2730,7 +2588,7 @@ export function LeadDetailPage() {
               </span>
             </h2>
             <p className="text-xs text-[#9A9AA5] mt-0.5">
-              Canonical chronological history across lead lifecycle, calls, follow-up tasks, site visits, and assignments.
+              Canonical chronological history across lead lifecycle, follow-up tasks, site visits, and assignments.
             </p>
           </div>
 
@@ -2740,7 +2598,6 @@ export function LeadDetailPage() {
               {(
                 [
                   { id: 'ALL', label: 'All Activity' },
-                  { id: 'CALLS', label: 'Calls' },
                   { id: 'TASKS', label: 'Tasks' },
                   { id: 'VISITS', label: 'Site Visits' },
                   { id: 'OWNERSHIP', label: 'Ownership' },
@@ -3016,195 +2873,7 @@ export function LeadDetailPage() {
         </div>
       )}
 
-      {/* ── Log Phone Call Modal ── */}
-      {showLogCallModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a2540]/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#141418] p-5 border border-white/[0.12] shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <PhoneCall className="h-4 w-4 text-[#635bff]" />
-                Record Phone Call Log
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowLogCallModal(false)}
-                className="text-[#6E6E7A] hover:text-[#D1D1DB] text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
 
-            <p className="text-xs text-[#9A9AA5]">
-              Record manual phone call details with <span className="font-semibold text-[#F5F5F7]">{lead.fullName}</span>. Track outcomes, discussion context, and follow-up requirements.
-            </p>
-
-            {/* Error Banner */}
-            {callFormError && (
-              <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-300 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
-                <div className="font-medium">{callFormError}</div>
-              </div>
-            )}
-
-            <form onSubmit={handleConfirmLogCall} className="space-y-3.5 text-xs">
-              {/* Call Direction */}
-              <div>
-                <label className="block font-semibold text-[#D1D1DB] mb-1.5">
-                  Call Direction *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCallDirection('OUTBOUND')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      callDirection === 'OUTBOUND'
-                        ? 'border-[#C9A961] bg-[#C9A961]/15 text-[#C9A961]'
-                        : 'border-white/[0.08] bg-[#181820] text-[#D1D1DB] hover:bg-[#1E1E26]'
-                    }`}
-                  >
-                    <PhoneOutgoing className="h-3.5 w-3.5" />
-                    Outbound Call
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCallDirection('INBOUND')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                      callDirection === 'INBOUND'
-                        ? 'border-teal-500/50 bg-teal-500/15 text-teal-300'
-                        : 'border-white/[0.08] bg-[#181820] text-[#D1D1DB] hover:bg-[#1E1E26]'
-                    }`}
-                  >
-                    <PhoneIncoming className="h-3.5 w-3.5" />
-                    Inbound Call
-                  </button>
-                </div>
-              </div>
-
-              {/* Call Outcome */}
-              <div>
-                <label className="block font-semibold text-[#D1D1DB] mb-1">
-                  Call Outcome *
-                </label>
-                <select
-                  value={callOutcome}
-                  onChange={(e) => setCallOutcome(e.target.value as CallOutcome)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
-                >
-                  <option value="CONNECTED">Connected (Spoke with Lead)</option>
-                  <option value="CALLBACK_REQUESTED">Callback Requested</option>
-                  <option value="VOICEMAIL">Left Voicemail</option>
-                  <option value="NO_ANSWER">No Answer</option>
-                  <option value="BUSY">Line Busy</option>
-                  <option value="WRONG_NUMBER">Wrong Number</option>
-                  <option value="OTHER">Other (Notes Required)</option>
-                </select>
-              </div>
-
-              {/* Date & Time + Duration */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block font-semibold text-[#D1D1DB] mb-1">
-                    Call Date &amp; Time *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={callTimestamp}
-                    onChange={(e) => setCallTimestamp(e.target.value)}
-                    max={getLocalIsoString(new Date(Date.now() + 5 * 60 * 1000))}
-                    required
-                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-[#D1D1DB] mb-1">
-                    Duration in Seconds <span className="text-[#6E6E7A] font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 180 (for 3m)"
-                    value={callDurationSeconds}
-                    onChange={(e) => setCallDurationSeconds(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Call Notes */}
-              <div>
-                <label className="block font-semibold text-[#D1D1DB] mb-1">
-                  Call Notes{' '}
-                  {callOutcome === 'OTHER' ? (
-                    <span className="text-rose-400 font-bold">* (Required for "Other")</span>
-                  ) : (
-                    <span className="text-[#6E6E7A] font-normal">(Optional)</span>
-                  )}
-                </label>
-                <textarea
-                  rows={3}
-                  value={callNotes}
-                  onChange={(e) => setCallNotes(e.target.value)}
-                  placeholder={
-                    callOutcome === 'OTHER'
-                      ? 'Detailed notes required to explain the "Other" outcome...'
-                      : 'Discussion points, customer sentiment, budget updates, next steps...'
-                  }
-                  className="w-full rounded-xl border border-white/[0.08] bg-[#181820] text-[#F5F5F7] placeholder:text-[#6E6E7A] px-3 py-2 text-xs focus:border-[#C9A961] focus:outline-none"
-                />
-              </div>
-
-              {/* Follow-up Section */}
-              <div className="p-3 rounded-xl border border-white/[0.08] bg-[#181820]/60 space-y-2.5">
-                <label className="flex items-center gap-2 cursor-pointer font-semibold text-[#F5F5F7]">
-                  <input
-                    type="checkbox"
-                    checked={callFollowUpNeeded}
-                    onChange={(e) => setCallFollowUpNeeded(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 accent-[#C9A961]"
-                  />
-                  <span>Follow-up required for this lead</span>
-                </label>
-
-                {callFollowUpNeeded && (
-                  <div className="pt-2 border-t border-white/[0.06]">
-                    <label className="block font-semibold text-[#D1D1DB] mb-1">
-                      Follow-up Due Date &amp; Time <span className="text-[#6E6E7A] font-normal">(Optional)</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={callFollowUpDate}
-                      onChange={(e) => setCallFollowUpDate(e.target.value)}
-                      min={getLocalIsoString()}
-                      className="w-full rounded-xl border border-white/[0.08] px-3 py-2 text-xs bg-[#181820] text-[#F5F5F7] focus:border-[#C9A961] focus:outline-none"
-                    />
-                    <p className="text-[10px] text-[#9A9AA5] mt-1">Must be set to a future date and time.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06]">
-                <button
-                  type="button"
-                  onClick={() => setShowLogCallModal(false)}
-                  className="px-3 py-1.5 rounded-xl border border-white/[0.08] text-xs font-semibold text-[#9A9AA5] hover:bg-[#181820]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loggingCall}
-                  className="btn-stripe-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {loggingCall && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Save Call Log
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ── Add Follow-Up Task Modal ── */}
       {showAddTaskModal && (
