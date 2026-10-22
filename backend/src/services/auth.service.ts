@@ -191,6 +191,15 @@ export async function completeSignIn(
 
   if (inviteToken) {
     user = await acceptInvitation(user, inviteToken);
+  } else if (!user.organizationId) {
+    const orgName = identity.name ? `${identity.name}'s Brokerage` : 'Agent Workspace';
+    const org = await prisma.organization.create({
+      data: { name: orgName },
+    });
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { organizationId: org.id, role: 'OWNER' },
+    });
   }
 
   return signSessionToken(user);
