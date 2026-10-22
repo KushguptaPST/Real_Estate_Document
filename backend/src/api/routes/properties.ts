@@ -19,7 +19,7 @@ const CreatePropertySchema = z.object({
   address: z.string().min(1, 'Address is required'),
   city: z.string().min(1, 'City is required'),
   price: z.number().positive('Price must be greater than 0'),
-  bedrooms: z.number().min(0),
+  bedrooms: z.number().int().min(1, 'Bedrooms must be between 1 and 3').max(3, 'Bedrooms must be between 1 and 3'),
   bathrooms: z.number().min(0),
   propertyType: z.string().min(1),
   status: z.enum(['AVAILABLE', 'UNDER_CONTRACT', 'SOLD', 'OFF_MARKET']).optional(),
@@ -55,7 +55,6 @@ router.get(
 router.post(
   '/',
   requireAuth,
-  requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const parsed = CreatePropertySchema.safeParse(req.body);
     if (!parsed.success) throw createError(parsed.error.message, 422);

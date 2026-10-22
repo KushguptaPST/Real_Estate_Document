@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { Deal, AuditLog, NotificationSetting } from '@/types';
+import type { Deal, AuditLog, NotificationSetting, Deadline } from '@/types';
 
 export function DealDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -63,17 +63,36 @@ export function DealDetailPage() {
   }, [dealId]);
 
   const handleConfirmAll = async () => {
-    const pendingDeadlines = deadlines.filter((d) => d.status === 'PENDING');
-    await Promise.all(
-      pendingDeadlines.map((d) =>
-        confirmDeadline(d.id, {
-          confirmedDate: d.computedDate,
-          activate: true,
-        }),
-      ),
+    const unverifiedDeadlines = deadlines.filter(
+      (d) => d.status !== 'CONFIRMED' && d.status !== 'ACTIVE' && d.status !== 'COMPLETED',
     );
+    if (unverifiedDeadlines.length === 0) return;
+
+    await Promise.all(
+      unverifiedDeadlines.map((d) => {
+        const targetDate = d.confirmedDate || d.computedDate || new Date().toISOString();
+        return confirmDeadline(d.id, {
+          confirmedDate: new Date(targetDate).toISOString(),
+          activate: true,
+        });
+      }),
+    );
+    refetch();
     // Refresh deal & notifications
     notificationsApi.getSettings(dealId).then(setNotifSettings).catch(() => {});
+  };
+
+  const handleConfirmSingleDeadline = async (deadline: Deadline) => {
+    try {
+      const targetDate = deadline.confirmedDate || deadline.computedDate || new Date().toISOString();
+      await confirmDeadline(deadline.id, {
+        confirmedDate: new Date(targetDate).toISOString(),
+        activate: true,
+      });
+      refetch();
+    } catch (err) {
+      alert(`Failed to confirm deadline: ${(err as Error).message}`);
+    }
   };
 
   const handleSendSummary = async () => {
@@ -308,7 +327,7 @@ export function DealDetailPage() {
           </div>
         )}
 
-        {!loading && <Timeline deadlines={deadlines} />}
+        {!loading && <Timeline deadlines={deadlines} onConfirm={handleConfirmSingleDeadline} />}
       </section>
 
       {/* Non-Contingency Transaction Obligations Tasks */}

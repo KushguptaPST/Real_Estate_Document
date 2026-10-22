@@ -131,22 +131,13 @@ export function PropertiesPage() {
             <FileSpreadsheet className="h-3.5 w-3.5 text-[#C9A961]" />
             <span>Import MLS / CSV</span>
           </button>
-          {isOwner ? (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-stripe-primary text-xs h-9 px-4 gap-1.5 cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Listing</span>
-            </button>
-          ) : (
-            <div title="Only organization owners can add listings">
-              <button disabled className="btn-stripe-secondary text-xs h-9 px-4 opacity-50 cursor-not-allowed">
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Listing (Owner Only)</span>
-              </button>
-            </div>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-stripe-primary text-xs h-9 px-4 gap-1.5 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Listing</span>
+          </button>
         </div>
       </div>
 
@@ -282,11 +273,10 @@ export function PropertiesPage() {
                       <span className="truncate">{p.address}, {p.city}</span>
                     </div>
                   </div>
-                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${
-                    p.status === 'AVAILABLE'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
-                  }`}>
+                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${p.status === 'AVAILABLE'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                    }`}>
                     {p.status}
                   </span>
                 </div>

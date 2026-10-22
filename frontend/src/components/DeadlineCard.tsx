@@ -62,12 +62,12 @@ export function DeadlineCard({ deadline, onConfirm }: Props) {
           </div>
         </div>
 
-        {deadline.status === 'PENDING' && onConfirm && (
+        {(deadline.status === 'PENDING' || deadline.status === 'MISSED') && onConfirm && (
           <Button
             variant="default"
             size="xs"
             onClick={() => onConfirm(deadline)}
-            className="shrink-0 self-start sm:self-center bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold rounded-full px-3 py-1.5"
+            className="shrink-0 self-start sm:self-center bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold rounded-full px-3 py-1.5 cursor-pointer shadow-sm"
           >
             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
             <span>Confirm Date</span>
