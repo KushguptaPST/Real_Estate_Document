@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
+    "build": "npm run build --prefix frontend",
     "dev": "tsx watch src/server.ts",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
