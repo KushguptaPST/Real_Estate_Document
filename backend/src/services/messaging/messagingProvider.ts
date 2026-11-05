@@ -5,6 +5,7 @@
 
 import { logger } from '../../utils/logger.js';
 import { maskEmail } from '../../utils/audit.js';
+import { whatsAppService } from './whatsapp.service.js';
 
 export interface OutboundMessagePayload {
   to: string;
@@ -193,6 +194,23 @@ export class SendGridMessagingProvider implements IMessagingProvider {
 }
 
 /**
+ * WhatsApp Cloud API Messaging Provider
+ */
+export class WhatsAppMessagingProvider implements IMessagingProvider {
+  readonly name = 'whatsapp';
+
+  async send(payload: OutboundMessagePayload): Promise<OutboundDispatchResult> {
+    const res = await whatsAppService.sendTextMessage(payload.to, payload.text);
+    return {
+      success: res.success,
+      providerMessageId: res.messageId,
+      error: res.error,
+      isTransient: false,
+    };
+  }
+}
+
+/**
  * Provider factory returning the configured messaging driver.
  */
 let customProviderOverride: IMessagingProvider | null = null;
@@ -201,9 +219,13 @@ export function setCustomMessagingProvider(provider: IMessagingProvider | null):
   customProviderOverride = provider;
 }
 
-export function getMessagingProvider(): IMessagingProvider {
+export function getMessagingProvider(channel?: string): IMessagingProvider {
   if (customProviderOverride) {
     return customProviderOverride;
+  }
+
+  if (channel === 'WHATSAPP') {
+    return new WhatsAppMessagingProvider();
   }
 
   const driver = (process.env['EMAIL_DRIVER'] || 'resend').toLowerCase();

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { notificationsApi } from '@/services/api';
-import { Send, Loader2, CheckCircle2, AlertCircle, X, Sparkles } from 'lucide-react';
+import { Send, Loader2, CheckCircle2, AlertCircle, X, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,7 +67,7 @@ export function SendTestEmailButton({ dealId, defaultRecipient = '', onSent }: P
           >
             <div className="flex items-center justify-between pb-3 border-b border-border/60">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <Mail className="h-3.5 w-3.5 text-primary" />
                 <h4 className="text-xs font-semibold text-foreground">Dispatch Test Alert</h4>
               </div>
               <button

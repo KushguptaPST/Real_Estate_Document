@@ -66,7 +66,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const leadId = req.params['id'];
     await authorizeConversationLead(leadId, req.user!);
-    const thread = await getOrCreateLeadThread(leadId, req.user!.organizationId);
+    const channel = req.query['channel'] as any;
+    const thread = await getOrCreateLeadThread(leadId, req.user!.organizationId, channel);
     res.json(thread);
   }),
 );

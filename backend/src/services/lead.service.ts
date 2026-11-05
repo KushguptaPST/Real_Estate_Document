@@ -438,12 +438,40 @@ export async function getLeadDetails(leadId: string, organizationId: string) {
   if (!lead) throw createError('Lead not found', 404);
 
   const now = Date.now();
-  const daysSinceLastActivity = Math.floor(
-    (now - new Date(lead.updatedAt).getTime()) / (1000 * 60 * 60 * 24),
+  const activityDates: number[] = [new Date(lead.updatedAt).getTime()];
+
+  if (lead.siteVisits && lead.siteVisits.length > 0) {
+    for (const v of lead.siteVisits) {
+      if (v.status === 'SCHEDULED' || v.status === 'COMPLETED') {
+        activityDates.push(new Date(v.startAt).getTime());
+        activityDates.push(new Date(v.updatedAt || v.createdAt).getTime());
+      }
+    }
+  }
+
+  if (lead.tasks && lead.tasks.length > 0) {
+    for (const t of lead.tasks) {
+      activityDates.push(new Date(t.updatedAt || t.createdAt).getTime());
+      if (t.status === 'OPEN') {
+        activityDates.push(new Date(t.dueDate).getTime());
+      }
+    }
+  }
+
+  const latestActivityTimestamp = Math.max(...activityDates);
+  const daysSinceLastActivity = Math.max(
+    0,
+    Math.floor((now - latestActivityTimestamp) / (1000 * 60 * 60 * 24)),
   );
+
+  const hasScheduledTour = (lead.siteVisits || []).some((v) => v.status === 'SCHEDULED');
+  const hasOpenTasks = (lead.tasks || []).some((t) => t.status === 'OPEN' && t.dueDate.getTime() >= now);
+
   const isInactiveWarning =
     Boolean(lead.assignedUserId) &&
     ACTIVE_LEAD_STATUSES.includes(lead.status) &&
+    !hasScheduledTour &&
+    !hasOpenTasks &&
     daysSinceLastActivity >= 7;
 
   const tasksWithOverdue = (lead.tasks || []).map((t) => ({
@@ -642,6 +670,7 @@ export async function getLeads(params: {
       requirements: true,
       assignedUser: { select: { id: true, name: true, email: true } },
       _count: { select: { matches: true, conversations: true } },
+      siteVisits: { where: { status: 'SCHEDULED' }, select: { id: true } },
     },
     orderBy: { updatedAt: 'desc' },
   });
@@ -650,9 +679,11 @@ export async function getLeads(params: {
     const daysSinceLastActivity = Math.floor(
       (Date.now() - new Date(lead.updatedAt).getTime()) / (1000 * 60 * 60 * 24),
     );
+    const hasActiveTour = Boolean(lead.siteVisits && lead.siteVisits.length > 0);
     const isInactiveWarning =
       Boolean(lead.assignedUserId) &&
       ACTIVE_LEAD_STATUSES.includes(lead.status) &&
+      !hasActiveTour &&
       daysSinceLastActivity >= 7;
 
     return {
@@ -1606,7 +1637,7 @@ export async function getLeadTimeline(params: GetLeadTimelineParams) {
       actor: v.createdByUser ?? null,
       title: `Site Visit Scheduled${v.property ? `: ${v.property.title}` : ''}`,
       description: v.notes || (v.meetingLocation ? `Location: ${v.meetingLocation}` : null),
-      outcome: `Scheduled for ${v.startAt.toISOString().slice(0, 16).replace('T', ' ')}`,
+      outcome: `Scheduled for ${v.startAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${v.startAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
       metadata: {
         startAt: v.startAt.toISOString(),
         endAt: v.endAt.toISOString(),

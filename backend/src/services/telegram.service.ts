@@ -387,11 +387,12 @@ async function getOrCreateTelegramLead(user: TelegramUser, orgId: string) {
     logger.info(`[Telegram] Created new Lead for user ${fullName} (${user.id}) in org ${orgId}`);
   }
 
-  // Find or create conversation thread
+  // Find or create conversation thread for Telegram (WEB_CHAT channel)
   let thread = await prisma.conversationThread.findFirst({
     where: {
       leadId: lead.id,
       organizationId: orgId,
+      channel: 'WEB_CHAT',
     },
   });
 
@@ -493,8 +494,8 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     text.includes('Resume AI') ||
     text.toLowerCase() === 'switch to ai'
   ) {
-    await prisma.conversationThread.update({
-      where: { id: thread.id },
+    await prisma.conversationThread.updateMany({
+      where: { leadId: lead.id, organizationId: orgId },
       data: {
         state: 'AUTOPILOT',
         isHumanTakeover: false,
@@ -517,8 +518,8 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
   // 2. Command: /start
   if (text.toLowerCase() === '/start') {
     // Reset any takeover on /start so user can restart AI chat
-    await prisma.conversationThread.update({
-      where: { id: thread.id },
+    await prisma.conversationThread.updateMany({
+      where: { leadId: lead.id, organizationId: orgId },
       data: {
         state: 'AUTOPILOT',
         isHumanTakeover: false,
@@ -571,12 +572,12 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
     let listingsText = `🏡 <b>Verified Available Inventory:</b>\n\n`;
     for (const p of properties) {
-      const isIndia =
-        (p.city &&
+      const isIndia = Boolean(
+        p.city &&
           (p.city.toLowerCase().includes('bengaluru') ||
             p.city.toLowerCase().includes('whitefield') ||
-            p.city.toLowerCase().includes('bangalore'))) ||
-        p.price >= 1000000;
+            p.city.toLowerCase().includes('bangalore'))
+      );
       const priceFormatted = isIndia
         ? p.price >= 10000000
           ? `₹${(p.price / 10000000).toFixed(2)} Cr`

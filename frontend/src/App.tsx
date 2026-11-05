@@ -23,6 +23,9 @@ import { LeadDetailPage } from '@/pages/LeadDetailPage';
 import { PropertiesPage } from '@/pages/PropertiesPage';
 import { KnowledgePage } from '@/pages/KnowledgePage';
 import { OrganizationPage } from '@/pages/OrganizationPage';
+import { SignupPage } from '@/pages/SignupPage';
+import { CampaignsPage } from '@/pages/CampaignsPage';
+import { AdminPage } from '@/pages/AdminPage';
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();
@@ -30,25 +33,30 @@ function ProtectedLayout() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0B]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
+      <div className="flex h-screen w-screen items-center justify-center bg-[#FAFAF8]">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-900" />
       </div>
     );
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
 
   return (
-    <div className="flex min-h-screen bg-[#0A0A0B] text-[#F5F5F7]">
-      {/* Fixed Left Vertical Sidebar */}
+    <div className="flex h-screen h-dvh w-screen overflow-hidden bg-[#FAFAF8] text-slate-900 font-sans">
+      {/* 1. Permanent Left Sidebar (Locked to Viewport, Never Scrolls Away) */}
       <Sidebar />
 
-      {/* Main Content Area with Sticky Header */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* 2. Main Content Viewport */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Fixed Top Header (h-14) */}
         <TopHeader />
-        <main className="flex-1 p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
-          <Breadcrumbs />
-          <div key={location.pathname} className="smooth-transition">
-            <Outlet />
+
+        {/* Dedicated Scrollable Content Area */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 w-full">
+          <div className="max-w-[1600px] w-full mx-auto">
+            <Breadcrumbs />
+            <div key={location.pathname} className="smooth-transition">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>
@@ -62,10 +70,18 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/signup" element={user ? <Navigate to="/deals" replace /> : <SignupPage />} />
       <Route path="/login" element={user ? <Navigate to="/upload" replace /> : <LoginPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/security" element={<SecurityPage />} />
+      <Route path="/contracts-library" element={<ContractsLibraryPage />} />
+      <Route path="/contracts" element={<Navigate to="/contracts-library" replace />} />
+      <Route path="/docs" element={<DocsPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/leads/:id" element={<LeadDetailPage />} />
+        <Route path="/campaigns" element={<CampaignsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/properties" element={<PropertiesPage />} />
         <Route path="/knowledge" element={<Navigate to="/deals" replace />} />
         <Route path="/organization" element={<OrganizationPage />} />
@@ -76,10 +92,6 @@ export default function App() {
         <Route path="/deals/:id/assistant" element={<AssistantPage />} />
         <Route path="/deals/:id/notifications" element={<NotificationSettingsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/docs" element={<DocsPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/contracts" element={<ContractsLibraryPage />} />
-        <Route path="/security" element={<SecurityPage />} />
         <Route path="/audit" element={<AuditPage />} />
       </Route>
     </Routes>

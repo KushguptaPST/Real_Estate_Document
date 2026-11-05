@@ -4,7 +4,6 @@ import { PdfViewer } from './pdf/PdfViewer';
 import {
   IconX,
   IconDocumentText,
-  IconSparkles,
   IconShieldCheck,
   IconCheckCircle,
   IconClock,

@@ -349,13 +349,11 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
 
     const candidateModels = Array.from(
       new Set([
-        configuredModel,
-        'gemini-3.1-flash-lite',
-        'gemini-3.5-flash-lite',
         'gemini-2.5-flash-lite',
+        configuredModel,
         'gemini-flash-lite-latest',
         'gemini-3.8-flash',
-        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
       ])
     );
 
@@ -366,7 +364,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout after 7000ms on ${modelCandidate}`)), 7000)
+            setTimeout(() => reject(new Error(`Timeout after 20000ms on ${modelCandidate}`)), 20000)
           );
           response = await Promise.race([
             ai.models.generateContent({

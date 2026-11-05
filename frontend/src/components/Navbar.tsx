@@ -30,10 +30,10 @@ export function Navbar() {
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold tracking-tight text-[#0f172a] group-hover:text-[#1d4ed8] transition-colors">
+              <span className="text-sm font-bold tracking-tight text-[#0f172a] group-hover:text-emerald-700 transition-colors">
                 Contingency Copilot
               </span>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200/80 px-2 py-0.5 text-[10px] font-bold text-[#1d4ed8]">
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                 <CheckCircle2 className="h-3 w-3 text-[#059669]" />
                 MLS &amp; Escrow Suite
               </span>

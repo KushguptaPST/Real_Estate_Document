@@ -72,14 +72,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const authApi = {
   getConfig: () => request<{ demoLoginEnabled: boolean }>('/auth/config'),
+  registerOrg: (data: {
+    ownerName: string;
+    email: string;
+    password?: string;
+    organizationName: string;
+    stateJurisdiction?: string;
+    planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+  }) =>
+    request<{
+      token: string;
+      user: User;
+      organization: { id: string; name: string; subscriptionTier: string; stateJurisdiction: string };
+    }>('/auth/register-org', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  loginWithPassword: (data: { email: string; password: string }) =>
+    request<{ token: string; user: User }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   signInWithGoogle: (credential: string, inviteToken?: string) =>
     request<{ token: string; user: User }>('/auth/google', {
       method: 'POST',
       body: JSON.stringify({ credential, ...(inviteToken ? { inviteToken } : {}) }),
     }),
-  signInAsDemoAgent: () =>
+  signInAsDemoAgent: (role?: 'AGENT' | 'OWNER') =>
     request<{ token: string; user: User }>('/auth/demo', {
       method: 'POST',
+      body: JSON.stringify({ role: role || 'AGENT' }),
     }),
   me: () => request<{ user: User }>('/auth/me'),
 };
@@ -442,6 +464,11 @@ export const organizationApi = {
     }),
   removeMember: (userId: string) =>
     request<void>(`/org/members/${userId}`, { method: 'DELETE' }),
+  changeMemberRole: (userId: string, role: 'OWNER' | 'AGENT') =>
+    request<User>(`/org/members/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
   revokeInvitation: (invitationId: string) =>
     request<void>(`/org/invitations/${invitationId}`, { method: 'DELETE' }),
 };
@@ -549,3 +576,284 @@ export const siteVisitsApi = {
       body: JSON.stringify({ notes }),
     }),
 };
+
+// ── Billing & Subscriptions API ───────────────────────────────────────────────
+
+export interface SubscriptionStatusResponse {
+  organizationId: string;
+  organizationName: string;
+  tier: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+  status: string;
+  stateJurisdiction: string;
+  planExpiresAt: string | null;
+  hasStripeCustomer: boolean;
+  planDetails: {
+    id: string;
+    name: string;
+    monthlyPrice: number;
+    annualPrice: number;
+    maxAgents: number;
+    maxDeals: number | null;
+    features: string[];
+  };
+  usage: {
+    activeDeals: number;
+    maxDeals: number | null;
+    seatsUsed: number;
+    maxSeats: number;
+  };
+}
+
+export const billingApi = {
+  getSubscription: () => request<SubscriptionStatusResponse>('/billing/subscription'),
+  getPlans: () => request<{ plans: any[] }>('/billing/plans'),
+  createCheckoutSession: (params: {
+    plan: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+    isAnnual?: boolean;
+    successUrl?: string;
+    cancelUrl?: string;
+  }) =>
+    request<{ url: string; mock: boolean }>('/billing/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+  createPortalSession: (returnUrl?: string) =>
+    request<{ url: string; mock: boolean }>('/billing/portal', {
+      method: 'POST',
+      body: JSON.stringify({ returnUrl }),
+    }),
+  devUpgrade: (plan: 'SOLO' | 'TEAM' | 'ENTERPRISE') =>
+    request<{ success: boolean; subscriptionTier: string; subscriptionStatus: string }>('/billing/dev-upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    }),
+};
+
+// ── Feature 12: Pre-Paid Metered Telephony & Messaging Wallet API ──────────
+
+export interface WalletTransaction {
+  id: string;
+  timestamp: string;
+  type: 'CREDIT' | 'DEBIT';
+  category: 'VOICE_CALL' | 'WHATSAPP_QUALIFICATION' | 'VOICE_CLONE_PROFILE' | 'DEPOSIT' | 'AUTO_RECHARGE' | 'REFUND';
+  description: string;
+  amount: number;
+  balanceAfter: number;
+  metadata?: Record<string, any>;
+}
+
+export interface WalletStateResponse {
+  organizationId: string;
+  balance: number;
+  currency: 'USD';
+  autoRecharge: {
+    enabled: boolean;
+    threshold: number;
+    rechargeAmount: number;
+  };
+  unitRates: {
+    voicePerMinute: number;
+    whatsappPerLead: number;
+    voiceCloneProfile: number;
+  };
+  transactions: WalletTransaction[];
+  stats: {
+    totalSpent: number;
+    voiceMinutesBilled: number;
+    leadsQualified: number;
+    totalDeposited: number;
+  };
+}
+
+export const walletApi = {
+  getWallet: () => request<WalletStateResponse>('/billing/wallet'),
+  depositCredits: (amount: number, options?: { successUrl?: string; cancelUrl?: string }) =>
+    request<{ success: boolean; newBalance: number; transaction: WalletTransaction; checkoutUrl?: string; isSimulated: boolean }>('/billing/wallet/deposit', {
+      method: 'POST',
+      body: JSON.stringify({ amount, ...options }),
+    }),
+  updateAutoRecharge: (data: { enabled?: boolean; threshold?: number; rechargeAmount?: number }) =>
+    request<{ success: boolean; autoRecharge: any }>('/billing/wallet/auto-recharge', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  simulateDeduction: (data: { type: 'VOICE_CALL' | 'WHATSAPP_QUALIFICATION'; durationSeconds?: number; leadName?: string }) =>
+    request<{ success: boolean; transaction: WalletTransaction; currentBalance: number }>('/billing/wallet/simulate-deduction', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ── Feature 10: Autonomous AI Voice Agent & Telephony API ────────────────────
+
+export interface OutboundCallInput {
+  leadId: string;
+  phone: string;
+  fromNumber?: string;
+}
+
+export interface OutboundCallResponse {
+  success: boolean;
+  callUuid?: string;
+  isSimulated?: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface TestCallResponse {
+  success: boolean;
+  message: string;
+  callUuid?: string;
+  isSimulated?: boolean;
+}
+
+export const voiceApi = {
+  dispatchOutboundCall: (data: OutboundCallInput) =>
+    request<OutboundCallResponse>('/voice/plivo/outbound', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  triggerTestCall: (phone: string) =>
+    request<TestCallResponse>('/voice/plivo/test-call', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
+  transferCall: (data: { callUuid: string; leadId: string; advisorPhone: string; advisorName?: string }) =>
+    request<{ success: boolean; message: string }>('/voice/plivo/transfer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ── Feature 11: High-Scale Batch Campaign Dialing API ────────────────────────
+
+export interface CampaignLogItem {
+  id: string;
+  leadName: string;
+  phone: string;
+  outcome: 'LIVE_HUMAN_ANSWERED' | 'AMD_VOICEMAIL_DROP' | 'BUSY_RETRY' | 'VISIT_CONFIRMED' | 'WARM_TRANSFER';
+  timestamp: string;
+  notes: string;
+}
+
+export interface CampaignStateResponse {
+  campaign: {
+    id: string;
+    name: string;
+    status: 'IDLE' | 'RUNNING' | 'PAUSED' | 'COMPLETED';
+    concurrencyTrunks: number;
+    totalLeads: number;
+    callsDialed: number;
+    liveHumansConnected: number;
+    voicemailsDetected: number;
+    busyOrNoAnswer: number;
+    siteVisitsLocked: number;
+    warmTransfersRequested: number;
+    startedAt?: string;
+    logs: CampaignLogItem[];
+  };
+  systemCapacity: {
+    maxTrunksAllowed: number;
+    carrierDidsActive: number;
+    dndComplianceActive: boolean;
+    callingWindow: string;
+  };
+}
+
+export const campaignsApi = {
+  getStats: () => request<CampaignStateResponse>('/campaigns/stats'),
+  startCampaign: (data?: { concurrencyTrunks?: number; campaignName?: string }) =>
+    request<{ success: boolean; message: string; campaign: any }>('/campaigns/start', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  pauseCampaign: () =>
+    request<{ success: boolean; message: string; campaign: any }>('/campaigns/pause', {
+      method: 'POST',
+    }),
+  importLeads: (leads: Array<{ fullName: string; phone: string; budget?: string; preferredLocation?: string }>) =>
+    request<{ success: boolean; importedCount: number; totalCampaignLeads: number }>('/campaigns/import', {
+      method: 'POST',
+      body: JSON.stringify({ leads }),
+    }),
+};
+
+// ── Feature 13: Super-Admin Mission Control API ─────────────────────────────
+
+export interface AdminMetricsResponse {
+  kpis: {
+    totalTenants: number;
+    activeDids: number;
+    totalMonthlyMinutes: number;
+    monthlyRevenue: number;
+    infrastructureCost: number;
+    netGrossMarginPct: number;
+    concurrentActiveCalls: number;
+    bargeInAvgReactionMs: number;
+  };
+  latencyWaterfall: {
+    sttDeepgramMs: number;
+    llmGeminiTtftMs: number;
+    ttsCartesiaMs: number;
+    networkRoundTripMs: number;
+    totalDuplexMs: number;
+  };
+  switchboard: {
+    activeLlm: 'gemini-2.5-flash' | 'groq-llama-3.3-70b' | 'claude-3.5-sonnet' | 'gpt-4o-mini';
+    activeStt: 'deepgram-nova-2' | 'whisper-large-v3' | 'assemblyai-conformer-2';
+    activeTts: 'cartesia-sonic' | 'elevenlabs-turbo-v2.5' | 'azure-neural-hd';
+    activeCarrier: 'plivo-high-throughput' | 'twilio-sip-trunking';
+    bargeInThresholdMs: number;
+    lastFailoverAt?: string;
+    failoverReason?: string;
+  };
+  tenants: Array<{
+    id: string;
+    name: string;
+    tier: string;
+    status: string;
+    stateJurisdiction: string;
+    activeDids: number;
+    monthlyMinutes: number;
+    walletBalance: number;
+    monthlyRevenue: number;
+    latencyMs: number;
+    lastActive: string;
+  }>;
+}
+
+export interface VisualPathwayNode {
+  id: string;
+  stepNumber: number;
+  name: string;
+  goal: string;
+  type: 'HOOK' | 'DISCOVERY' | 'FINANCIAL_BRIDGE' | 'SITE_VISIT_LOCK' | 'WARM_TRANSFER';
+  targetDurationSeconds: number;
+  promptSnippet: string;
+  active: boolean;
+}
+
+export interface PathwaySettings {
+  maxDiscountFlexibilityPct: number;
+  budgetStretchCeilingPct: number;
+  fieldAdvisorsOnDuty: number;
+  fairHousingEnforced: boolean;
+}
+
+export const adminApi = {
+  getMetrics: () => request<AdminMetricsResponse>('/admin/metrics'),
+  updateSwitchboard: (data: Partial<AdminMetricsResponse['switchboard']>) =>
+    request<{ success: boolean; message: string; switchboard: any }>('/admin/switchboard', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getPathways: () => request<{ nodes: VisualPathwayNode[]; settings: PathwaySettings }>('/admin/pathways'),
+  updatePathways: (data: { nodes?: VisualPathwayNode[]; settings?: Partial<PathwaySettings> }) =>
+    request<{ success: boolean; nodes: VisualPathwayNode[]; settings: PathwaySettings }>('/admin/pathways', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+
+

@@ -34,24 +34,32 @@ export interface QueueDispatchResult {
 export async function queueMessageDispatch(params: QueueDispatchParams): Promise<QueueDispatchResult> {
   const { messageId, organizationId, leadId, content, subject, actorEmail, channel = 'EMAIL' } = params;
 
-  // 1. Resolve & validate recipient email
+  // 1. Resolve & validate recipient (Email or WhatsApp Phone)
   let recipient = params.recipientEmail;
   if (!recipient) {
     const lead = await prisma.lead.findFirst({
       where: { id: leadId, organizationId },
-      select: { email: true, fullName: true },
+      select: { email: true, phone: true, fullName: true },
     });
-    recipient = lead?.email ?? undefined;
+    recipient = channel === 'WHATSAPP' ? (lead?.phone ?? undefined) : (lead?.email ?? undefined);
   }
 
-  if (!recipient || !isValidEmail(recipient)) {
-    logger.warn(`[Outbox] Dispatch rejected for message ${messageId}: Missing or invalid recipient email.`);
+  const isWhatsApp = channel === 'WHATSAPP';
+  const isValidRecipient = isWhatsApp
+    ? Boolean(recipient && recipient.replace(/[^\d]/g, '').length >= 7)
+    : Boolean(recipient && isValidEmail(recipient));
+
+  if (!isValidRecipient || !recipient) {
+    const errReason = isWhatsApp
+      ? 'Lead does not have a valid recipient phone number'
+      : 'Lead does not have a valid recipient email address';
+    logger.warn(`[Outbox] Dispatch rejected for message ${messageId}: ${errReason}.`);
     await prisma.conversationMessage.update({
       where: { id: messageId },
       data: {
         deliveryStatus: 'FAILED',
         failedAt: new Date(),
-        deliveryError: 'Lead does not have a valid recipient email address',
+        deliveryError: errReason,
       },
     });
 
@@ -62,13 +70,14 @@ export async function queueMessageDispatch(params: QueueDispatchParams): Promise
         entityType: 'ConversationMessage',
         entityId: messageId,
         actor: actorEmail ?? 'system',
-        note: 'Dispatch failed: Missing or invalid recipient email address',
+        note: `Dispatch failed: ${errReason}`,
       },
     });
 
-    return { queued: false, reason: 'Missing or invalid recipient email address' };
+    return { queued: false, reason: errReason };
   }
 
+  const safeRecipient = recipient.trim();
   const idempotencyKey = `dispatch-${messageId}`;
 
   // 2. Check if a dispatch job already exists for this message
@@ -83,7 +92,7 @@ export async function queueMessageDispatch(params: QueueDispatchParams): Promise
 
   const defaultSubject = subject || 'Update regarding your property enquiry';
   const payload: OutboundMessagePayload = {
-    to: recipient.trim(),
+    to: safeRecipient,
     subject: defaultSubject,
     text: content,
     html: `<div style="font-family: sans-serif; line-height: 1.6; color: #1e293b;"><p>${content.replace(/\n/g, '<br/>')}</p></div>`,
@@ -108,7 +117,7 @@ export async function queueMessageDispatch(params: QueueDispatchParams): Promise
       data: {
         organizationId,
         messageId,
-        recipientEmail: recipient.trim(),
+        recipientEmail: safeRecipient,
         channel,
         payload: payload as object,
         idempotencyKey,
@@ -126,14 +135,14 @@ export async function queueMessageDispatch(params: QueueDispatchParams): Promise
         entityType: 'ConversationMessage',
         entityId: messageId,
         actor: actorEmail ?? 'system',
-        note: `Message queued for outbound dispatch to ${maskEmail(recipient)}`,
+        note: `Message queued for outbound dispatch to ${maskEmail(safeRecipient)}`,
       },
     });
 
     return job;
   });
 
-  logger.info(`[Outbox] Queued dispatch job ${result.id} for message ${messageId} to ${maskEmail(recipient)}`);
+  logger.info(`[Outbox] Queued dispatch job ${result.id} for message ${messageId} to ${maskEmail(safeRecipient)}`);
   return { queued: true, jobId: result.id };
 }
 
@@ -200,7 +209,8 @@ export async function processOutboxJobs(options: {
     const payload = job.payload as unknown as OutboundMessagePayload;
 
     try {
-      // 4. Send via messaging provider
+      // 4. Send via messaging provider based on job channel (Email vs WhatsApp)
+      const provider = getMessagingProvider(job.channel);
       const dispatchResult = await provider.send(payload);
 
       if (dispatchResult.success) {

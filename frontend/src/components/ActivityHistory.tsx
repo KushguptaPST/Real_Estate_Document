@@ -4,9 +4,12 @@ import { formatAuditTimestamp, formatShortDate } from '@/utils/date';
 import {
   Building2,
   FileText,
+  FileCheck,
+  MessageSquare,
   Search,
-  Sparkles,
   CheckCircle2,
+  CheckSquare,
+  ListTodo,
   Edit3,
   Bell,
   ListOrdered,
@@ -40,6 +43,15 @@ interface EventView {
   description: string;
   changeDiff?: string;
   actorText?: string;
+}
+
+function toTitleCase(str: string): string {
+  if (!str) return 'Activity Recorded';
+  return str
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**
@@ -88,8 +100,8 @@ function parseEventDetails(log: AuditLog): EventView {
       const filename = (next['filename'] as string) || (next['originalname'] as string) || note || 'document.pdf';
       return {
         Icon: FileText,
-        iconBgClass: 'bg-blue-50 dark:bg-blue-950/50 ring-blue-200 dark:ring-blue-800',
-        iconTextClass: 'text-blue-700 dark:text-blue-400',
+        iconBgClass: 'bg-emerald-50 ring-emerald-200',
+        iconTextClass: 'text-emerald-700',
         title: 'Contract Uploaded',
         description: filename,
         actorText,
@@ -110,7 +122,7 @@ function parseEventDetails(log: AuditLog): EventView {
     case 'EXTRACTION_COMPLETED': {
       const clausesCount = (next['clauses'] as number) ?? (next['count'] as number) ?? 3;
       return {
-        Icon: Sparkles,
+        Icon: FileCheck,
         iconBgClass: 'bg-purple-50 dark:bg-purple-950/50 ring-purple-200 dark:ring-purple-800',
         iconTextClass: 'text-purple-700 dark:text-purple-400',
         title: 'Extraction Completed',
@@ -221,12 +233,68 @@ function parseEventDetails(log: AuditLog): EventView {
       };
     }
 
+    case 'TASK_EXTRACTED':
+    case 'TASKS_EXTRACTED': {
+      return {
+        Icon: ListTodo,
+        iconBgClass: 'bg-blue-50 ring-blue-200',
+        iconTextClass: 'text-blue-700',
+        title: 'Tasks Extracted',
+        description: note || 'Extracted transaction obligations for human review.',
+        actorText,
+      };
+    }
+
+    case 'TASK_APPROVED': {
+      return {
+        Icon: CheckSquare,
+        iconBgClass: 'bg-emerald-50 ring-emerald-200',
+        iconTextClass: 'text-emerald-700',
+        title: 'Task Approved',
+        description: note || 'Transaction task approved for closing workflow',
+        actorText,
+      };
+    }
+
+    case 'TASK_COMPLETED': {
+      return {
+        Icon: CheckCircle2,
+        iconBgClass: 'bg-emerald-50 ring-emerald-200',
+        iconTextClass: 'text-emerald-700',
+        title: 'Task Completed',
+        description: note || 'Transaction task completed and verified',
+        actorText,
+      };
+    }
+
+    case 'LEAD_TASK_CREATED': {
+      return {
+        Icon: ListTodo,
+        iconBgClass: 'bg-blue-50 ring-blue-200',
+        iconTextClass: 'text-blue-700',
+        title: 'Lead Task Scheduled',
+        description: note || 'Advisor follow-up task scheduled',
+        actorText,
+      };
+    }
+
+    case 'LEAD_TASK_COMPLETED': {
+      return {
+        Icon: CheckCircle2,
+        iconBgClass: 'bg-emerald-50 ring-emerald-200',
+        iconTextClass: 'text-emerald-700',
+        title: 'Lead Task Completed',
+        description: note || 'Advisor task completed',
+        actorText,
+      };
+    }
+
     case 'ASSISTANT_QUERY': {
       const citationsCount = (next['citationsCount'] as number) ?? 0;
       return {
-        Icon: Sparkles,
-        iconBgClass: 'bg-primary/10 ring-primary/20',
-        iconTextClass: 'text-primary',
+        Icon: MessageSquare,
+        iconBgClass: 'bg-slate-100 ring-slate-200',
+        iconTextClass: 'text-slate-900',
         title: 'AI Copilot Query',
         description: `Assistant answered question with ${citationsCount} verified contract citation${citationsCount === 1 ? '' : 's'}`,
         actorText,
@@ -236,10 +304,10 @@ function parseEventDetails(log: AuditLog): EventView {
     case 'DEAL_UPDATED': {
       return {
         Icon: ListOrdered,
-        iconBgClass: 'bg-muted ring-border/80',
-        iconTextClass: 'text-muted-foreground',
+        iconBgClass: 'bg-slate-100 ring-slate-200',
+        iconTextClass: 'text-slate-800',
         title: 'Deal Configuration Updated',
-        description: 'Deal metadata modified',
+        description: note || 'Deal metadata modified',
         actorText,
       };
     }
@@ -247,9 +315,9 @@ function parseEventDetails(log: AuditLog): EventView {
     default: {
       return {
         Icon: History,
-        iconBgClass: 'bg-muted ring-border/80',
-        iconTextClass: 'text-muted-foreground',
-        title: (log.action as string).replace(/_/g, ' '),
+        iconBgClass: 'bg-slate-100 ring-slate-200',
+        iconTextClass: 'text-slate-800',
+        title: toTitleCase(log.action as string),
         description: note || 'Activity recorded',
         actorText,
       };

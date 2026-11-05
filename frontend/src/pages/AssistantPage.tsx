@@ -196,20 +196,20 @@ export function AssistantPage() {
         {/* Left Pane: Interactive PDF Viewer (7 cols / 58% width) */}
         <div className="lg:col-span-7 h-full flex flex-col min-h-[460px] lg:min-h-0">
           {loadingDocs ? (
-            <div className="rounded-2xl border border-white/10 bg-[#141418] h-full flex flex-col items-center justify-center gap-2 text-[#9A9AA5] text-xs shadow-xl">
-              <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
+            <div className="rounded-2xl border border-slate-200/90 bg-white h-full flex flex-col items-center justify-center gap-2 text-slate-500 text-xs shadow-xs">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-900" />
               <span>Loading transaction contract documents...</span>
             </div>
           ) : documents.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-[#141418] h-full flex flex-col items-center justify-center p-8 text-center text-[#9A9AA5] space-y-3 shadow-xl">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-[#C9A961] border border-white/10">
+            <div className="rounded-2xl border border-slate-200/90 bg-white h-full flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 shadow-xs">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-800 border border-slate-200">
                 <FileText className="h-6 w-6" />
               </div>
-              <h4 className="text-sm font-semibold text-[#F5F5F7]">No Contract Documents Uploaded</h4>
-              <p className="text-xs max-w-xs text-[#9A9AA5]">
+              <h4 className="text-sm font-semibold text-slate-900">No Contract Documents Uploaded</h4>
+              <p className="text-xs max-w-xs text-slate-500">
                 Upload the purchase agreement or counter offer PDF to enable deep citation-grounded viewing.
               </p>
-              <Button asChild size="sm" className="text-xs gap-1.5 bg-[#C9A961] text-[#0A0A0B] hover:bg-[#DFBF77]">
+              <Button asChild size="sm" className="text-xs gap-1.5 btn-stripe-primary">
                 <Link to="/upload">
                   <Plus className="h-3.5 w-3.5" />
                   <span>Upload Purchase Agreement</span>
@@ -227,6 +227,7 @@ export function AssistantPage() {
               selectedDocId={selectedDocId}
               onSelectDoc={setSelectedDocId}
               onClearHighlight={() => setHighlightQuote(undefined)}
+              clauses={deal?.clauses}
               className="flex-1 shadow-2xs"
             />
           )}

@@ -56,15 +56,6 @@ export function IconMagnifyingGlass({ className }: IconProps) {
   );
 }
 
-export function IconSparkles({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} aria-hidden="true">
-      <path d="M12 3l1.4 4.2L17.5 8.7l-4.1 1.5L12 14.4l-1.4-4.2L6.5 8.7l4.1-1.5L12 3z" />
-      <path d="M19 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z" />
-    </svg>
-  );
-}
-
 export function IconCheckCircle({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

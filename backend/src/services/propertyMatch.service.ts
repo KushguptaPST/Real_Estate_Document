@@ -23,18 +23,24 @@ export interface MatchCalculationResult {
  * 2. Applies soft scoring for locations, amenities, price targets, and bedrooms.
  * 3. Returns and persists top matches with explicit reasons scoped strictly to organizationId.
  */
-function formatIndianPrice(amount: number | null | undefined): string {
-  if (amount == null || isNaN(amount) || amount === 0) return '₹0';
-  if (amount >= 10_000_000) {
-    const cr = (amount / 10_000_000).toFixed(2).replace(/\.00$/, '');
-    return `₹${cr} Cr`;
+function formatPrice(amount: number | null | undefined): string {
+  if (amount == null || isNaN(amount) || amount === 0) return '$0';
+  if (amount >= 1_000_000) {
+    const m = (amount / 1_000_000).toFixed(2).replace(/\.00$/, '');
+    return `$${m}M`;
   }
   if (amount >= 100_000) {
-    const lakh = (amount / 100_000).toFixed(2).replace(/\.00$/, '');
-    return `₹${lakh} Lakh`;
+    const k = Math.round(amount / 1_000);
+    return `$${k}K`;
   }
-  return `₹${amount.toLocaleString('en-IN')}`;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
+
+const formatIndianPrice = formatPrice;
 
 export async function computeMatchesForLead(leadId: string, organizationId: string): Promise<MatchCalculationResult[]> {
   const orgId = requireOrgId(organizationId);

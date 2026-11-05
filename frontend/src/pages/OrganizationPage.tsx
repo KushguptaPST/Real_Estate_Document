@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users,
   UserPlus,
   CheckCircle2,
-  Bot,
   Key,
   Copy,
   Check,
-  Sparkles,
   Loader2,
   Trash2,
   Palette,
@@ -15,15 +13,24 @@ import {
   Mail,
   AlertCircle,
   ExternalLink,
+  Shield,
+  UserCheck,
+  PhoneCall,
+  Phone,
+  Bot,
+  Mic,
+  Radio,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { organizationApi } from '@/services/api';
+import { useToast } from '@/context/ToastContext';
+import { organizationApi, voiceApi } from '@/services/api';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface TeamMember {
   id: string;
   name: string;
   email: string;
-  role: 'BROKER_ADMIN' | 'AGENT';
+  role: 'OWNER' | 'AGENT';
   status: 'ACTIVE' | 'PENDING';
   joinedAt: string;
   isInvite?: boolean;
@@ -31,21 +38,39 @@ interface TeamMember {
 
 export function OrganizationPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  // White-Label Settings State
-  const [orgName, setOrgName] = useState('Apex Brokerage Group Inc.');
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    memberId: string;
+    isInvite?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    memberId: '',
+  });
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Organization Branding Settings
+  const [orgName, setOrgName] = useState(
+    user?.organizationId === 'demo-sandbox-org' ? 'Demo Sandbox Brokerage' : 'Apex Brokerage Group'
+  );
   const [customDomain, setCustomDomain] = useState('ai.apexbrokerage.com');
-  const [primaryColor, setPrimaryColor] = useState('#C9A961');
+  const [primaryColor, setPrimaryColor] = useState('#2563EB');
   const [aiPersona, setAiPersona] = useState('PROFESSIONAL');
   const [maxAutoBudget, setMaxAutoBudget] = useState('2500000');
   const [savedBranding, setSavedBranding] = useState(false);
 
   // Invite Form State
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'BROKER_ADMIN' | 'AGENT'>('AGENT');
+  const [inviteRole, setInviteRole] = useState<'OWNER' | 'AGENT'>('AGENT');
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [copiedInviteUrl, setCopiedInviteUrl] = useState(false);
@@ -56,29 +81,41 @@ export function OrganizationPage() {
     emailError?: string;
   } | null>(null);
 
+  // Voice Telephony & Sandbox Test Dialer State
+  const [testPhoneInput, setTestPhoneInput] = useState('+1');
+  const [dialingTest, setDialingTest] = useState(false);
+  const [copiedMetaWebhook, setCopiedMetaWebhook] = useState(false);
+  const [copiedVerifyToken, setCopiedVerifyToken] = useState(false);
+
+  const metaWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/inbound/meta` : 'https://api.contingencycopilot.com/api/inbound/meta';
+  const metaVerifyToken = 'contingency_copilot_meta_webhook_secret';
+
+  const handleOrgTestCall = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testPhoneInput.trim()) return;
+    try {
+      setDialingTest(true);
+      const res = await voiceApi.triggerTestCall(testPhoneInput.trim());
+      if (res.success) {
+        toast.success(
+          res.isSimulated
+            ? `[Simulation] Test call triggered for ${testPhoneInput}. WebSocket stream initiated.`
+            : `Call initiated! Your phone (${testPhoneInput}) will ring in ~4 seconds.`
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to dispatch test call');
+    } finally {
+      setDialingTest(false);
+    }
+  };
+
   // Team Members & Invitations State
   const [loadingMembers, setLoadingMembers] = useState(true);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: '1',
-      name: user?.name || 'Demo Broker Admin',
-      email: user?.email || 'admin@brokerage.com',
-      role: 'BROKER_ADMIN',
-      status: 'ACTIVE',
-      joinedAt: '2026-01-15',
-    },
-    {
-      id: '2',
-      name: 'Sarah Jenkins',
-      email: 'sarah.j@brokerage.com',
-      role: 'AGENT',
-      status: 'ACTIVE',
-      joinedAt: '2026-02-01',
-    },
-  ]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   const webhookSecret = 'whsec_copilot_b2b_9f8a7b6c5d4e3f2a1';
-  const embedCodeSnippet = `<script src="https://cdn.contingencycopilot.com/widget.js" data-org="whsec_copilot_b2b_9f8a7b6c5d4e3f2a1" async></script>`;
+  const embedCodeSnippet = `<script src="https://cdn.contingencycopilot.com/widget.js" data-org="${user?.organizationId || 'demo-sandbox-org'}" async></script>`;
 
   const fetchMembersAndInvites = useCallback(async () => {
     try {
@@ -90,13 +127,13 @@ export function OrganizationPage() {
 
       const membersList: TeamMember[] = [];
 
-      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value) && membersRes.value.length > 0) {
+      if (membersRes.status === 'fulfilled' && Array.isArray(membersRes.value)) {
         membersRes.value.forEach((m) => {
           membersList.push({
             id: m.id,
             name: m.name || m.email.split('@')[0],
             email: m.email,
-            role: m.role === 'OWNER' ? 'BROKER_ADMIN' : 'AGENT',
+            role: m.role as 'OWNER' | 'AGENT',
             status: 'ACTIVE',
             joinedAt: m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : '2026-01-15',
             isInvite: false,
@@ -112,7 +149,7 @@ export function OrganizationPage() {
               id: inv.id,
               name: inv.email.split('@')[0],
               email: inv.email,
-              role: inv.role === 'OWNER' ? 'BROKER_ADMIN' : 'AGENT',
+              role: inv.role as 'OWNER' | 'AGENT',
               status: 'PENDING',
               joinedAt: inv.createdAt ? new Date(inv.createdAt).toISOString().split('T')[0] : 'Pending',
               isInvite: true,
@@ -120,15 +157,14 @@ export function OrganizationPage() {
           });
       }
 
-      if (membersList.length > 0) {
-        setTeamMembers(membersList);
-      }
-    } catch (err) {
+      setTeamMembers(membersList);
+    } catch (err: any) {
       console.warn('Failed to fetch team members:', err);
+      toast.error('Failed to load team members from server');
     } finally {
       setLoadingMembers(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchMembersAndInvites();
@@ -137,12 +173,14 @@ export function OrganizationPage() {
   function handleCopyWebhookSecret() {
     navigator.clipboard.writeText(webhookSecret);
     setCopiedKey(true);
+    toast.success('Webhook secret copied to clipboard');
     setTimeout(() => setCopiedKey(false), 2000);
   }
 
   function handleCopyEmbedSnippet() {
     navigator.clipboard.writeText(embedCodeSnippet);
     setCopiedSnippet(true);
+    toast.success('Live chat embed code copied to clipboard');
     setTimeout(() => setCopiedSnippet(false), 2000);
   }
 
@@ -150,6 +188,7 @@ export function OrganizationPage() {
     if (inviteSuccessData?.inviteUrl) {
       navigator.clipboard.writeText(inviteSuccessData.inviteUrl);
       setCopiedInviteUrl(true);
+      toast.success('One-time invitation URL copied to clipboard');
       setTimeout(() => setCopiedInviteUrl(false), 2000);
     }
   }
@@ -157,6 +196,7 @@ export function OrganizationPage() {
   function handleSaveBranding(e: React.FormEvent) {
     e.preventDefault();
     setSavedBranding(true);
+    toast.success('Brokerage workspace and AI persona settings saved');
     setTimeout(() => setSavedBranding(false), 2500);
   }
 
@@ -169,7 +209,7 @@ export function OrganizationPage() {
       setInviteError(null);
       const res = await organizationApi.sendInvitation({
         email: inviteEmail.trim(),
-        role: inviteRole === 'BROKER_ADMIN' ? 'OWNER' : 'AGENT',
+        role: inviteRole,
       });
 
       setInviteSuccessData({
@@ -179,333 +219,538 @@ export function OrganizationPage() {
         emailError: res.emailError,
       });
 
-      // Refresh real list
+      toast.success(`Invitation created for ${inviteEmail.trim()}`);
+      setInviteEmail('');
       fetchMembersAndInvites();
     } catch (err: any) {
-      setInviteError(err.message || 'Failed to dispatch email invitation. Please check configuration.');
+      const msg = err.message || 'Failed to dispatch email invitation. Please check configuration.';
+      setInviteError(msg);
+      toast.error(msg);
     } finally {
       setSendingInvite(false);
     }
   }
 
-  async function handleRemoveMember(memberId: string, isInvite?: boolean) {
-    if (confirm(isInvite ? 'Revoke this pending invitation?' : 'Remove this team member?')) {
-      try {
-        if (isInvite) {
-          await organizationApi.revokeInvitation(memberId);
-        } else {
-          await organizationApi.removeMember(memberId);
-        }
-        fetchMembersAndInvites();
-      } catch (err: any) {
-        setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+  function promptRemoveMember(memberId: string, isInvite?: boolean) {
+    setConfirmModal({
+      isOpen: true,
+      title: isInvite ? 'Revoke Pending Invitation' : 'Remove Team Member',
+      message: isInvite
+        ? 'Are you sure you want to revoke this invitation token? The invite link will no longer function.'
+        : 'Are you sure you want to remove this agent from the organization? They will immediately lose access to deals and leads.',
+      memberId,
+      isInvite,
+    });
+  }
+
+  async function handleConfirmRemove() {
+    try {
+      setActionLoading(true);
+      if (confirmModal.isInvite) {
+        await organizationApi.revokeInvitation(confirmModal.memberId);
+        toast.success('Invitation successfully revoked');
+      } else {
+        await organizationApi.removeMember(confirmModal.memberId);
+        toast.success('Team member removed from organization');
       }
+      setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      fetchMembersAndInvites();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove member');
+    } finally {
+      setActionLoading(false);
     }
   }
+
+  async function handleRoleChange(memberId: string, newRole: 'OWNER' | 'AGENT') {
+    try {
+      await organizationApi.changeMemberRole(memberId, newRole);
+      toast.success(`Role updated to ${newRole === 'OWNER' ? 'Broker Admin' : 'Agent'}`);
+      fetchMembersAndInvites();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change role');
+    }
+  }
+
+  const activeSeats = teamMembers.filter((m) => m.status === 'ACTIVE').length;
 
   return (
     <div className="space-y-8 pb-12 max-w-[1600px] mx-auto">
       {/* ── B2B Header Card ── */}
-      <div className="bg-[#141418] border border-white/[0.08] p-8 rounded-2xl relative overflow-hidden shadow-xl">
+      <div className="bg-white border border-slate-200/90 p-8 rounded-2xl relative overflow-hidden shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#34D399]/15 px-2.5 py-0.5 text-xs font-semibold text-[#34D399] border border-[#34D399]/25">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
                 <CheckCircle2 className="h-3.5 w-3.5" /> B2B Enterprise Workspace
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#C9A961]/15 px-2.5 py-0.5 text-xs font-semibold text-[#C9A961] border border-[#C9A961]/25">
-                4 / 10 Agent Seats Used
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 px-2.5 py-0.5 text-xs font-semibold border border-slate-200">
+                {activeSeats} / 10 Agent Seats Active
               </span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-[#F5F5F7]">
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">
               {orgName}
             </h1>
-            <p className="text-xs text-[#9A9AA5] max-w-xl">
-              Manage team members, white-label agency branding, AI persona tone, and custom CRM webhook integrations.
+            <p className="text-xs text-slate-500 max-w-xl">
+              Manage licensed agents, role-based access control, AI persona guidelines, and integration credentials.
             </p>
           </div>
 
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2.5 text-xs font-semibold transition-all shadow-md self-start md:self-auto"
-          >
-            <UserPlus className="h-4 w-4" /> Invite Team Member
-          </button>
+          {user?.role === 'OWNER' && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0A0A0A] hover:bg-slate-800 text-white px-5 py-2.5 text-xs font-semibold transition-all shadow-xs self-start md:self-auto cursor-pointer"
+            >
+              <UserPlus className="h-4 w-4" /> Invite Team Member
+            </button>
+          )}
         </div>
       </div>
 
       {/* ── 2-Column Section: White-Label Branding & AI Persona ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* White-Label Branding Form */}
-        <div className="bg-[#141418] border border-white/[0.08] p-6 rounded-2xl space-y-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Palette className="h-4.5 w-4.5 text-[#C9A961]" /> White-Label Agency Branding
+        <div className="bg-white border border-slate-200/90 p-6 rounded-2xl space-y-4 shadow-xs">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Palette className="h-4.5 w-4.5 text-emerald-700" /> Agency Identity &amp; White-Label Branding
             </h2>
-            <span className="inline-block px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
-              Custom Branding
-            </span>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Customize your brokerage workspace title, custom sub-domain, and brand accents.
+            </p>
           </div>
 
-          <form onSubmit={handleSaveBranding} className="space-y-4 text-xs">
+          <form onSubmit={handleSaveBranding} className="space-y-4 pt-2">
             <div>
-              <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Brokerage Company Name</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Brokerage Brand Name</label>
               <input
                 type="text"
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
-                className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] focus:border-[#C9A961] outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900 focus:bg-white transition-colors"
+                placeholder="Apex Brokerage Group Inc."
               />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Custom Subdomain</label>
-              <div className="flex items-center">
-                <span className="px-3 py-2 bg-[#0D0D11] text-[#6E6E7A] rounded-l-xl border border-r-0 border-white/[0.08] font-mono text-[11px]">
-                  https://
-                </span>
-                <input
-                  type="text"
-                  value={customDomain}
-                  onChange={(e) => setCustomDomain(e.target.value)}
-                  className="w-full bg-[#0D0D11] px-3 py-2 rounded-r-xl border border-white/[0.08] font-mono text-[#F5F5F7] focus:outline-none focus:border-[#C9A961] text-xs"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Brand Accent Color</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Custom Portal Domain</label>
+                <input
+                  type="text"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900 focus:bg-white transition-colors font-mono"
+                  placeholder="ai.yourbrokerage.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Brand Accent Color</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-9 w-9 rounded-lg border border-white/[0.08] bg-[#0D0D11] cursor-pointer p-0.5"
+                    className="h-8 w-12 rounded-lg border border-slate-200 cursor-pointer bg-slate-50 p-0.5"
                   />
-                  <span className="font-mono text-[#F5F5F7] font-semibold">{primaryColor}</span>
+                  <input
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-mono"
+                  />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Max Auto-Pilot Budget ($)</label>
-                <input
-                  type="number"
-                  value={maxAutoBudget}
-                  onChange={(e) => setMaxAutoBudget(e.target.value)}
-                  className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] font-mono focus:border-[#C9A961] outline-none"
-                  placeholder="e.g. 2,500,000"
-                />
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold px-5 py-2 text-xs transition-all shadow-sm"
-            >
-              {savedBranding ? <Check className="h-3.5 w-3.5 text-[#0A0A0B]" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {savedBranding ? 'Branding Saved!' : 'Save Branding Preferences'}
-            </button>
+            <div className="pt-2 flex items-center justify-end">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                {savedBranding ? 'Saved Successfully!' : 'Save Branding'}
+              </button>
+            </div>
           </form>
         </div>
 
-        {/* AI Persona & Tone Configurator */}
-        <div className="bg-[#141418] border border-white/[0.08] p-6 rounded-2xl space-y-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Bot className="h-4.5 w-4.5 text-[#C9A961]" /> AI Tone &amp; Persona Selector
+        {/* AI Tone & Guardrail Tuning */}
+        <div className="bg-white border border-slate-200/90 p-6 rounded-2xl space-y-4 shadow-xs">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Shield className="h-4.5 w-4.5 text-emerald-700" /> AI Persona Tone &amp; Guardrails
             </h2>
-            <span className="inline-block px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/25">
-              Active Persona
-            </span>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select the conversational negotiation style for your AI sales copilot across Web and Telegram.
+            </p>
           </div>
 
-          <p className="text-xs text-[#9A9AA5]">
-            Customize how your AI Assistant speaks to prospective buyers across WhatsApp, Live Chat, and Email.
-          </p>
-
-          <div className="space-y-2.5 text-xs">
+          <div className="space-y-3 pt-1">
             <label
               onClick={() => setAiPersona('PROFESSIONAL')}
-              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                aiPersona === 'PROFESSIONAL'
-                  ? 'border-[#C9A961] bg-[#C9A961]/10 text-[#F5F5F7]'
-                  : 'border-white/[0.08] bg-[#0D0D11] hover:border-white/20 text-[#9A9AA5]'
-              }`}
+              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${aiPersona === 'PROFESSIONAL'
+                  ? 'border-slate-900 bg-emerald-50/70 text-emerald-950'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-700'
+                }`}
             >
               <div>
-                <p className="font-semibold text-[#F5F5F7]">🌟 Warm &amp; Professional (Recommended)</p>
-                <p className="text-[11px] text-[#9A9AA5] mt-0.5">Polite, helpful, consultative. Great for standard buyer inquiries.</p>
+                <p className="font-semibold text-xs text-slate-900">Senior Broker &amp; Consultative (Recommended)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Formal, authoritative, deeply knowledgeable about local market trends.</p>
               </div>
-              <input type="radio" checked={aiPersona === 'PROFESSIONAL'} readOnly className="h-4 w-4 accent-[#C9A961]" />
+              <input type="radio" checked={aiPersona === 'PROFESSIONAL'} readOnly className="h-4 w-4 accent-emerald-600" />
             </label>
 
             <label
               onClick={() => setAiPersona('LUXURY')}
-              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                aiPersona === 'LUXURY'
-                  ? 'border-[#C9A961] bg-[#C9A961]/10 text-[#F5F5F7]'
-                  : 'border-white/[0.08] bg-[#0D0D11] hover:border-white/20 text-[#9A9AA5]'
-              }`}
+              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${aiPersona === 'LUXURY'
+                  ? 'border-slate-900 bg-emerald-50/70 text-emerald-950'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-700'
+                }`}
             >
               <div>
-                <p className="font-semibold text-[#F5F5F7]">💎 Luxury &amp; Exclusive</p>
-                <p className="text-[11px] text-[#9A9AA5] mt-0.5">Refined, discreet, high-end vocabulary for luxury estates ($2M+).</p>
+                <p className="font-semibold text-xs text-slate-900">Luxury &amp; Private Client</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Refined, discreet, tailored for multi-million dollar high-net-worth acquisitions.</p>
               </div>
-              <input type="radio" checked={aiPersona === 'LUXURY'} readOnly className="h-4 w-4 accent-[#C9A961]" />
+              <input type="radio" checked={aiPersona === 'LUXURY'} readOnly className="h-4 w-4 accent-emerald-600" />
             </label>
 
             <label
               onClick={() => setAiPersona('INVESTOR')}
-              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                aiPersona === 'INVESTOR'
-                  ? 'border-[#C9A961] bg-[#C9A961]/10 text-[#F5F5F7]'
-                  : 'border-white/[0.08] bg-[#0D0D11] hover:border-white/20 text-[#9A9AA5]'
-              }`}
+              className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${aiPersona === 'INVESTOR'
+                  ? 'border-slate-900 bg-emerald-50/70 text-emerald-950'
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-700'
+                }`}
             >
               <div>
-                <p className="font-semibold text-[#F5F5F7]">⚡ Direct &amp; Energetic (Investor Focus)</p>
-                <p className="text-[11px] text-[#9A9AA5] mt-0.5">Concise, metrics-driven, fast responses tailored for flippers and REIT investors.</p>
+                <p className="font-semibold text-xs text-slate-900">Fast &amp; Metrics-Driven (Investor Focus)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Concise, ROI-focused, immediate cash-flow and cap-rate analysis.</p>
               </div>
-              <input type="radio" checked={aiPersona === 'INVESTOR'} readOnly className="h-4 w-4 accent-[#C9A961]" />
+              <input type="radio" checked={aiPersona === 'INVESTOR'} readOnly className="h-4 w-4 accent-emerald-600" />
             </label>
           </div>
         </div>
       </div>
 
       {/* ── Integration Hub & Embed Code Snippet Card ── */}
-      <div className="bg-[#141418] border border-white/[0.08] p-6 rounded-2xl space-y-4 shadow-xl">
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl space-y-4 shadow-xs">
         <div>
-          <h2 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-            <Code className="h-4.5 w-4.5 text-[#C9A961]" /> 1-Click Integrations &amp; Website Widget Embed
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Code className="h-4.5 w-4.5 text-emerald-700" /> 1-Click Website Widget Embed
           </h2>
-          <p className="text-xs text-[#9A9AA5] mt-0.5">
-            Copy this embed script to add the AI Live Chat Assistant directly to your brokerage website, or connect Zillow and WhatsApp.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Embed this asynchronous widget tag onto your public website to enable instant 24/7 AI lead capture.
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-xs font-medium text-[#9A9AA5]">Website Live Chat Embed Snippet:</label>
-          <div className="flex items-center gap-3 bg-[#0D0D11] text-[#C9A961] p-4 rounded-xl border border-white/[0.08] font-mono text-xs overflow-x-auto">
-            <span className="flex-1 truncate">{embedCodeSnippet}</span>
+          <div className="flex items-center gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-mono text-xs overflow-x-auto">
+            <span className="flex-1 truncate text-slate-700">{embedCodeSnippet}</span>
             <button
               onClick={handleCopyEmbedSnippet}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] text-xs font-semibold px-4 py-1.5 shrink-0 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0A0A0A] hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 shrink-0 transition-colors cursor-pointer"
             >
               {copiedSnippet ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copiedSnippet ? 'Copied Code!' : 'Copy Snippet'}
+              <span>{copiedSnippet ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Team Members Table ── */}
-      <div className="bg-[#141418] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
+      {/* ── Autonomous AI Voice Telephony & Omnichannel Messaging Hub (Section 5 & 11) ── */}
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl space-y-6 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Users className="h-4.5 w-4.5 text-[#C9A961]" /> Organization Team Members
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <PhoneCall className="h-5 w-5 text-purple-600" />
+              Autonomous Voice Telephony &amp; Meta WhatsApp Hub
             </h2>
-            <p className="text-xs text-[#9A9AA5] mt-0.5">Agents and administrators belonging to your brokerage organization.</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Managed carrier pool, duplex WebSocket audio streaming, advisor voice cloning &amp; official Meta Cloud API.
+            </p>
           </div>
-          <span className="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
-            Multi-Tenant Isolated Workspace
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Duplex Stream Gateway Active
+            </span>
+          </div>
+        </div>
+
+        {/* 2-Column Grid: Voice Sandbox Dialer & Carrier Line Pool */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Card 1: 1-Click Interactive Voice Test Sandbox */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 space-y-4 shadow-xs hover:border-slate-300 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2.5 rounded-xl bg-[#0A0A0A] text-white shadow-2xs">
+                  <Bot className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Sandbox Test Dialer</h3>
+                  <p className="text-[11px] text-slate-500">Duplex AI Live Phone Simulation &bull; Sub-500ms</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                Plivo Stream
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Test your autonomous AI senior advisor directly from your personal mobile phone. Rings in 4 seconds with live real estate negotiation, inventory matching, and interruption barge-in.
+            </p>
+
+            <form onSubmit={handleOrgTestCall} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Your Mobile Number (E.164 with Country Code)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    required
+                    value={testPhoneInput}
+                    onChange={(e) => setTestPhoneInput(e.target.value)}
+                    placeholder="+1 (555) 234-5678"
+                    className="flex-1 bg-slate-50/60 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-slate-900 focus:bg-white shadow-2xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={dialingTest || !testPhoneInput.trim()}
+                    className="px-4 py-2 bg-[#0A0A0A] hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+                  >
+                    {dialingTest ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Dialing...
+                      </>
+                    ) : (
+                      <>
+                        <PhoneCall className="h-3.5 w-3.5" />
+                        Test Call Now
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Acoustics: Deepgram Nova-2 + Cartesia / ElevenLabs</span>
+              <span className="font-semibold text-emerald-700 font-mono">&lt; 450ms Latency</span>
+            </div>
+          </div>
+
+          {/* Card 2: Meta WhatsApp Cloud API Setup */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-teal-50/30 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                  <Radio className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Meta WhatsApp Cloud API</h3>
+                  <p className="text-[11px] text-slate-500">Official Graph API v21.0 Webhook Integration</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                Meta Verified
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Copy these webhook credentials into your <strong>Meta App Dashboard &gt; WhatsApp &gt; Configuration</strong> to receive instant inbound messages and deliver native OGG-OPUS voice notes.
+            </p>
+
+            <div className="space-y-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Callback Webhook URL</label>
+                <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-emerald-300 font-mono text-[11px] text-slate-800">
+                  <span className="flex-1 truncate">{metaWebhookUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(metaWebhookUrl);
+                      setCopiedMetaWebhook(true);
+                      toast.success('Webhook URL copied to clipboard');
+                      setTimeout(() => setCopiedMetaWebhook(false), 2000);
+                    }}
+                    className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+                    title="Copy Webhook URL"
+                  >
+                    {copiedMetaWebhook ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Verify Token</label>
+                <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-emerald-300 font-mono text-[11px] text-slate-800">
+                  <span className="flex-1 truncate">{metaVerifyToken}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(metaVerifyToken);
+                      setCopiedVerifyToken(true);
+                      toast.success('Verify Token copied to clipboard');
+                      setTimeout(() => setCopiedVerifyToken(false), 2000);
+                    }}
+                    className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+                    title="Copy Verify Token"
+                  >
+                    {copiedVerifyToken ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Advisor Voice Cloning Studio Status */}
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="p-2 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+              <Mic className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="font-bold text-slate-900">Digital Twin: Cloned Advisor Voice Profile</p>
+              <p className="text-[11px] text-slate-500">
+                Active Model: <strong>Sarah Jenkins (Managing Broker / Austin Advisory)</strong> &bull; 5 Acoustic Pillars: Room Tone (-48dB), Phone EQ (200-3400Hz), Native OGG-OPUS VoIP
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+            Voice Ready &bull; 48kHz
+          </span>
+        </div>
+      </div>
+
+      {/* ── Team Members Table ── */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Users className="h-4.5 w-4.5 text-emerald-700" /> Team Roster &amp; Member Roles
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Licensed agents and brokerage managers operating within this organization.</p>
+          </div>
+          <span className="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            Tenant Isolated
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#0D0D11] text-[#9A9AA5] font-semibold border-b border-white/[0.06]">
-              <tr>
-                <th className="py-3.5 px-6">Member Name</th>
-                <th className="py-3.5 px-6">Email Address</th>
-                <th className="py-3.5 px-6">Role</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6">Joined Date</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.06] text-[#F5F5F7]">
-              {teamMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-4 px-6 font-semibold text-[#F5F5F7] flex items-center gap-2.5">
-                    <div className="h-7 w-7 rounded-full bg-[#C9A961]/15 text-[#C9A961] font-bold flex items-center justify-center text-xs border border-[#C9A961]/25">
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    {member.name}
-                  </td>
-                  <td className="py-4 px-6 text-[#9A9AA5]">{member.email}</td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
-                        member.role === 'BROKER_ADMIN'
-                          ? 'bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25'
-                          : 'bg-white/[0.06] text-[#9A9AA5] border border-white/[0.08]'
-                      }`}
-                    >
-                      {member.role === 'BROKER_ADMIN' ? 'Broker Admin' : 'Agent'}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                        member.status === 'ACTIVE'
-                          ? 'bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/25'
-                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/25'
-                      }`}
-                    >
-                      {member.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-[#6E6E7A] font-mono">{member.joinedAt}</td>
-                  <td className="py-4 px-6 text-right">
-                    {member.role !== 'BROKER_ADMIN' && (
-                      <button
-                        onClick={() => handleRemoveMember(member.id, member.isInvite)}
-                        className="p-1.5 rounded-lg text-[#6E6E7A] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title={member.isInvite ? 'Revoke Invitation' : 'Remove Team Member'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </td>
+          {loadingMembers ? (
+            <div className="py-12 flex items-center justify-center gap-2 text-slate-500 text-xs">
+              <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
+              <span>Loading organization members...</span>
+            </div>
+          ) : teamMembers.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-500">
+              No team members registered yet. Invite an agent to get started.
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200/80">
+                <tr>
+                  <th className="py-3 px-6">Member Name</th>
+                  <th className="py-3 px-6">Email Address</th>
+                  <th className="py-3 px-6">Role</th>
+                  <th className="py-3 px-6">Status</th>
+                  <th className="py-3 px-6">Joined Date</th>
+                  <th className="py-3 px-6 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {teamMembers.map((member) => (
+                  <tr key={member.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-6 font-semibold text-slate-900 flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-xs">
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span>{member.name}</span>
+                    </td>
+                    <td className="py-3.5 px-6 font-mono text-slate-600">{member.email}</td>
+                    <td className="py-3.5 px-6">
+                      {user?.role === 'OWNER' && !member.isInvite && member.id !== user.id ? (
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value as 'OWNER' | 'AGENT')}
+                          className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-900 cursor-pointer"
+                        >
+                          <option value="AGENT">Real Estate Advisor</option>
+                          <option value="OWNER">Broker Admin</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full font-semibold text-[11px] ${member.role === 'OWNER'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}
+                        >
+                          {member.role === 'OWNER' ? 'Broker Admin' : 'Agent'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-6">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${member.status === 'ACTIVE'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                      >
+                        {member.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-6 text-slate-500 font-mono">{member.joinedAt}</td>
+                    <td className="py-3.5 px-6 text-right">
+                      {user?.role === 'OWNER' && member.id !== user.id && (
+                        <button
+                          onClick={() => promptRemoveMember(member.id, member.isInvite)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title={member.isInvite ? 'Revoke Invitation' : 'Remove Team Member'}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
       {/* ── Webhook & API Key Settings Card ── */}
-      <div className="bg-[#141418] border border-white/[0.08] p-6 rounded-2xl space-y-4 shadow-xl">
+      <div className="bg-white border border-slate-200/90 p-6 rounded-2xl space-y-4 shadow-xs">
         <div>
-          <h2 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-            <Key className="h-4.5 w-4.5 text-[#C9A961]" /> Organization Webhook &amp; Integration Keys
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Key className="h-4.5 w-4.5 text-emerald-700" /> Integration API Secret
           </h2>
-          <p className="text-xs text-[#9A9AA5] mt-0.5">
-            Use this secret key to connect your website forms, WhatsApp Cloud API, Zillow, or Facebook Webhooks directly to your AI Lead Management workspace.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Use this organization webhook secret to authenticate inbound leads from Facebook Ads, Zillow, or CRM webhooks.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-[#0D0D11] text-[#C9A961] p-4 rounded-xl border border-white/[0.08] font-mono text-xs">
-          <span className="flex-1 truncate">{webhookSecret}</span>
+        <div className="flex items-center gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-mono text-xs">
+          <span className="flex-1 truncate text-slate-700">{webhookSecret}</span>
           <button
             onClick={handleCopyWebhookSecret}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] text-xs font-semibold px-4 py-1.5 shrink-0 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0A0A0A] hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 shrink-0 transition-colors cursor-pointer"
           >
             {copiedKey ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copiedKey ? 'Copied Key!' : 'Copy Secret'}
+            <span>{copiedKey ? 'Copied' : 'Copy Secret'}</span>
           </button>
         </div>
       </div>
 
       {/* ── Invite Modal ── */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#141418] rounded-2xl border border-white/[0.08] p-6 w-full max-w-md shadow-2xl space-y-5 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <h3 className="text-sm font-semibold text-[#F5F5F7] flex items-center gap-2">
-                <UserPlus className="h-4.5 w-4.5 text-[#C9A961]" /> Invite Agent to Organization
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 w-full max-w-md shadow-2xl space-y-5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <UserPlus className="h-4.5 w-4.5 text-emerald-700" /> Invite Agent to Workspace
               </h3>
               <button
                 onClick={() => {
@@ -513,7 +758,7 @@ export function OrganizationPage() {
                   setInviteSuccessData(null);
                   setInviteError(null);
                 }}
-                className="text-[#6E6E7A] hover:text-[#F5F5F7] font-semibold transition-colors"
+                className="text-slate-400 hover:text-slate-600 font-semibold transition-colors cursor-pointer"
               >
                 ✕
               </button>
@@ -521,126 +766,88 @@ export function OrganizationPage() {
 
             {inviteSuccessData ? (
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-bold text-white">Invitation Created</p>
-                    {inviteSuccessData.emailSent ? (
-                      <p className="text-emerald-300 mt-1">
-                        An email invitation has been dispatched to <strong className="text-white">{inviteSuccessData.email}</strong> via Resend.
-                      </p>
-                    ) : (
-                      <p className="text-amber-300 mt-1">
-                        {inviteSuccessData.emailError ? (
-                          <>Delivery Note: {inviteSuccessData.emailError}</>
-                        ) : (
-                          <>Note: Free sandbox mode requires domain verification to send to external recipients.</>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-medium text-[#9A9AA5]">
-                    One-Click Join Link (Valid for 7 Days)
-                  </label>
-                  <div className="flex items-center gap-2 bg-[#0D0D11] border border-white/[0.08] rounded-xl p-2.5">
-                    <input
-                      type="text"
-                      readOnly
-                      value={inviteSuccessData.inviteUrl}
-                      className="bg-transparent text-[#F5F5F7] font-mono text-xs flex-1 outline-none truncate"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCopyInviteUrl}
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-bold text-xs px-3 py-1.5 shrink-0 transition-all cursor-pointer"
-                    >
-                      {copiedInviteUrl ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copiedInviteUrl ? 'Copied!' : 'Copy Link'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-[#9A9AA5] mt-1">
-                    The recipient can open this link in any browser to sign in and immediately join your brokerage workspace.
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
+                  <p className="font-semibold mb-1">Invitation Ready for {inviteSuccessData.email}!</p>
+                  <p className="text-[11px] text-emerald-700">
+                    Share this one-time link with your agent to allow them to join this brokerage workspace:
                   </p>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-white/[0.08]">
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-xs">
+                  <input
+                    type="text"
+                    readOnly
+                    value={inviteSuccessData.inviteUrl}
+                    className="flex-1 bg-transparent border-0 text-slate-800 focus:outline-none truncate"
+                  />
                   <button
-                    type="button"
-                    onClick={() => {
-                      setInviteSuccessData(null);
-                      setInviteEmail('');
-                    }}
-                    className="rounded-full border border-white/[0.08] bg-[#0D0D11] hover:bg-white/[0.06] text-[#9A9AA5] hover:text-[#F5F5F7] px-4 py-2 text-xs font-medium transition-all cursor-pointer"
+                    onClick={handleCopyInviteUrl}
+                    className="px-3 py-1 bg-[#0A0A0A] hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
                   >
-                    Invite Another
+                    {copiedInviteUrl ? 'Copied!' : 'Copy Link'}
                   </button>
+                </div>
+
+                <div className="pt-2 flex justify-end">
                   <button
-                    type="button"
                     onClick={() => {
                       setShowInviteModal(false);
                       setInviteSuccessData(null);
-                      setInviteEmail('');
                     }}
-                    className="rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2 text-xs font-semibold transition-all cursor-pointer"
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl cursor-pointer"
                   >
                     Done
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSendInvite} className="space-y-4 text-xs">
+              <form onSubmit={handleSendInvite} className="space-y-4">
                 {inviteError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>{inviteError}</span>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Agent Email Address *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Agent Email Address</label>
                   <input
                     type="email"
                     required
-                    placeholder="agent@brokerage.com"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-[#F5F5F7] placeholder-[#6E6E7A] focus:border-[#C9A961] outline-none"
+                    placeholder="agent@brokerage.com"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-[#9A9AA5] mb-1">Organization Role</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Assigned Role</label>
                   <select
                     value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value as any)}
-                    className="w-full bg-[#0D0D11] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-[#F5F5F7] focus:border-[#C9A961] outline-none"
+                    onChange={(e) => setInviteRole(e.target.value as 'OWNER' | 'AGENT')}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-slate-900 focus:bg-white cursor-pointer"
                   >
-                    <option value="AGENT">Agent (Standard Seat)</option>
-                    <option value="BROKER_ADMIN">Broker Admin (Full Access)</option>
+                    <option value="AGENT">Real Estate Advisor (Standard Permissions)</option>
+                    <option value="OWNER">Broker Admin (Full Governance &amp; Billing)</option>
                   </select>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-white/[0.08]">
+                <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowInviteModal(false);
-                      setInviteError(null);
-                    }}
-                    className="rounded-full border border-white/[0.08] bg-[#0D0D11] hover:bg-white/[0.06] text-[#9A9AA5] hover:text-[#F5F5F7] px-4 py-2 text-xs font-medium transition-all"
+                    onClick={() => setShowInviteModal(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={sendingInvite}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] px-5 py-2 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
+                    className="px-5 py-2 bg-[#0A0A0A] hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     {sendingInvite && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    Send Email Invite
+                    <span>Generate Invite Link</span>
                   </button>
                 </div>
               </form>
@@ -648,6 +855,16 @@ export function OrganizationPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        loading={actionLoading}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

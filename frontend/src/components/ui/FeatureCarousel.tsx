@@ -216,8 +216,8 @@ export function FeatureCarousel() {
       {/* ── Carousel Bottom Controls (Arrows + Dots) ── */}
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
         {/* Slide Counter / Status */}
-        <div className="text-xs font-mono text-[#9A9AA5] flex items-center gap-2">
-          <span className="text-[#C9A961] font-bold">0{currentIndex + 1}</span>
+        <div className="text-xs font-mono text-slate-500 flex items-center gap-2">
+          <span className="text-emerald-700 font-bold">0{currentIndex + 1}</span>
           <span className="text-white/20">/</span>
           <span>0{total}</span>
           <span className="text-[11px] text-white/30 ml-2 hidden sm:inline">
@@ -234,7 +234,7 @@ export function FeatureCarousel() {
               aria-label={`Go to slide ${idx + 1}: ${feat.title}`}
               className={`h-1.5 transition-all duration-300 rounded-full cursor-pointer ${
                 idx === currentIndex
-                  ? 'w-7 bg-[#C9A961] shadow-[0_0_10px_rgba(201,169,97,0.5)]'
+                  ? 'w-7 bg-[#0A0A0A] text-white shadow-[0_0_10px_rgba(201,169,97,0.5)]'
                   : 'w-1.5 bg-white/15 hover:bg-white/30'
               }`}
             />
@@ -246,14 +246,14 @@ export function FeatureCarousel() {
           <button
             onClick={prevSlide}
             aria-label="Previous feature"
-            className="h-9 w-9 rounded-full border border-white/10 bg-[#141418] text-[#F5F5F7] hover:border-[#C9A961]/40 hover:text-[#C9A961] hover:bg-[#1A1A22] transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-sm"
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:text-emerald-700 hover:bg-[#1A1A22] transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={nextSlide}
             aria-label="Next feature"
-            className="h-9 w-9 rounded-full border border-white/10 bg-[#141418] text-[#F5F5F7] hover:border-[#C9A961]/40 hover:text-[#C9A961] hover:bg-[#1A1A22] transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-sm"
+            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:text-emerald-700 hover:bg-[#1A1A22] transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-sm"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -279,7 +279,7 @@ function FeatureCard({
       onClick={onSelect}
       className={`h-full flex flex-col justify-between p-7 rounded-2xl transition-all duration-400 ease-out border ${
         isActive
-          ? 'bg-gradient-to-b from-[#181820] to-[#121216] border-[#C9A961]/40 shadow-2xl scale-[1.01] ring-1 ring-[#C9A961]/20'
+          ? 'bg-gradient-to-b from-[#181820] to-[#121216] border-slate-300 shadow-2xl scale-[1.01] ring-1 ring-[#C9A961]/20'
           : 'bg-[#121216]/60 border-white/6 opacity-75 hover:opacity-100 hover:border-white/15 cursor-pointer'
       }`}
     >
@@ -290,34 +290,34 @@ function FeatureCard({
             <div
               className={`h-11 w-11 rounded-2xl flex items-center justify-center transition-all ${
                 isActive
-                  ? 'bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/30 shadow-[0_0_15px_rgba(201,169,97,0.2)]'
-                  : 'bg-white/5 text-[#9A9AA5] border border-white/10'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-[0_0_15px_rgba(201,169,97,0.2)]'
+                  : 'bg-white/5 text-slate-500 border border-slate-200'
               }`}
             >
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <span className="text-[10px] font-mono tracking-wider uppercase text-[#C9A961] block font-semibold">
+              <span className="text-[10px] font-mono tracking-wider uppercase text-emerald-700 block font-semibold">
                 {item.category}
               </span>
-              <span className="text-[11px] text-[#9A9AA5] font-medium block">
+              <span className="text-[11px] text-slate-500 font-medium block">
                 {item.tag}
               </span>
             </div>
           </div>
 
           {isActive && (
-            <span className="h-2 w-2 rounded-full bg-[#C9A961] animate-ping" />
+            <span className="h-2 w-2 rounded-full bg-[#0A0A0A] text-white animate-ping" />
           )}
         </div>
 
         {/* Feature Title */}
-        <h3 className="text-lg font-bold text-[#F5F5F7] tracking-tight mb-2.5">
+        <h3 className="text-lg font-bold text-slate-800 tracking-tight mb-2.5">
           {item.title}
         </h3>
 
         {/* Description */}
-        <p className="text-xs text-[#9A9AA5] leading-relaxed font-normal">
+        <p className="text-xs text-slate-500 leading-relaxed font-normal">
           {item.description}
         </p>
       </div>
@@ -328,8 +328,8 @@ function FeatureCard({
           to={item.link}
           className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-all ${
             isActive
-              ? 'text-[#C9A961] hover:text-[#DFBF77]'
-              : 'text-[#9A9AA5] hover:text-[#F5F5F7]'
+              ? 'text-emerald-700 hover:text-[#DFBF77]'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           <span>{item.linkLabel}</span>

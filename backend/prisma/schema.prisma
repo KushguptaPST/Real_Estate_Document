@@ -13,10 +13,16 @@ datasource db {
 
 // ─── Organization / Multi-Tenancy Boundary ────────────────────────────────────
 model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                   String       @id @default(cuid())
+  name                 String
+  subscriptionTier     String       @default("SOLO")
+  subscriptionStatus   String       @default("ACTIVE")
+  stripeCustomerId     String?      @unique
+  stripeSubscriptionId String?      @unique
+  planExpiresAt        DateTime?
+  stateJurisdiction    String?      @default("CA")
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
   users               User[]
   leads               Lead[]
@@ -42,8 +48,9 @@ enum UserRole {
 
 model User {
   id             String        @id @default(cuid())
-  googleId       String        @unique
+  googleId       String?       @unique
   email          String        @unique
+  passwordHash   String?
   name           String?
   pictureUrl     String?
   organizationId String?

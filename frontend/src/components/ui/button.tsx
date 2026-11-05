@@ -17,32 +17,32 @@ export function buttonVariants({
   className?: string;
 } = {}) {
   const baseStyles =
-    'inline-flex items-center justify-center whitespace-nowrap rounded-full font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C9A961]/40 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer';
+    'inline-flex items-center justify-center whitespace-nowrap rounded-xl font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/15 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer active:scale-[0.99]';
 
   const variants = {
     default:
-      'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#DFBF77] active:bg-[#B5934C] shadow-sm hover:shadow-[0_0_20px_rgba(201,169,97,0.35)]',
+      'bg-[#0A0A0A] text-white hover:bg-slate-800 active:bg-slate-950 shadow-xs',
     gold:
-      'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#DFBF77] active:bg-[#B5934C] shadow-sm hover:shadow-[0_0_20px_rgba(201,169,97,0.35)]',
+      'bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 shadow-xs',
     brand:
-      'bg-[#C9A961] text-[#0A0A0B] hover:bg-[#DFBF77] active:bg-[#B5934C] shadow-sm',
+      'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-xs',
     secondary:
-      'bg-[#1A1A22] text-[#F5F5F7] border border-white/10 hover:bg-[#22222C] hover:border-[#C9A961]/40 active:scale-[0.99]',
+      'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs',
     outline:
-      'border border-white/10 bg-transparent text-[#F5F5F7] hover:bg-white/5 hover:border-white/20 active:scale-[0.99]',
+      'border border-slate-200 bg-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-900',
     ghost:
-      'text-[#9A9AA5] hover:bg-white/5 hover:text-[#F5F5F7] active:scale-[0.99]',
+      'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     destructive:
-      'bg-rose-600/90 text-white hover:bg-rose-500 shadow-sm active:scale-[0.99]',
+      'bg-rose-600 text-white hover:bg-rose-700 shadow-xs',
     link:
-      'text-[#C9A961] underline-offset-4 hover:underline p-0 h-auto rounded-none',
+      'text-emerald-700 underline-offset-4 hover:underline p-0 h-auto rounded-none',
   };
 
   const sizes = {
     default: 'h-9 px-4 py-2 text-xs',
     sm: 'h-8 px-3.5 py-1 text-xs',
     xs: 'h-7 px-2.5 py-0.5 text-[11px]',
-    lg: 'h-11 px-6 py-2.5 text-sm',
+    lg: 'h-10 px-5 py-2.5 text-sm',
     icon: 'h-9 w-9 p-0',
   };
 

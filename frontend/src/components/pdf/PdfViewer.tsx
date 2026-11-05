@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
@@ -7,16 +8,22 @@ import {
   Loader2,
   AlertTriangle,
   FileText,
-  Sparkles,
   Search,
   Plus,
   Minus,
   X,
+  RotateCw,
+  Download,
+  Maximize2,
+  Minimize2,
+  Maximize,
+  BookOpen,
+  CheckCircle2,
+  Sparkles,
+  Bookmark,
 } from 'lucide-react';
-import { findQuoteInPage, findMatchingItemIndices } from '@/utils/quoteMatcher';
-import type { Document as Doc } from '@/types';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { findMatchingItemIndices } from '@/utils/quoteMatcher';
+import type { Document as Doc, ContingencyClause } from '@/types';
 
 // Configure pdfjs worker to use local bundled Vite worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -41,6 +48,7 @@ interface Props {
   selectedDocId?: string;
   onSelectDoc?: (docId: string) => void;
   onClearHighlight?: () => void;
+  clauses?: ContingencyClause[];
   className?: string;
 }
 
@@ -54,28 +62,49 @@ export function PdfViewer({
   selectedDocId,
   onSelectDoc,
   onClearHighlight,
+  clauses = [],
   className = '',
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null);
+  const isRenderingRef = useRef(false);
+  const pendingRenderRef = useRef<{ page: number; scale: number; rotation: number } | null>(null);
+
+  const [canvasNode, setCanvasNode] = useState<HTMLCanvasElement | null>(null);
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
+
+  const setCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
+    canvasRef.current = node;
+    setCanvasNode(node);
+  }, []);
+
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [numPages, setNumPages] = useState(0);
-  const [scale, setScale] = useState(1.2);
+  const [scale, setScale] = useState(1.0);
+  const [rotation, setRotation] = useState(0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, setQuoteMatched] = useState<boolean | null>(null);
-  const [, setPageText] = useState('');
   const [highlightBoxes, setHighlightBoxes] = useState<HighlightBox[]>([]);
+  const [activeHighlightQuote, setActiveHighlightQuote] = useState<string | undefined>(highlightQuote);
 
   // In-document Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
+  // Fullscreen & Drawer State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showClauseDrawer, setShowClauseDrawer] = useState(false);
+
+  // Update internal highlight quote if prop changes
+  useEffect(() => {
+    setActiveHighlightQuote(highlightQuote);
+  }, [highlightQuote]);
 
   // Synchronize initialPage changes or jumpTrigger
   useEffect(() => {
@@ -84,13 +113,40 @@ export function PdfViewer({
     }
   }, [initialPage, jumpTrigger]);
 
+  // Auto-fit scale to available container width
+  const fitToWidth = useCallback(
+    async (doc?: pdfjsLib.PDFDocumentProxy, pageNum?: number) => {
+      const targetDoc = doc || pdfDoc;
+      const targetPageNum = pageNum || currentPage;
+      const container = scrollContainerRef.current;
+      if (!targetDoc || !container) return;
+
+      const clientWidth = container.clientWidth;
+      if (!clientWidth || clientWidth < 100) return;
+
+      try {
+        const page = await targetDoc.getPage(targetPageNum);
+        const unscaledViewport = page.getViewport({ scale: 1, rotation });
+        const availableWidth = clientWidth - 64; // 32px padding on each side
+
+        if (availableWidth > 200 && unscaledViewport.width > 0) {
+          const calculated = Math.min(2.2, Math.max(0.5, availableWidth / unscaledViewport.width));
+          setScale(parseFloat(calculated.toFixed(2)));
+        }
+      } catch (e) {
+        console.warn('Auto fitToWidth calculation failed:', e);
+      }
+    },
+    [pdfDoc, currentPage, rotation]
+  );
+
   // Automatic Quote Page Discovery:
   // When a highlight quote is set, ensure we are on the page containing the quote
   useEffect(() => {
-    if (!pdfDoc || !highlightQuote?.trim()) return;
+    if (!pdfDoc || !activeHighlightQuote?.trim()) return;
 
     let isMounted = true;
-    const cleanQuote = highlightQuote.trim();
+    const cleanQuote = activeHighlightQuote.trim();
 
     async function findPageForQuote() {
       if (!pdfDoc) return;
@@ -121,7 +177,7 @@ export function PdfViewer({
     return () => {
       isMounted = false;
     };
-  }, [pdfDoc, highlightQuote, jumpTrigger]);
+  }, [pdfDoc, activeHighlightQuote, jumpTrigger]);
 
   // Smooth Auto-Scroll to highlighted clause
   useEffect(() => {
@@ -152,8 +208,14 @@ export function PdfViewer({
         if (!isMounted) return;
         setPdfDoc(pdf);
         setNumPages(pdf.numPages);
-        setCurrentPage(Math.min(initialPage, pdf.numPages));
+        const startPage = Math.min(initialPage, pdf.numPages);
+        setCurrentPage(startPage);
         setLoading(false);
+
+        // Auto-fit initial scale nicely
+        setTimeout(() => {
+          fitToWidth(pdf, startPage);
+        }, 100);
       })
       .catch((err) => {
         if (!isMounted) return;
@@ -168,73 +230,73 @@ export function PdfViewer({
     };
   }, [fileUrl]);
 
-  // Render current page to canvas & compute in-situ highlight bounding boxes
-  useEffect(() => {
-    if (!pdfDoc || !canvasRef.current) return;
+  // Robust, queue-based page render function that eliminates race conditions and worker conflicts
+  const renderPage = useCallback(
+    async (pageNum: number, currentScale: number, currentRotation: number) => {
+      const canvas = canvasRef.current;
+      if (!pdfDoc || !canvas) return;
 
-    let isCancelled = false;
-    setRendering(true);
-    setHighlightBoxes([]);
+      // If already rendering, store latest requested params and request cancellation of in-flight task
+      if (isRenderingRef.current) {
+        pendingRenderRef.current = { page: pageNum, scale: currentScale, rotation: currentRotation };
+        if (renderTaskRef.current) {
+          try {
+            renderTaskRef.current.cancel();
+          } catch {}
+        }
+        return;
+      }
 
-    if (renderTaskRef.current) {
+      isRenderingRef.current = true;
+      setRendering(true);
+
       try {
-        renderTaskRef.current.cancel();
-      } catch {}
-      renderTaskRef.current = null;
-    }
+        const page = await pdfDoc.getPage(pageNum);
+        const effectiveRotation = (page.rotate + currentRotation) % 360;
+        const viewport = page.getViewport({ scale: currentScale, rotation: effectiveRotation });
 
-    pdfDoc
-      .getPage(currentPage)
-      .then(async (page) => {
-        if (isCancelled) return;
-
-        const viewport = page.getViewport({ scale });
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+        // Maintain document dimensions on card wrapper to prevent layout shift
+        setViewportSize({ width: Math.floor(viewport.width), height: Math.floor(viewport.height) });
 
         const context = canvas.getContext('2d');
-        if (!context) return;
+        if (!context) {
+          isRenderingRef.current = false;
+          setRendering(false);
+          return;
+        }
 
         const pixelRatio = window.devicePixelRatio || 1;
-        canvas.width = viewport.width * pixelRatio;
-        canvas.height = viewport.height * pixelRatio;
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
+        canvas.width = Math.floor(viewport.width * pixelRatio);
+        canvas.height = Math.floor(viewport.height * pixelRatio);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
 
         context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 
-        const renderContext = {
+        const renderTask = page.render({
           canvasContext: context,
           viewport,
-        };
-
-        const renderTask = page.render(renderContext);
+        });
         renderTaskRef.current = renderTask;
 
         try {
           await renderTask.promise;
         } catch (renderErr: any) {
-          if (renderErr?.name === 'RenderingCancelledException') return;
-          throw renderErr;
+          if (renderErr?.name !== 'RenderingCancelledException') {
+            console.warn('PDF page render task error:', renderErr);
+          }
         }
+        renderTaskRef.current = null;
 
-        if (isCancelled) return;
-
-        // Extract text items with exact geometry
+        // Extract text items with exact geometry for search and citation highlighting
         const textContent = await page.getTextContent();
-        const extracted = textContent.items
-          .map((item: any) => ('str' in item ? item.str : ''))
-          .join(' ');
-        setPageText(extracted);
-
         const targetSearch = searchQuery.trim()
           ? searchQuery.trim()
-          : highlightQuote
-          ? highlightQuote.trim()
+          : activeHighlightQuote
+          ? activeHighlightQuote.trim()
           : '';
 
         const boxes: HighlightBox[] = [];
-
         if (targetSearch) {
           const matchedIndices = findMatchingItemIndices(textContent.items as any[], targetSearch);
           const matchedSet = new Set(matchedIndices);
@@ -265,33 +327,51 @@ export function PdfViewer({
         }
 
         setHighlightBoxes(boxes);
-
-        if (highlightQuote) {
-          const matchResult = findQuoteInPage(highlightQuote, extracted);
-          setQuoteMatched(matchResult.isMatched);
-        } else {
-          setQuoteMatched(null);
+      } catch (err: any) {
+        if (err?.name !== 'RenderingCancelledException') {
+          console.warn('Page render execution error:', err);
         }
-
+      } finally {
+        isRenderingRef.current = false;
         setRendering(false);
-      })
-      .catch((err) => {
-        if (!isCancelled && err?.name !== 'RenderingCancelledException') {
-          console.warn('Page render error:', err);
-          setRendering(false);
-        }
-      });
 
-    return () => {
-      isCancelled = true;
-      if (renderTaskRef.current) {
-        try {
-          renderTaskRef.current.cancel();
-        } catch {}
-        renderTaskRef.current = null;
+        // If a new render request was queued while rendering/cancelling, execute it now
+        if (pendingRenderRef.current) {
+          const next = pendingRenderRef.current;
+          pendingRenderRef.current = null;
+          renderPage(next.page, next.scale, next.rotation);
+        }
       }
-    };
-  }, [pdfDoc, currentPage, scale, highlightQuote, searchQuery]);
+    },
+    [pdfDoc, searchQuery, activeHighlightQuote]
+  );
+
+  // Trigger page rendering whenever document, mounted canvas, page, scale or rotation changes
+  useEffect(() => {
+    if (pdfDoc && canvasNode) {
+      renderPage(currentPage, scale, rotation);
+    }
+  }, [pdfDoc, canvasNode, currentPage, scale, rotation, renderPage]);
+
+  // Fullscreen transition handler: recompute optimal fit to width for reader mode after portal layout
+  useEffect(() => {
+    if (!pdfDoc) return;
+    const timer = setTimeout(() => {
+      fitToWidth();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [isFullscreen, fitToWidth, pdfDoc]);
+
+  // Press Escape to exit fullscreen
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Document-wide text search handler
   const handleSearch = async (term: string) => {
@@ -342,140 +422,239 @@ export function PdfViewer({
     if (currentPage < numPages) setCurrentPage(currentPage + 1);
   };
 
-  return (
+  const handleRotate = () => {
+    setRotation((r) => (r + 90) % 360);
+  };
+
+  const handleDownload = () => {
+    if (!fileUrl) return;
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleJumpToClause = (clause: ContingencyClause) => {
+    if (clause.pageNumber) {
+      setCurrentPage(clause.pageNumber);
+    }
+    setActiveHighlightQuote(clause.rawText);
+  };
+
+  const handleClearHighlightInternal = () => {
+    setActiveHighlightQuote(undefined);
+    if (onClearHighlight) onClearHighlight();
+  };
+
+  // Main Viewer Content Layout
+  const viewerContent = (
     <div
       ref={containerRef}
-      className={`flex flex-col h-full bg-[#101014] border border-white/10 rounded-2xl overflow-hidden shadow-2xl ${className}`}
+      className={`flex flex-col h-full bg-slate-50 border border-slate-200/90 rounded-2xl overflow-hidden shadow-xl relative ${
+        isFullscreen ? 'w-full h-full rounded-none border-none' : className
+      }`}
     >
-      {/* Top Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#16161D] border-b border-white/10 text-xs text-[#F5F5F7] select-none backdrop-blur-md">
+      {/* ── Executive Top Toolbar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 bg-white border-b border-slate-200 text-xs text-slate-800 select-none shadow-2xs z-20">
         {/* Document Switcher & Info */}
-        <div className="flex items-center gap-2 max-w-xs truncate">
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#1E1E26] text-[#C9A961] shadow-sm shrink-0 border border-white/10">
-            <FileText className="h-3.5 w-3.5 text-[#C9A961]" />
+        <div className="flex items-center gap-2 max-w-sm truncate">
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800 shadow-2xs shrink-0 border border-emerald-200">
+            <FileText className="h-3.5 w-3.5" />
           </div>
+
           {documents.length > 1 && onSelectDoc ? (
             <select
               value={selectedDocId}
               onChange={(e) => onSelectDoc(e.target.value)}
-              className="bg-[#1A1A22] text-[#F5F5F7] border border-white/10 rounded-xl px-2.5 py-1 text-xs font-semibold focus:border-[#C9A961] focus:outline-none truncate cursor-pointer shadow-sm"
+              className="bg-slate-50 text-slate-900 border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-semibold focus:border-slate-900 focus:outline-none truncate cursor-pointer shadow-2xs"
             >
               {documents.map((d) => (
-                <option key={d.id} value={d.id} className="bg-[#141418] text-[#F5F5F7]">
+                <option key={d.id} value={d.id} className="bg-white text-slate-900">
                   {d.filename}
                 </option>
               ))}
             </select>
           ) : (
-            <span className="font-semibold text-[#F5F5F7] truncate" title={filename}>
-              {filename}
-            </span>
+            <div className="truncate">
+              <span className="font-bold text-slate-900 truncate block text-xs" title={filename}>
+                {filename}
+              </span>
+            </div>
+          )}
+
+          <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded font-mono font-bold text-[10px] bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+            {numPages || 1} Pages
+          </span>
+
+          {clauses.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowClauseDrawer(!showClauseDrawer)}
+              className={`hidden md:flex items-center gap-1 px-2.5 py-1 rounded-xl font-semibold text-xs transition-colors cursor-pointer border ${
+                showClauseDrawer
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+              title="Toggle Clauses Navigator"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-emerald-700" />
+              <span>Clauses ({clauses.length})</span>
+            </button>
           )}
         </div>
 
         {/* Page Navigation Controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={handlePrevPage}
             disabled={currentPage <= 1 || loading}
-            className="p-1.5 rounded-xl bg-[#1A1A22] border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 disabled:opacity-30 transition-all cursor-pointer"
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 transition-all cursor-pointer shadow-2xs"
             title="Previous Page"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
 
-          <div className="flex items-center gap-1 bg-[#1A1A22] border border-white/10 px-2.5 py-1 rounded-xl shadow-sm">
-            <span className="text-[11px] font-medium text-[#9A9AA5]">Page</span>
-            <span className="text-[11px] font-bold font-mono text-[#F5F5F7] px-0.5">
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1 rounded-xl shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-500">Page</span>
+            <span className="text-xs font-bold font-mono text-slate-900 px-1 py-0.5 bg-slate-100 rounded border border-slate-200">
               {currentPage}
             </span>
-            <span className="text-[11px] text-[#6E6E7A]">of {numPages || 1}</span>
+            <span className="text-[11px] text-slate-500">of {numPages || 1}</span>
           </div>
 
           <button
             type="button"
             onClick={handleNextPage}
             disabled={currentPage >= numPages || loading}
-            className="p-1.5 rounded-xl bg-[#1A1A22] border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 disabled:opacity-30 transition-all cursor-pointer"
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 transition-all cursor-pointer shadow-2xs"
             title="Next Page"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Search & Zoom Controls */}
-        <div className="flex items-center gap-2">
+        {/* Viewing, Zoom & Action Controls */}
+        <div className="flex items-center gap-1.5">
           {/* Document Search Toggle */}
           <button
             type="button"
             onClick={() => setShowSearch(!showSearch)}
-            className={`p-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+            className={`p-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border ${
               showSearch || searchQuery
-                ? 'bg-[#C9A961] text-[#0A0A0B] shadow-sm font-bold'
-                : 'bg-[#1A1A22] hover:bg-[#22222E] text-[#9A9AA5] hover:text-[#F5F5F7] border border-white/10'
+                ? 'bg-[#0A0A0A] text-white border-black shadow-xs font-bold'
+                : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200 shadow-2xs'
             }`}
             title="Search in document"
           >
             <Search className="h-3.5 w-3.5" />
           </button>
 
+          {/* Fit to Width Button */}
+          <button
+            type="button"
+            onClick={() => fitToWidth()}
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Fit to Width"
+          >
+            <Maximize className="h-3.5 w-3.5" />
+          </button>
+
           {/* Zoom Controls */}
-          <div className="flex items-center gap-0.5 bg-[#1A1A22] border border-white/10 rounded-xl p-0.5 shadow-sm">
+          <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
             <button
               type="button"
-              onClick={() => setScale((s) => Math.max(0.6, s - 0.15))}
-              className="p-1 rounded-lg hover:bg-white/5 text-[#9A9AA5] hover:text-[#F5F5F7] cursor-pointer"
+              onClick={() => setScale((s) => Math.max(0.5, parseFloat((s - 0.1).toFixed(2))))}
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
               title="Zoom Out"
             >
               <Minus className="h-3 w-3" />
             </button>
-            <span className="font-mono text-[11px] font-semibold text-[#F5F5F7] px-1.5">
-              {Math.round(scale * 100)}%
-            </span>
             <button
               type="button"
-              onClick={() => setScale((s) => Math.min(2.5, s + 0.15))}
-              className="p-1 rounded-lg hover:bg-white/5 text-[#9A9AA5] hover:text-[#F5F5F7] cursor-pointer"
+              onClick={() => setScale(1.0)}
+              className="font-mono text-[11px] font-bold text-slate-900 px-1.5 hover:text-emerald-700 cursor-pointer"
+              title="Reset Zoom to 100%"
+            >
+              {Math.round(scale * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setScale((s) => Math.min(2.5, parseFloat((s + 0.1).toFixed(2))))}
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
               title="Zoom In"
             >
               <Plus className="h-3 w-3" />
             </button>
           </div>
+
+          {/* Rotate Clockwise */}
+          <button
+            type="button"
+            onClick={handleRotate}
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Rotate Page Clockwise"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Download PDF */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Download PDF Agreement"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Fullscreen Modal Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Open Fullscreen Reader'}
+          >
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </div>
 
-      {/* In-Document Search Bar */}
+      {/* ── In-Document Search Bar ── */}
       {showSearch && (
-        <div className="px-4 py-2.5 bg-[#14141A] border-b border-white/10 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 text-xs z-10">
           <div className="flex items-center gap-2 flex-1 max-w-sm">
-            <Search className="h-3.5 w-3.5 text-[#C9A961] shrink-0" />
+            <Search className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Search contract terms..."
-              className="w-full bg-[#0E0E12] border border-white/10 rounded-xl px-3 py-1.5 text-[#F5F5F7] text-xs placeholder-[#5E5E6C] focus:outline-none focus:border-[#C9A961] shadow-inner"
+              placeholder="Search contract terms (e.g. earnest, inspection)..."
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs"
               autoFocus
             />
           </div>
 
           {searchResults.length > 0 && (
-            <div className="flex items-center gap-2 text-[#9A9AA5]">
-              <span className="text-[11px] font-medium">
+            <div className="flex items-center gap-2 text-slate-600 font-mono text-[11px]">
+              <span>
                 Page {searchResults[currentMatchIndex]} ({currentMatchIndex + 1} of {searchResults.length} matches)
               </span>
               <button
                 type="button"
                 onClick={prevSearchMatch}
-                className="p-1 rounded-lg bg-[#1A1A22] border border-white/10 text-[#F5F5F7] cursor-pointer hover:border-[#C9A961]/40"
+                className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                title="Previous Match"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={nextSearchMatch}
-                className="p-1 rounded-lg bg-[#1A1A22] border border-white/10 text-[#F5F5F7] cursor-pointer hover:border-[#C9A961]/40"
+                className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                title="Next Match"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -484,96 +663,156 @@ export function PdfViewer({
         </div>
       )}
 
-      {/* Citation Highlight Focus Banner */}
-      {highlightQuote && (
-        <div className="px-4 py-2.5 bg-[#1C170E]/95 border-b border-[#C9A961]/30 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+      {/* ── Active Citation Highlight Banner ── */}
+      {activeHighlightQuote && (
+        <div className="px-4 py-2 bg-emerald-50 border-b border-emerald-200/90 flex items-center justify-between gap-3 text-xs z-10 shadow-2xs">
           <div className="flex items-start gap-2.5 min-w-0">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#C9A961]/20 text-[#C9A961] shrink-0 mt-0.5 border border-[#C9A961]/30 shadow-xs">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-100 text-emerald-800 shrink-0 mt-0.5 border border-emerald-200">
+              <Sparkles className="h-3 w-3" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-[#E8C575] text-[10px] uppercase tracking-wider">
-                  Active Citation Reference
-                </span>
-                {highlightBoxes.length > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C9A961]/20 border border-[#C9A961]/40 px-2 py-0.5 text-[9px] font-semibold text-[#E8C575]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#C9A961] animate-pulse" />
-                    In-Situ Highlighted
-                  </span>
-                )}
-              </div>
-              <p className="font-mono text-[#F5F5F7] text-[11px] mt-0.5 italic line-clamp-2">
-                &ldquo;{highlightQuote}&rdquo;
+              <span className="font-bold text-emerald-950 text-[10px] uppercase tracking-wider block">
+                Active Grounded Citation Highlight
+              </span>
+              <p className="font-mono text-slate-800 text-[11px] truncate max-w-xl">
+                &ldquo;{activeHighlightQuote}&rdquo;
               </p>
             </div>
           </div>
 
-          {onClearHighlight && (
-            <button
-              type="button"
-              onClick={onClearHighlight}
-              className="p-1 rounded-lg bg-white/5 border border-white/10 text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-[#C9A961]/40 transition-colors cursor-pointer"
-              title="Clear Highlight"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleClearHighlightInternal}
+            className="p-1 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-colors cursor-pointer shadow-2xs"
+            title="Clear Highlight"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Document Viewport */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-auto p-6 flex items-center justify-center relative bg-[#0C0C10] shadow-inner"
-      >
-        {loading && (
-          <div className="flex flex-col items-center gap-3 text-[#9A9AA5] text-xs py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
-            <span className="font-medium text-[#F5F5F7]">Rendering contractual document&hellip;</span>
-            <span className="text-[11px] text-[#6E6E7A]">Parsing vector layers and annotations</span>
+      {/* ── Main Viewport Area (Split with Clause Drawer) ── */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Collapsible Clause Navigator Drawer */}
+        {showClauseDrawer && clauses.length > 0 && (
+          <div className="w-64 sm:w-72 border-r border-slate-200 bg-white flex flex-col shrink-0 z-10 shadow-sm">
+            <div className="p-3 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Bookmark className="h-3.5 w-3.5 text-emerald-700" />
+                Indexed Clauses ({clauses.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowClauseDrawer(false)}
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+              {clauses.map((clause, idx) => (
+                <div
+                  key={clause.id || idx}
+                  onClick={() => handleJumpToClause(clause)}
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                    currentPage === clause.pageNumber
+                      ? 'border-emerald-700 bg-emerald-50/70 shadow-2xs'
+                      : 'border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-900 text-xs">
+                      {clause.clauseType.replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100/60 px-1.5 py-0.2 rounded border border-emerald-200">
+                      Pg {clause.pageNumber || 1}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 line-clamp-2 font-mono leading-relaxed">
+                    {clause.rawText}
+                  </p>
+                  {clause.numberOfDays && (
+                    <div className="mt-1 text-[10px] font-semibold text-slate-500">
+                      Timeline: {clause.numberOfDays} {clause.dayType || 'calendar'} days
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {error && !loading && (
-          <div className="flex flex-col items-center gap-2 text-rose-400 text-xs max-w-sm text-center py-16 bg-rose-500/10 border border-rose-500/20 rounded-2xl p-6">
-            <AlertTriangle className="h-6 w-6 text-rose-400" />
-            <span className="font-medium">{error}</span>
-          </div>
-        )}
+        {/* ── Document Desk Viewport Canvas ── */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-auto p-6 sm:p-8 flex items-start justify-center relative bg-[#ECEEF1] shadow-inner select-text"
+        >
+          {loading && (
+            <div className="flex flex-col items-center gap-3 text-slate-500 text-xs py-20">
+              <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
+              <span className="font-bold text-slate-900">Rendering contractual document&hellip;</span>
+              <span className="text-[11px] text-slate-500">Parsing vector layers, text bounds &amp; OCR signatures</span>
+            </div>
+          )}
 
-        {!loading && !error && pdfDoc && (
-          <div className="relative shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] rounded-xl bg-white ring-1 ring-white/15 transition-transform duration-150">
-            <canvas ref={canvasRef} className="block rounded-xl" />
+          {error && !loading && (
+            <div className="flex flex-col items-center gap-2 text-rose-700 text-xs max-w-sm text-center py-16 bg-rose-50 border border-rose-200 rounded-2xl p-6 shadow-sm">
+              <AlertTriangle className="h-6 w-6 text-rose-600" />
+              <span className="font-bold">{error}</span>
+            </div>
+          )}
 
-            {/* In-Situ Highlighter Overlay */}
-            {highlightBoxes.length > 0 && (
-              <div className="absolute inset-0 pointer-events-none">
-                {highlightBoxes.map((box, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      position: 'absolute',
-                      left: `${box.left}px`,
-                      top: `${box.top}px`,
-                      width: `${box.width}px`,
-                      height: `${box.height}px`,
-                    }}
-                    className="bg-[#C9A961]/35 border-b-2 border-[#C9A961] rounded-xs ring-1 ring-[#C9A961]/50 shadow-sm"
-                    title={box.text}
-                  />
-                ))}
-              </div>
-            )}
+          {!loading && !error && pdfDoc && (
+            <div
+              className="relative shadow-[0_12px_40px_-8px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.06)] rounded-sm bg-white ring-1 ring-slate-900/10 border border-slate-300/80 my-auto transition-all duration-150"
+              style={{
+                minWidth: viewportSize ? `${viewportSize.width}px` : undefined,
+                minHeight: viewportSize ? `${viewportSize.height}px` : undefined,
+              }}
+            >
+              <canvas ref={setCanvasRef} className="block rounded-sm" />
 
-            {rendering && (
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
-                <Loader2 className="h-6 w-6 animate-spin text-[#C9A961]" />
-              </div>
-            )}
-          </div>
-        )}
+              {/* In-Situ Statutory Citation Highlighter Overlay */}
+              {highlightBoxes.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {highlightBoxes.map((box, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        position: 'absolute',
+                        left: `${box.left}px`,
+                        top: `${box.top}px`,
+                        width: `${box.width}px`,
+                        height: `${box.height}px`,
+                      }}
+                      className="bg-amber-300/40 border-b-2 border-emerald-700 ring-2 ring-emerald-600/30 rounded-xs shadow-xs"
+                      title={box.text}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {rendering && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center rounded-sm">
+                  <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+
+  if (isFullscreen) {
+    return createPortal(
+      <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-md p-3 sm:p-5 flex flex-col">
+        {viewerContent}
+      </div>,
+      document.body
+    );
+  }
+
+  return viewerContent;
 }

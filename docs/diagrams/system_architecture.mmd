@@ -1,0 +1,94 @@
+flowchart TB
+    subgraph Client_Layer ["Client Presentation Layer (Vite + React 18 SPA)"]
+        BrowserUI["Web Application (React 18 / Tailwind / Lucide / Recharts)"]
+        TelegramClient["Telegram Mobile / Desktop App"]
+        ExternalWebhookClient["External Portals / Inbound Webhooks"]
+    end
+
+    subgraph Security_Gateway ["Security Gateway & HTTP Middleware"]
+        HelmetCors["Helmet & Strict CORS Policy"]
+        RateLimiter["In-Memory Sliding Window Rate Limiter"]
+        AuthMiddleware["JWT Authentication Middleware (requireAuth)"]
+        RoleMiddleware["Role Enforcement Middleware (requireRole)"]
+        TenantScoper["Tenant Boundary Scoper (requireOrgId)"]
+        ErrorHandler["Production Error Handler & Stack Masking"]
+    end
+
+    subgraph Application_Core ["Application Service Layer (Modular Express 4 Backend)"]
+        AuthSvc["Auth & Org Service<br/>(Google OAuth / Invitations / API Keys)"]
+        LeadSvc["Lead & CRM Service<br/>(Triage / Calls / Assignments / Tasks)"]
+        AgentRuntime["AI Sales Agent Runtime<br/>(5-Round Loop / Tool Execution / Safety Fences)"]
+        SiteVisitSvc["Site Visit Service<br/>(Calendar Overlap / DST Timezone Engine)"]
+        ConversionSvc["Lead Conversion Service<br/>(Atomic Deal Transition / Inventory Locking)"]
+        MatchEngine["Property Match Engine<br/>(SQL Hard Filters + Soft Preference Ranking)"]
+        ContractPipeline["Contract Extraction Pipeline<br/>(PDF Parse / Vision OCR / Gemini Structured Output)"]
+        DateEngine["Contingency Date Engine<br/>(Calendar / Business Day Holiday Rollover)"]
+        RagAssistant["RAG Knowledge Assistant<br/>(Hybrid Search / Citation Verifier / SSE Streaming)"]
+        OutboxDispatcher["Transactional Outbox Dispatcher<br/>(Optimistic Locking / Exponential Backoff)"]
+        AlertDaemon["Alert Cron Daemon<br/>(Hourly Deadline Evaluation & Email Generator)"]
+        TelegramService["Telegram Service<br/>(Long Polling / Audio Pipeline / Edge TTS)"]
+    end
+
+    subgraph Persistence_Layer ["Data & Storage Layer"]
+        PrismaORM["Prisma ORM v5.22 (Singleton Connection Pool)"]
+        PostgresDB[("PostgreSQL 16 Engine")]
+        PgVector["pgvector Extension (HNSW Index for Embeddings)"]
+        LocalFileStorage["Local Storage Driver (/uploads)"]
+        ImageKitCDN["ImageKit Media CDN (Cloud Driver)"]
+    end
+
+    subgraph External_Cloud ["External Cloud Services & APIs"]
+        GoogleIdentity["Google Identity OAuth 2.0"]
+        GeminiAPI["Google Gemini AI Platform (LLM & Embeddings)"]
+        ResendEmail["Resend API (Outbound Transactional Mail)"]
+        SendGridEmail["SendGrid (Inbound Parse & Backup Delivery)"]
+        TelegramAPI["Telegram Bot API"]
+    end
+
+    BrowserUI -->|HTTPS / REST / SSE| HelmetCors
+    ExternalWebhookClient -->|POST / HMAC-SHA256| HelmetCors
+    TelegramClient -->|Bot API Updates| TelegramAPI
+    TelegramAPI -->|Long Polling| TelegramService
+
+    HelmetCors --> RateLimiter --> AuthMiddleware --> RoleMiddleware --> TenantScoper
+
+    TenantScoper --> AuthSvc
+    TenantScoper --> LeadSvc
+    TenantScoper --> AgentRuntime
+    TenantScoper --> SiteVisitSvc
+    TenantScoper --> ConversionSvc
+    TenantScoper --> MatchEngine
+    TenantScoper --> ContractPipeline
+    TenantScoper --> RagAssistant
+
+    LeadSvc --> MatchEngine
+    LeadSvc --> ConversionSvc
+    AgentRuntime --> MatchEngine
+    AgentRuntime --> SiteVisitSvc
+    ConversionSvc --> PostgresDB
+    ContractPipeline --> DateEngine
+    ContractPipeline --> LocalFileStorage
+    ContractPipeline --> ImageKitCDN
+    TelegramService --> AgentRuntime
+    OutboxDispatcher --> ResendEmail
+    OutboxDispatcher --> SendGridEmail
+    AlertDaemon --> OutboxDispatcher
+
+    AuthSvc --> PrismaORM
+    LeadSvc --> PrismaORM
+    AgentRuntime --> PrismaORM
+    SiteVisitSvc --> PrismaORM
+    ConversionSvc --> PrismaORM
+    MatchEngine --> PrismaORM
+    ContractPipeline --> PrismaORM
+    RagAssistant --> PrismaORM
+    OutboxDispatcher --> PrismaORM
+    AlertDaemon --> PrismaORM
+
+    PrismaORM --> PostgresDB
+    PostgresDB --- PgVector
+
+    AuthSvc --> GoogleIdentity
+    ContractPipeline --> GeminiAPI
+    RagAssistant --> GeminiAPI
+    AgentRuntime --> GeminiAPI

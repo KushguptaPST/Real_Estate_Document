@@ -41,6 +41,12 @@ __pycache__/
 *.swo
 Thumbs.db
 
+# ── Logs & Backups ──────────────────────────────────────────
+*.log
+*.backup
+*.icloud-placeholder-backup
+*.unavailable-backup
+
 # ── Test coverage ─────────────────────────────────────────────
 coverage/
 .nyc_output/

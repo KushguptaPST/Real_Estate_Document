@@ -18,19 +18,19 @@ export function DeadlineCard({ deadline, onConfirm }: Props) {
     <div
       className={`rounded-xl border p-4 transition-all ${
         overdue
-          ? 'border-rose-500/30 bg-rose-500/5 shadow-lg'
-          : 'border-white/[0.08] bg-[#141418] shadow-lg hover:border-[#C9A961]/30'
+          ? 'border-rose-200 bg-rose-50/50 shadow-xs'
+          : 'border-slate-200/90 bg-white shadow-xs hover:border-slate-300'
       }`}
     >
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-xs font-semibold text-[#F5F5F7] tracking-tight">
+            <span className="truncate text-xs font-semibold text-slate-900 tracking-tight">
               {deadline.label}
             </span>
             <StatusBadge status={deadline.status} />
             {overdue && (
-              <Badge variant="destructive" className="text-[10px] bg-rose-500/15 text-rose-300 border-rose-500/25">
+              <Badge variant="destructive" className="text-[10px]">
                 <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
                 Action Required
               </Badge>
@@ -38,25 +38,25 @@ export function DeadlineCard({ deadline, onConfirm }: Props) {
           </div>
 
           {deadline.clause && (
-            <div className="mt-2.5 border-l-2 border-[#C9A961]/60 bg-[#0D0D11] p-2.5 rounded-r-md text-[11px] font-mono text-[#9A9AA5] italic line-clamp-2 leading-relaxed">
+            <div className="mt-2.5 border-l-2 border-slate-900 bg-slate-50 p-2.5 rounded-r-md text-[11px] font-mono text-slate-600 italic line-clamp-2 leading-relaxed">
               &ldquo;{deadline.clause.rawText}&rdquo;
             </div>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5 font-mono font-medium text-[#F5F5F7]">
-              <Calendar className="h-3.5 w-3.5 text-[#C9A961]" />
-              <span className={overdue ? 'text-rose-400 font-bold' : 'text-[#F5F5F7]'}>
+            <div className="flex items-center gap-1.5 font-mono font-medium text-slate-900">
+              <Calendar className="h-3.5 w-3.5 text-emerald-700" />
+              <span className={overdue ? 'text-rose-600 font-bold' : 'text-slate-900'}>
                 {formatDate(effectiveDate)}
               </span>
             </div>
 
-            <Badge variant={overdue ? 'destructive' : 'neutral'} className="text-[10px] bg-white/[0.06] text-[#9A9AA5] border-white/[0.08]">
-              <Clock className="h-2.5 w-2.5 mr-0.5 text-[#C9A961]" />
+            <Badge variant={overdue ? 'destructive' : 'neutral'} className="text-[10px]">
+              <Clock className="h-2.5 w-2.5 mr-0.5 text-slate-500" />
               {urgencyLabel(effectiveDate)}
             </Badge>
 
-            <span className="text-[11px] capitalize text-[#6E6E7A] font-medium">
+            <span className="text-[11px] capitalize text-slate-500 font-medium">
               {deadline.dayType.toLowerCase()} days
             </span>
           </div>

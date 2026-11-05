@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   IconBot,
   IconX,
-  IconSparkles,
+  IconSpinner,
   IconDocumentText,
   IconClock,
   IconShieldCheck,
@@ -157,7 +157,7 @@ export function CopilotDrawer({ isOpen, onClose, dealAddress }: Props) {
               >
                 {m.sender === 'assistant' && (
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-600/30 text-brand-400 border border-brand-500/30">
-                    <IconSparkles className="h-4 w-4" />
+                    <IconBot className="h-4 w-4" />
                   </span>
                 )}
                 <div
@@ -183,7 +183,7 @@ export function CopilotDrawer({ isOpen, onClose, dealAddress }: Props) {
 
             {isTyping && (
               <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                <IconSparkles className="h-4 w-4 animate-spin text-brand-400" />
+                <IconSpinner className="h-4 w-4 animate-spin text-brand-400" />
                 <span>AI is scanning document clauses...</span>
               </div>
             )}

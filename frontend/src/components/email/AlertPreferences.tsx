@@ -187,7 +187,7 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
       <div className="space-y-3 pb-6 border-b border-border/60">
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <Mail className="h-3.5 w-3.5 text-[#C9A961]" />
+            <Mail className="h-3.5 w-3.5 text-emerald-700" />
             Alert Distribution List
           </label>
           <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
                 {recipientFeedback}
               </span>
             )}
-            <Badge variant="neutral" className="text-[11px] font-mono bg-[#181820] border-white/10 text-muted-foreground">
+            <Badge variant="neutral" className="text-[11px] font-mono bg-slate-50 border-slate-200 text-muted-foreground">
               {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} configured
             </Badge>
           </div>
@@ -221,7 +221,7 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
                   handleAddRecipient();
                 }
               }}
-              className="h-9.5 text-xs pl-3 bg-[#101014] border-white/10 text-[#F5F5F7] placeholder-[#5E5E6C] focus-visible:border-[#C9A961]/70"
+              className="h-9.5 text-xs pl-3 bg-slate-50 border-slate-200 text-slate-800 placeholder-[#5E5E6C] focus-visible:border-[#C9A961]/70"
             />
           </div>
           <Button
@@ -230,16 +230,16 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
             size="sm"
             disabled={!newEmail.trim() || isPersistingRecipient}
             onClick={() => handleAddRecipient()}
-            className="h-9.5 px-3.5 text-xs gap-1.5 shrink-0 bg-[#1A1A22] text-[#F5F5F7] border border-white/10 hover:border-[#C9A961]/40 hover:bg-[#22222C]"
+            className="h-9.5 px-3.5 text-xs gap-1.5 shrink-0 bg-[#1A1A22] text-slate-800 border border-slate-200 hover:border-slate-300 hover:bg-[#22222C]"
           >
             {isPersistingRecipient ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#C9A961]" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-900" />
                 <span>Saving...</span>
               </>
             ) : (
               <>
-                <Plus className="h-3.5 w-3.5 text-[#C9A961]" />
+                <Plus className="h-3.5 w-3.5 text-emerald-700" />
                 <span>Add Recipient</span>
               </>
             )}
@@ -262,9 +262,9 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
             {recipients.map((email) => (
               <span
                 key={email}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#181820] border border-white/10 px-2.5 py-1 text-xs font-mono text-[#F5F5F7] shadow-xs group hover:border-[#C9A961]/40 transition-all"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs font-mono text-slate-800 shadow-xs group hover:border-slate-300 transition-all"
               >
-                <Mail className="h-3 w-3 text-[#C9A961]" />
+                <Mail className="h-3 w-3 text-emerald-700" />
                 <span>{email}</span>
                 <button
                   type="button"
@@ -363,10 +363,10 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
           <select
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            className="flex h-9.5 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-1.5 text-xs text-[#F5F5F7] ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C9A961]/40 focus-visible:border-[#C9A961]/70 shadow-xs"
+            className="flex h-9.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-800 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#C9A961]/40 focus-visible:border-[#C9A961]/70 shadow-xs"
           >
             {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value} className="bg-[#141418] text-[#F5F5F7]">
+              <option key={tz.value} value={tz.value} className="bg-white text-slate-800">
                 {tz.label} ({tz.value})
               </option>
             ))}
@@ -377,7 +377,7 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
       {/* Submit Button & Confirmation */}
       <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/60">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 text-[#C9A961]" />
+          <ShieldCheck className="h-4 w-4 text-emerald-700" />
           <span>Encrypted webhook delivery via Resend Enterprise</span>
         </div>
 

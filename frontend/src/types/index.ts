@@ -30,7 +30,33 @@ export type AuditAction =
   | 'ASSISTANT_QUERY'
   | 'DOCUMENT_INDEXED'
   | 'EMAIL_SENT_TEST'
-  | 'EMAIL_INBOUND_RECEIVED';
+  | 'EMAIL_INBOUND_RECEIVED'
+  | 'LEAD_CREATED'
+  | 'LEAD_UPDATED'
+  | 'LEAD_REQUIREMENTS_EXTRACTED'
+  | 'HUMAN_TAKEOVER_TOGGLED'
+  | 'PROPERTY_CREATED'
+  | 'PROPERTY_MATCHED'
+  | 'TASK_EXTRACTED'
+  | 'TASKS_EXTRACTED'
+  | 'TASK_APPROVED'
+  | 'TASK_COMPLETED'
+  | 'CALL_LOGGED'
+  | 'LEAD_TASK_CREATED'
+  | 'LEAD_TASK_UPDATED'
+  | 'LEAD_TASK_COMPLETED'
+  | 'LEAD_TASK_CANCELLED'
+  | 'SITE_VISIT_SCHEDULED'
+  | 'SITE_VISIT_RESCHEDULED'
+  | 'SITE_VISIT_CANCELLED'
+  | 'SITE_VISIT_COMPLETED'
+  | 'SITE_VISIT_NO_SHOW'
+  | 'MESSAGE_DISPATCH_QUEUED'
+  | 'MESSAGE_SENT'
+  | 'MESSAGE_DELIVERED'
+  | 'MESSAGE_BOUNCED'
+  | 'MESSAGE_DISPATCH_FAILED'
+  | 'WALLET_DEPOSIT';
 
 export interface Deal {
   id: string;
@@ -41,6 +67,7 @@ export interface Deal {
   sellerName: string | null;
   acceptanceDate: string | null; // ISO 8601
   status: DealStatus;
+  purchasePrice?: number | null;
   timezone?: string;
   inboundAlias?: string | null;
   createdAt: string;
@@ -135,6 +162,7 @@ export interface User {
   name: string | null;
   pictureUrl: string | null;
   organizationId?: string;
+  organizationName?: string;
   role?: 'OWNER' | 'AGENT';
   createdAt?: string;
   lastLoginAt?: string;

@@ -15,15 +15,16 @@ import {
   Send,
   Mail,
   Bell,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Deal } from '@/types';
+import { useToast } from '@/context/ToastContext';
 
 export function NotificationSettingsPage() {
   const { id } = useParams<{ id: string }>();
   const dealId = id!;
+  const { toast } = useToast();
 
   const [deal, setDeal] = useState<Deal | null>(null);
   const [dealError, setDealError] = useState<string | null>(null);
@@ -52,18 +53,19 @@ export function NotificationSettingsPage() {
 
   const handleSendSummary = async () => {
     if (!settings?.recipients || settings.recipients.length === 0) {
-      alert('Please add at least one alert recipient in settings before sending the summary.');
+      toast.warning('Please add at least one alert recipient in settings before sending the summary.');
       return;
     }
     setSendingSummary(true);
     setSummaryStatus(null);
     try {
       await notificationsApi.sendSummaryEmail(dealId, settings.recipients);
+      toast.success('Deal summary email dispatched to all recipients.');
       setSummaryStatus('Deal summary email dispatched via Resend to all recipients.');
       refreshLogs();
       setTimeout(() => setSummaryStatus(null), 4000);
     } catch (err) {
-      alert(`Failed to send summary: ${(err as Error).message}`);
+      toast.error(`Failed to send summary: ${(err as Error).message}`);
     } finally {
       setSendingSummary(false);
     }
@@ -151,8 +153,8 @@ export function NotificationSettingsPage() {
       )}
 
       {summaryStatus && (
-        <div className="flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-50/80 dark:bg-blue-950/40 p-4 text-xs text-blue-800 dark:text-blue-300">
-          <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-50/80 dark:bg-zinc-900 p-4 text-xs text-emerald-900 dark:text-emerald-400">
+          <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-500 shrink-0" />
           <span>{summaryStatus}</span>
         </div>
       )}

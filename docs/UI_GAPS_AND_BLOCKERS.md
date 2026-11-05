@@ -170,15 +170,16 @@ Each finding includes its **Severity**, **User Impact**, **Exact Code Locations 
 
 ---
 
-## 3. Prioritized Remediation Roadmap
+## 3. Prioritized Remediation Roadmap & Resolution Status
 
-| Priority | Task ID | Description | Estimated Effort | Impact |
+| Priority | Task ID | Description | Status | Resolution Detail |
 |---|---|---|---|---|
-| **P1** | GAP-01 | Connect `OrganizationPage.tsx` to real `/api/org/members` & `/api/org/invitations` endpoints | 2–3 hours | High — Eliminates mock state in B2B team management |
-| **P1** | GAP-08 | Add "Role Switcher" (Owner vs Agent) in demo sandbox UI header for effortless permission testing | 1 hour | High — Enables full OWNER workflow verification without database manipulation |
-| **P2** | GAP-05 | Replace native browser `alert()` and `confirm()` calls with non-blocking toast notifications | 1–2 hours | Medium — Professional UI polish |
-| **P2** | GAP-10 | Add periodic 60-second outbox processor to `scheduler.service.ts` | 30 mins | Medium — Enhances background retry autonomy |
-| **P3** | GAP-03 | Dynamic role badge in `UserMenu.tsx` | 15 mins | Low — Eliminates minor visual inconsistency |
-| **P3** | GAP-04 | Dynamic organization name in `Sidebar.tsx` | 15 mins | Low — Eliminates hardcoded brand name |
-| **P3** | GAP-02 | Connect TopHeader search input to instant search command palette | 2 hours | Low — Improves navigation ergonomics |
-| **P3** | GAP-06 | Implement genuine CSV download for Analytics and Deals export buttons | 1 hour | Low — Replaces alert placeholders |
+| **P1** | GAP-01 | Connect `OrganizationPage.tsx` to real `/api/org/members` & `/api/org/invitations` endpoints | ✅ **RESOLVED** | Connected live team members, role toggles, magic invite links, and revocation dialogs. |
+| **P1** | GAP-08 | Add "Role Switcher" (Owner vs Agent) in demo sandbox UI header for effortless permission testing | ✅ **RESOLVED** | Added 1-click sandbox role toggle in `TopHeader.tsx` and `UserMenu.tsx` with backend session re-issuance. |
+| **P2** | GAP-05 | Replace native browser `alert()` and `confirm()` calls with non-blocking toast notifications | ✅ **RESOLVED** | 100% of 22 raw `alert()` and `confirm()` calls replaced with `ToastContext` and `ConfirmModal`. |
+| **P2** | GAP-10 | Add periodic 60-second outbox processor to `scheduler.service.ts` | ✅ **RESOLVED** | Registered 60s background retry loop for autonomous queue draining in `scheduler.service.ts`. |
+| **P3** | GAP-03 | Dynamic role badge in `UserMenu.tsx` | ✅ **RESOLVED** | Dynamically displays Brokerage Admin for `OWNER` and Real Estate Advisor for `AGENT`. |
+| **P3** | GAP-04 | Dynamic organization name in `Sidebar.tsx` | ✅ **RESOLVED** | Dynamically driven by active session and organization context. |
+| **P3** | GAP-02 | Connect TopHeader search input to instant search command palette | ✅ **RESOLVED** | Built full `CommandPalette.tsx` overlay with `⌘K` / `Ctrl+K` global keyboard trigger. |
+| **P3** | GAP-06 | Implement genuine CSV download for Analytics and Deals export buttons | ✅ **RESOLVED** | Created `exportToCsv.ts` utility with UTF-8 BOM, wired to Deals pipeline & Analytics summary. |
+| **P3** | GAP-07 | Static KPI metrics on Properties Page | ✅ **RESOLVED** | Replaced static strings with live inventory metrics (Available vs. Pending/Escrow). |

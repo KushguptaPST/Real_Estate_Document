@@ -1,0 +1,33 @@
+flowchart TB
+    subgraph Public_Internet ["Public Internet"]
+        Users["Web Browsers (Agents / TCs)"]
+        WebhookSenders["External Webhook Emitters (SendGrid / Portals)"]
+        TelegramCloud["Telegram Cloud Servers"]
+    end
+
+    subgraph CDN_Edge ["Edge & CDN Tier (Cloudflare / Vercel)"]
+        EdgeDNS["DNS & DDoS Shield"]
+        StaticHosting["Static Asset CDN (React 18 / Vite Build)"]
+    end
+
+    subgraph Compute_Tier ["Application Compute Tier (Railway / Render / AWS ECS)"]
+        LoadBalancer["Application Load Balancer / Reverse Proxy"]
+        BackendApp["Node.js 22 LTS API Server (Express Monolith)"]
+        WorkerProcess["Outbox & Cron Worker (Co-located / Daemon)"]
+    end
+
+    subgraph Data_Tier ["Managed Database & Storage Tier"]
+        PostgresInstance[("Managed PostgreSQL 16 + pgvector")]
+        CloudStorage["ImageKit Media CDN / AWS S3 Storage"]
+    end
+
+    Users -->|HTTPS / Port 443| EdgeDNS
+    EdgeDNS --> StaticHosting
+    Users -->|API Requests / JWT| LoadBalancer
+    WebhookSenders -->|Signed Webhooks| LoadBalancer
+    TelegramCloud -->|Bot Polling| BackendApp
+
+    LoadBalancer --> BackendApp
+    BackendApp --- WorkerProcess
+    BackendApp -->|SQL / Port 5432| PostgresInstance
+    BackendApp -->|Document Uploads| CloudStorage

@@ -23,6 +23,7 @@ export interface SessionUser {
   name: string | null;
   pictureUrl: string | null;
   organizationId: string;
+  organizationName?: string;
   role: UserRole;
 }
 
@@ -75,7 +76,7 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function toSessionUser(user: User): SessionUser {
+function toSessionUser(user: User & { organization?: { name: string } | null }): SessionUser {
   if (!user.organizationId) {
     throw createError('Your account is not a member of any organization. Ask an organization owner for an invitation.', 403);
   }
@@ -85,12 +86,13 @@ function toSessionUser(user: User): SessionUser {
     name: user.name,
     pictureUrl: user.pictureUrl,
     organizationId: user.organizationId,
+    organizationName: user.organization?.name,
     role: user.role,
   };
 }
 
 /** Issues a session JWT for a user that belongs to an organization. */
-export function signSessionToken(user: User): { token: string; user: SessionUser } {
+export function signSessionToken(user: User & { organization?: { name: string } | null }): { token: string; user: SessionUser } {
   const sessionUser = toSessionUser(user);
   const claims: SessionClaims = {
     sub: user.id,
@@ -206,7 +208,7 @@ export async function completeSignIn(
 }
 
 /** Demo login — only when ENABLE_DEMO_LOGIN=true outside production; isolated sandbox org. */
-export async function signInAsDemoAgent(): Promise<{ token: string; user: SessionUser }> {
+export async function signInAsDemoAgent(targetRole: 'AGENT' | 'OWNER' = 'AGENT'): Promise<{ token: string; user: SessionUser }> {
   if (!isDemoLoginEnabled()) {
     throw createError('Route not found', 404);
   }
@@ -217,10 +219,13 @@ export async function signInAsDemoAgent(): Promise<{ token: string; user: Sessio
     create: { id: DEMO_ORG_ID, name: 'Demo Sandbox Brokerage' },
   });
 
+  const isOwner = targetRole === 'OWNER';
   const profile = {
-    email: 'agent.demo@contingencycopilot.com',
-    name: 'Sarah Jenkins (Demo Agent)',
-    pictureUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+    email: isOwner ? 'owner.demo@contingencycopilot.com' : 'agent.demo@contingencycopilot.com',
+    name: isOwner ? 'Marcus Vance (Demo Broker Owner)' : 'Sarah Jenkins (Demo Agent)',
+    pictureUrl: isOwner
+      ? 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150'
+      : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
     lastLoginAt: new Date(),
   };
 
@@ -231,8 +236,9 @@ export async function signInAsDemoAgent(): Promise<{ token: string; user: Sessio
 
   const user = await prisma.user.upsert({
     where: { googleId: DEMO_GOOGLE_ID },
-    update: { ...profile, organizationId: DEMO_ORG_ID, role: 'AGENT' },
-    create: { googleId: DEMO_GOOGLE_ID, ...profile, organizationId: DEMO_ORG_ID, role: 'AGENT' },
+    update: { ...profile, organizationId: DEMO_ORG_ID, role: targetRole },
+    create: { googleId: DEMO_GOOGLE_ID, ...profile, organizationId: DEMO_ORG_ID, role: targetRole },
+    include: { organization: { select: { name: true } } },
   });
 
   return signSessionToken(user);
@@ -260,10 +266,118 @@ export async function verifySessionToken(token: string): Promise<SessionUser> {
     throw createError('Session expired or invalid — please sign in again', 401);
   }
 
-  const user = await prisma.user.findUnique({ where: { id: claims.sub } });
+  const user = await prisma.user.findUnique({
+    where: { id: claims.sub },
+    include: { organization: { select: { name: true } } },
+  });
   if (!user || !user.organizationId || user.organizationId !== claims.org || user.sessionVersion !== claims.sv) {
     throw createError('Session expired or invalid — please sign in again', 401);
   }
 
   return toSessionUser(user);
+}
+
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  try {
+    const [salt, key] = storedHash.split(':');
+    if (!salt || !key) return false;
+    const keyBuffer = Buffer.from(key, 'hex');
+    const derivedKey = crypto.scryptSync(password, salt, 64);
+    return crypto.timingSafeEqual(keyBuffer, derivedKey);
+  } catch {
+    return false;
+  }
+}
+
+export interface RegisterOrganizationInput {
+  ownerName: string;
+  email: string;
+  password?: string;
+  organizationName: string;
+  stateJurisdiction?: string;
+  planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+}
+
+export async function registerOrganization(input: RegisterOrganizationInput): Promise<{
+  token: string;
+  user: SessionUser;
+  organization: {
+    id: string;
+    name: string;
+    subscriptionTier: string;
+    subscriptionStatus: string;
+    stateJurisdiction: string;
+  };
+}> {
+  const email = input.email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw createError('An account with this email address already exists. Please log in.', 409);
+  }
+
+  const jurisdiction = input.stateJurisdiction || 'KA';
+  const tier = input.planTier || 'SOLO';
+
+  return prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: {
+        name: input.organizationName.trim(),
+        stateJurisdiction: jurisdiction,
+        subscriptionTier: tier,
+        subscriptionStatus: 'ACTIVE',
+        planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const user = await tx.user.create({
+      data: {
+        email,
+        name: input.ownerName.trim(),
+        passwordHash: input.password ? hashPassword(input.password) : null,
+        organizationId: org.id,
+        role: 'OWNER',
+        lastLoginAt: new Date(),
+      },
+    });
+
+    const { token, user: sessionUser } = signSessionToken({ ...user, organization: { name: org.name } });
+    return {
+      token,
+      user: sessionUser,
+      organization: {
+        id: org.id,
+        name: org.name,
+        subscriptionTier: org.subscriptionTier,
+        subscriptionStatus: org.subscriptionStatus,
+        stateJurisdiction: org.stateJurisdiction || 'KA',
+      },
+    };
+  });
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<{ token: string; user: SessionUser }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+    throw createError('Invalid email or password', 401);
+  }
+  if (!user.organizationId) {
+    throw createError('Your account is not linked to any brokerage organization', 403);
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  return signSessionToken(user);
 }

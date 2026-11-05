@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { notificationsApi } from '@/services/api';
-import { Eye, X, Loader2, AlertTriangle, Mail, Code2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Eye, X, Loader2, AlertTriangle, Mail, Code2, CheckCircle2 } from 'lucide-react';
 import type { EmailPreviewResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -132,7 +132,7 @@ export function EmailPreviewModal({ dealId, isOpen, onClose }: Props) {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Sparkles className="h-3 w-3" />
+                <Eye className="h-3 w-3" />
                 <span>Rendered HTML</span>
               </button>
               <button

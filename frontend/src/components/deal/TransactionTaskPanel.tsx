@@ -7,12 +7,13 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
-  IndianRupee,
+  DollarSign,
   User,
   Plus,
   FileText,
 } from 'lucide-react';
 import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
+import { useToast } from '@/context/ToastContext';
 
 interface TransactionTaskPanelProps {
   dealId: string;
@@ -20,6 +21,7 @@ interface TransactionTaskPanelProps {
 }
 
 export function TransactionTaskPanel({ dealId, documents }: TransactionTaskPanelProps) {
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +49,9 @@ export function TransactionTaskPanel({ dealId, documents }: TransactionTaskPanel
       setExtractingDocId(docId);
       await tasksApi.extractFromDoc(dealId, docId);
       loadTasks();
+      toast.success('Tasks extracted successfully from document');
     } catch (err: any) {
-      alert(err.message || 'Failed to extract tasks from document');
+      toast.error(err.message || 'Failed to extract tasks from document');
     } finally {
       setExtractingDocId(null);
     }
@@ -58,8 +61,9 @@ export function TransactionTaskPanel({ dealId, documents }: TransactionTaskPanel
     try {
       await tasksApi.reviewTask(dealId, taskId, { status });
       loadTasks();
+      toast.success(`Task status updated to ${status.toLowerCase()}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to update task status');
+      toast.error(err.message || 'Failed to update task status');
     }
   }
 
@@ -156,7 +160,7 @@ export function TransactionTaskPanel({ dealId, documents }: TransactionTaskPanel
 
                     {task.amount && (
                       <span className="flex items-center gap-1 font-semibold text-emerald-600" title={formatIndianPriceFull(task.amount)}>
-                        <IndianRupee className="h-3.5 w-3.5" /> {formatIndianPrice(task.amount)}
+                        <DollarSign className="h-3.5 w-3.5" /> {formatIndianPrice(task.amount)}
                       </span>
                     )}
 

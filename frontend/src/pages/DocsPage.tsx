@@ -4,225 +4,294 @@ import {
   Calendar,
   Clock,
   Mail,
-  Sparkles,
   AlertTriangle,
   Scale,
   CheckCircle2,
+  PhoneCall,
+  ArrowRight,
+  FileText,
+  ShieldCheck,
+  Check,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PublicHeader } from '@/components/landing/PublicHeader';
 
 export function DocsPage() {
-  const [activeTab, setActiveTab] = useState<'lifecycle' | 'math' | 'alerts' | 'dos'>('lifecycle');
+  const [activeTab, setActiveTab] = useState<'lifecycle' | 'voice' | 'math' | 'alerts' | 'dos'>('lifecycle');
 
   return (
-    <div className="space-y-8 max-w-[1600px] mx-auto pb-12">
+    <div className="min-h-screen bg-[#FDFCFB] text-[#0A0A0A] pb-28 selection:bg-emerald-100 selection:text-emerald-900">
+      <PublicHeader />
+      <div className="pt-28 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E5E7EB] pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#C9A961] font-mono">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#047857] font-mono">
               Brokerage Knowledge Base
             </span>
-            <Badge variant="neutral" className="bg-[#C9A961]/10 text-[#C9A961] border border-[#C9A961]/20 font-mono text-[10px]">
-              Compliance Standards &amp; Rules
-            </Badge>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]">
+              Statutory SOP &bull; 50-State Rules
+            </span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#F5F5F7] sm:text-3xl">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0A0A0A]">
             Documentation &amp; Compliance Guidelines
           </h1>
-          <p className="text-xs text-[#9A9AA5] mt-1 max-w-2xl">
-            Standard operating procedures for managing contingency timelines, contract math rules, and automated dispatches.
+          <p className="text-xs sm:text-sm text-[#6B7280] mt-1 max-w-2xl leading-relaxed">
+            Standard operating procedures for managing AI speed-to-lead qualification, deterministic contingency timelines, and automated alert escalation.
           </p>
         </div>
 
-        <Button asChild size="sm" className="rounded-full bg-[#C9A961] hover:bg-[#D4B774] text-[#0A0A0B] font-semibold gap-1.5 h-9 text-xs shadow-sm">
-          <Link to="/upload">
-            <Sparkles className="h-4 w-4" />
-            <span>Ingest Contract PDF</span>
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <Button asChild size="sm" className="rounded-full bg-[#0A0A0A] text-white hover:bg-[#1F2937] font-medium gap-1.5 h-9 text-xs px-4 shadow-xs">
+            <Link to="/upload">
+              <FileText className="h-3.5 w-3.5" />
+              <span>Ingest Contract PDF</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* ── Tab Selector ── */}
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap gap-2">
         {[
           { id: 'lifecycle', label: '1. Transaction Lifecycle', icon: Calendar },
-          { id: 'math', label: '2. Calculation Rules & Math', icon: Clock },
-          { id: 'alerts', label: '3. Resend Alert Windows', icon: Mail },
-          { id: 'dos', label: '4. Legal DOs & DON’Ts', icon: Scale },
+          { id: 'voice', label: '2. AI Voice & Inbound SOP', icon: PhoneCall },
+          { id: 'math', label: '3. Calculation Rules & Math', icon: Clock },
+          { id: 'alerts', label: '4. Resend Alert Windows', icon: Mail },
+          { id: 'dos', label: '5. Legal DOs & DON’Ts', icon: Scale },
         ].map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === tab.id
-                  ? 'bg-[#C9A961] text-[#0A0A0B] shadow-sm'
-                  : 'bg-[#141418] border border-white/[0.08] text-[#9A9AA5] hover:text-[#F5F5F7] hover:border-white/20'
+                isActive
+                  ? 'bg-[#0A0A0A] text-white shadow-xs'
+                  : 'bg-white border border-[#E5E7EB] text-[#6B7280] hover:text-[#0A0A0A] hover:bg-[#F8F9FA]'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* ── Tab Content ── */}
-      <div className="bg-[#141418] p-8 rounded-2xl border border-white/[0.08] shadow-xl space-y-6">
+      {/* ── Tab Content Container ── */}
+      <div className="bg-white p-7 sm:p-9 rounded-3xl border border-[#E5E7EB] shadow-xs space-y-6">
+        
+        {/* TAB 1: 4-Stage Lifecycle */}
         {activeTab === 'lifecycle' && (
           <div className="space-y-6">
-            <h2 className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-[#C9A961]" />
-              <span>4-Stage Contingency Lifecycle</span>
-            </h2>
+            <div className="flex items-center justify-between pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-base font-bold text-[#0A0A0A] flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-[#047857]" />
+                <span>4-Stage Autonomous Escrow Lifecycle</span>
+              </h2>
+              <span className="text-xs text-[#6B7280]">Standard Operating Procedure</span>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1.5 hover:border-[#C9A961]/30 transition-all">
-                <span className="text-[10px] font-semibold text-[#C9A961] uppercase tracking-wider">Stage 1</span>
-                <h3 className="font-semibold text-[#F5F5F7]">Contract Ingestion</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Upload Executed Purchase &amp; Sale Agreement PDF. AI vector embeddings index the contract text layers.
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <span className="text-[10px] font-bold text-[#0A0A0A] uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">Stage 1</span>
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Contract Ingestion &amp; OCR Indexing</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Upload signed Purchase Agreement (NWMLS Form 21, CAR RPA, TREC 1-4, FAR/BAR). Vector embeddings and deterministic regex index clauses in under 2.4s.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1.5 hover:border-[#C9A961]/30 transition-all">
-                <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Stage 2</span>
-                <h3 className="font-semibold text-[#F5F5F7]">Verification &amp; Confirmation</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Agent reviews extracted clauses against PDF quotes, adjusts dates if needed, and clicks "Confirm All".
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <span className="text-[10px] font-bold text-[#047857] uppercase tracking-wider bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#A7F3D0]">Stage 2</span>
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Verifiable Line Citation Review</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Agent reviews extracted dates against PDF line coordinates (§4.2, Pg 4, Line 18). Any manual adjustment is recorded with cryptographic user attribution.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1.5 hover:border-[#C9A961]/30 transition-all">
-                <span className="text-[10px] font-semibold text-[#34D399] uppercase tracking-wider">Stage 3</span>
-                <h3 className="font-semibold text-[#F5F5F7]">Automated Alert Surveillance</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Resend engine triggers automated reminder notices to agents and TCs at T-3, T-1, and day-of cutoff.
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <span className="text-[10px] font-bold text-[#047857] uppercase tracking-wider bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#A7F3D0]">Stage 3</span>
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Deterministic Countdown &amp; Outbox Alerts</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Transactional outbox monitors cutoff windows (e.g. 9:00 PM PST) and automatically sends escalation notices to buyer, seller, and escrow officer at T-3, T-1, and 9:00 AM day-of.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1.5 hover:border-[#C9A961]/30 transition-all">
-                <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider">Stage 4</span>
-                <h3 className="font-semibold text-[#F5F5F7]">Waiver &amp; Execution Locking</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Written contingency notices or waivers are signed and recorded in the tamper-evident audit history.
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <span className="text-[10px] font-bold text-[#0A0A0A] uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">Stage 4</span>
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Contingency Removal &amp; Audit Seal</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Formal removal addenda (CAR Form CR, NWMLS Form 35R) are confirmed. Deal converts to firm escrow; tamper-evident SHA-256 E&amp;O audit log is archived.
                 </p>
               </div>
             </div>
           </div>
         )}
 
+        {/* TAB 2: AI Voice & Inbound SOP */}
+        {activeTab === 'voice' && (
+          <div className="space-y-6 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-base font-bold text-[#0A0A0A] flex items-center gap-2">
+                <PhoneCall className="h-4 w-4 text-[#047857]" />
+                <span>AI Inbound Sales Copilot &amp; Tour Booking SOP</span>
+              </h2>
+              <span className="text-xs text-[#6B7280]">Speed-to-Lead Protocol</span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Sub-60s Inbound Voice Calling</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  When a buyer submits an inquiry via Zillow, Realtor.com, or brokerage landing page, Plivo high-throughput telephony triggers an immediate duplex call. Deepgram Nova-2 STT and Cartesia TTS ensure sub-450ms voice latency that feels natural and conversational.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">WhatsApp Audio Note &amp; Showing Scheduler</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  If the buyer prefers text or does not pick up, an automated WhatsApp audio voice memo is dispatched with interactive time slots. GraphRAG memory recalls buyer price point, school district preferences, and pre-approval status.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">3-Tier Human Takeover Protocol</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Licensed agents receive live push notifications when a buyer expresses urgent offer intent. Clicking "Take Over Call" bridges the human agent onto the audio stream seamlessly while the AI gracefully hands off.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Date Math Rules */}
         {activeTab === 'math' && (
           <div className="space-y-6 text-xs">
-            <h2 className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Clock className="h-5 w-5 text-[#C9A961]" />
-              <span>Deterministic Date Calculation Rules</span>
-            </h2>
+            <div className="flex items-center justify-between pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-base font-bold text-[#0A0A0A] flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[#047857]" />
+                <span>Deterministic Date Calculation Rules</span>
+              </h2>
+              <span className="text-xs text-[#6B7280]">Zero LLM Hallucinations</span>
+            </div>
 
-            <div className="space-y-3">
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <h3 className="font-semibold text-[#F5F5F7]">Day 0 Rule</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  The date of Mutual Acceptance is Day 0. Calculation begins on Day 1 (the calendar day following acceptance).
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Day 0 Rule (Mutual Acceptance)</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  The date of Mutual Acceptance is always Day 0. Calculation strictly begins on Day 1 (the calendar day immediately following acceptance).
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <h3 className="font-semibold text-[#F5F5F7]">Calendar Days vs. Business Days</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Unless the contract explicitly states "Business Days", all timeline windows default to consecutive calendar days. If a deadline lands on a weekend or federal holiday, cutoff shifts to 5:00 PM on the next business day.
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">State Statutory Cutoff Hours</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  Washington NWMLS cutoff is <strong>9:00 PM PST</strong>. California CAR cutoff is <strong>11:59 PM PST</strong>. Texas TREC and Florida FAR/BAR default to <strong>5:00 PM local time</strong>. The engine automatically enforces the governing state jurisdiction.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <h3 className="font-semibold text-[#F5F5F7]">5:00 PM Local Time Cutoff</h3>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Notice cutoffs default to 5:00 PM local property timezone unless otherwise specified in special stipulations.
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <h3 className="font-bold text-sm text-[#0A0A0A]">Holiday &amp; Weekend Roll-Forward Logic</h3>
+                <p className="text-[#6B7280] leading-relaxed">
+                  If the final day of a contingency lands on a Saturday, Sunday, or official Federal/State court holiday, the expiration automatically rolls forward to 5:00 PM (or state cutoff) on the next business day.
                 </p>
               </div>
             </div>
           </div>
         )}
 
+        {/* TAB 4: Alert Schedules */}
         {activeTab === 'alerts' && (
           <div className="space-y-6 text-xs">
-            <h2 className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Mail className="h-5 w-5 text-[#C9A961]" />
-              <span>Resend Automated Alert Schedule</span>
-            </h2>
+            <div className="flex items-center justify-between pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-base font-bold text-[#0A0A0A] flex items-center gap-2">
+                <Mail className="h-4 w-4 text-[#047857]" />
+                <span>Transactional Outbox Escalation Windows</span>
+              </h2>
+              <span className="text-xs text-[#6B7280]">Resend High-Deliverability Engine</span>
+            </div>
 
             <div className="space-y-3">
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="neutral" className="font-mono text-[10px] bg-[#C9A961]/15 text-[#C9A961] border-[#C9A961]/25">T-3 Days</Badge>
-                  <h3 className="font-semibold text-[#F5F5F7]">Early Warning Notice</h3>
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]">T-3 Days</span>
+                  <h3 className="font-bold text-sm text-[#0A0A0A]">Early Runway Warning Notice</h3>
                 </div>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Dispatched 3 calendar days prior to expiration. Gives buyer and agent runway to schedule inspections or title reviews.
+                <p className="text-[#6B7280] leading-relaxed">
+                  Dispatched 72 hours prior to deadline cutoff. Allows buyer's agent to confirm inspector availability or verify loan underwriting status with the lender.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="warning" className="font-mono text-[10px] bg-amber-500/15 text-amber-300 border-amber-500/25">T-1 Day</Badge>
-                  <h3 className="font-semibold text-[#F5F5F7]">High-Priority Action Required</h3>
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">T-1 Day (24h)</span>
+                  <h3 className="font-bold text-sm text-[#0A0A0A]">Urgent Action Escalation Notice</h3>
                 </div>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Dispatched 24 hours prior to deadline cutoff. Reminds agent to draft objection notice or request formal extension.
+                <p className="text-[#6B7280] leading-relaxed">
+                  Dispatched 24 hours prior to deadline. Highlights exact contractual citation (§4.2) and prompts agent to either deliver signed removal or submit formal extension addendum.
                 </p>
               </div>
 
-              <div className="p-4.5 rounded-xl bg-[#0D0D11] border border-white/[0.08] space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="destructive" className="font-mono text-[10px] bg-rose-500/15 text-rose-300 border-rose-500/25">T-0 Day Of</Badge>
-                  <h3 className="font-semibold text-[#F5F5F7]">Execution Notice</h3>
+              <div className="p-5 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA]">T-0 Day Of</span>
+                  <h3 className="font-bold text-sm text-[#0A0A0A]">Final Expiration Morning Alert</h3>
                 </div>
-                <p className="text-[#9A9AA5] leading-relaxed">
-                  Dispatched at 9:00 AM local time on the expiration date. Final alert before 5:00 PM waiver cutoff.
+                <p className="text-[#6B7280] leading-relaxed">
+                  Dispatched at 9:00 AM local property time. Escalates to Managing Broker and Transaction Coordinator if removal notice is still unconfirmed.
                 </p>
               </div>
             </div>
           </div>
         )}
 
+        {/* TAB 5: DOs and DON'Ts */}
         {activeTab === 'dos' && (
           <div className="space-y-6 text-xs">
-            <h2 className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
-              <Scale className="h-5 w-5 text-[#C9A961]" />
-              <span>Legal DOs &amp; DON’Ts Cheat Sheet</span>
-            </h2>
+            <div className="flex items-center justify-between pb-3 border-b border-[#F3F4F6]">
+              <h2 className="text-base font-bold text-[#0A0A0A] flex items-center gap-2">
+                <Scale className="h-4 w-4 text-[#047857]" />
+                <span>Brokerage Risk &amp; E&amp;O Defense DOs &amp; DON’Ts</span>
+              </h2>
+              <span className="text-xs text-[#6B7280]">Legal Best Practices</span>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-5 rounded-xl border border-[#34D399]/25 bg-[#34D399]/10 space-y-2">
-                <h3 className="font-semibold text-[#34D399] flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
-                  <span>DOs</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="p-6 rounded-2xl border border-[#A7F3D0] bg-[#ECFDF5]/50 space-y-3">
+                <h3 className="font-bold text-sm text-[#065F46] flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-[#047857]" />
+                  <span>DOs for Licensed Agents &amp; TCs</span>
                 </h3>
-                <ul className="space-y-1.5 text-[#F5F5F7] list-disc pl-4 leading-relaxed">
-                  <li>DO verify Mutual Acceptance Date on the binding contract signature page.</li>
-                  <li>DO deliver written objection notices before 5:00 PM local cutoff time.</li>
-                  <li>DO obtain written extension addenda signed by both parties before deadline lapses.</li>
+                <ul className="space-y-2 text-[#065F46] list-disc pl-4 leading-relaxed">
+                  <li><strong>DO</strong> verify the executed Mutual Acceptance Date on the final signature page before locking the timeline.</li>
+                  <li><strong>DO</strong> deliver written contingency removal notices before the governing state cutoff time (9:00 PM NWMLS, 11:59 PM CAR).</li>
+                  <li><strong>DO</strong> obtain written, mutually-signed extension addenda before a contingency expires.</li>
+                  <li><strong>DO</strong> download and archive the SHA-256 E&amp;O audit trail into your brokerage transaction vault.</li>
                 </ul>
               </div>
 
-              <div className="p-5 rounded-xl border border-rose-500/25 bg-rose-500/10 space-y-2">
-                <h3 className="font-semibold text-rose-300 flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 text-rose-400" />
-                  <span>DON’Ts</span>
+              <div className="p-6 rounded-2xl border border-[#FECACA] bg-[#FEF2F2]/60 space-y-3">
+                <h3 className="font-bold text-sm text-[#991B1B] flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
+                  <span>DON’Ts to Prevent Deposit Forfeiture</span>
                 </h3>
-                <ul className="space-y-1.5 text-[#F5F5F7] list-disc pl-4 leading-relaxed">
-                  <li>DON’T rely on verbal communications or text messages for contingency waivers.</li>
-                  <li>DON’T assume automatic extension without executed written mutual consent.</li>
-                  <li>DON’T let earnest money deposits remain unmonitored without active email alerts.</li>
+                <ul className="space-y-2 text-[#991B1B] list-disc pl-4 leading-relaxed">
+                  <li><strong>DON'T</strong> rely on verbal agreements, voice calls, or text messages for contingency extensions.</li>
+                  <li><strong>DON'T</strong> assume an automatic extension exists without fully executed bilateral addenda.</li>
+                  <li><strong>DON'T</strong> use generic AI chatbots (ChatGPT/Claude) to compute dates without statutory holiday calendar checks.</li>
+                  <li><strong>DON'T</strong> allow earnest money deposits to go unverified past the 2-day or 3-day statutory delivery window.</li>
                 </ul>
               </div>
             </div>
           </div>
         )}
+
+      </div>
       </div>
     </div>
   );

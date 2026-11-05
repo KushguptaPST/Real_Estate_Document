@@ -18,7 +18,6 @@ import {
   SlidersHorizontal,
   History,
   Clock,
-  Sparkles,
   ShieldCheck,
   FileText,
   UploadCloud,
@@ -27,10 +26,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Deal, AuditLog, NotificationSetting, Deadline } from '@/types';
+import { useToast } from '@/context/ToastContext';
 
 export function DealDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dealId = id!;
+  const { toast } = useToast();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [dealError, setDealError] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -97,17 +98,18 @@ export function DealDetailPage() {
 
   const handleSendSummary = async () => {
     if (!notifSettings?.recipients || notifSettings.recipients.length === 0) {
-      alert('Please configure at least one recipient email in Notification Settings.');
+      toast.warning('Please configure at least one recipient email in Notification Settings.');
       return;
     }
     setSendingSummary(true);
     setSummaryMessage(null);
     try {
       await notificationsApi.sendSummaryEmail(dealId, notifSettings.recipients);
+      toast.success('Executive summary report dispatched to all configured recipients.');
       setSummaryMessage('Executive summary report dispatched via Resend to all configured recipients.');
       setTimeout(() => setSummaryMessage(null), 4000);
     } catch (err) {
-      alert(`Failed to send summary email: ${(err as Error).message}`);
+      toast.error(`Failed to send summary email: ${(err as Error).message}`);
     } finally {
       setSendingSummary(false);
     }
@@ -158,15 +160,15 @@ export function DealDetailPage() {
       />
 
       {/* ── Deal Documents & Contract Ingestion ── */}
-      <div id="deal-documents-section" className="rounded-2xl border border-white/[0.08] bg-[#141418] p-5 shadow-lg space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+      <div id="deal-documents-section" className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C9A961]/15 text-[#C9A961] border border-[#C9A961]/25">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-800 border border-slate-200">
               <FileText className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold text-white tracking-tight uppercase">
+                <h3 className="text-xs font-bold text-slate-900 tracking-tight uppercase">
                   Deal Contract &amp; Legal Documents
                 </h3>
                 <Badge variant={(deal?.documents?.length ?? 0) > 0 ? 'success' : 'warning'} className="text-[10px]">
@@ -175,7 +177,7 @@ export function DealDetailPage() {
                     : 'Action Required: No Contract Uploaded'}
                 </Badge>
               </div>
-              <p className="text-[11px] text-[#9A9AA5] mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 {(deal?.documents?.length ?? 0) > 0
                   ? 'Executed agreements, counter-offers, and addenda indexed by the AI contingency parser.'
                   : 'Upload your purchase agreement PDF to compute binding contingency milestones and alert triggers.'}
@@ -189,9 +191,9 @@ export function DealDetailPage() {
               variant="outline"
               size="sm"
               onClick={() => setShowUploadZone(!showUploadZone)}
-              className="h-8 px-3 text-xs gap-1.5 border-white/[0.08] text-[#D1D1DB] hover:bg-white/5 cursor-pointer"
+              className="h-8 px-3 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <UploadCloud className="h-3.5 w-3.5 text-[#C9A961]" />
+              <UploadCloud className="h-3.5 w-3.5 text-slate-700" />
               <span>{showUploadZone ? 'Close Upload' : '+ Upload Agreement / Addendum'}</span>
             </Button>
           </div>
@@ -213,17 +215,17 @@ export function DealDetailPage() {
             {deal?.documents?.map((doc: any) => (
               <div
                 key={doc.id}
-                className="bg-[#0D0D11] border border-white/[0.08] rounded-xl p-3 flex items-center justify-between hover:border-[#C9A961]/30 transition-all"
+                className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-3 flex items-center justify-between hover:border-slate-300 transition-all shadow-xs"
               >
                 <div className="flex items-center gap-2.5 overflow-hidden">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
                     <FileText className="h-4 w-4" />
                   </div>
                   <div className="overflow-hidden">
-                    <div className="text-xs font-semibold text-white truncate max-w-[160px]" title={doc.fileName}>
+                    <div className="text-xs font-semibold text-slate-900 truncate max-w-[160px]" title={doc.fileName}>
                       {doc.fileName}
                     </div>
-                    <div className="text-[10px] text-[#9A9AA5]">
+                    <div className="text-[10px] text-slate-500">
                       {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB • ` : ''}
                       {new Date(doc.uploadedAt || doc.createdAt).toLocaleDateString()}
                     </div>
@@ -232,7 +234,7 @@ export function DealDetailPage() {
 
                 <Link
                   to={`/deals/${dealId}/review`}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold text-[#C9A961] bg-[#C9A961]/10 hover:bg-[#C9A961]/20 transition-colors shrink-0"
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition-colors shrink-0"
                 >
                   Clauses
                 </Link>

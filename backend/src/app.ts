@@ -19,6 +19,11 @@ import leadTasksRouter from './api/routes/leadTasks.js';
 import siteVisitsRouter from './api/routes/siteVisits.js';
 import knowledgeRouter from './api/routes/knowledge.js';
 import messagingWebhooksRouter from './api/routes/messagingWebhooks.js';
+import whatsappWebhookRouter from './api/routes/webhooks/whatsapp.js';
+import billingRouter from './api/routes/billing.js';
+import adminRouter from './api/routes/admin.js';
+import campaignsRouter from './api/routes/campaigns.js';
+import voiceRouter from './api/routes/voice.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -63,22 +68,37 @@ export function createApp() {
   );
   app.use(express.urlencoded({ extended: true }));
 
-  // ── Health check ─────────────────────────────────────────────────────────
+  // ── Root & Health check ──────────────────────────────────────────────────
+  app.get('/', (_req, res) => {
+    res.json({
+      service: 'Contingency Deadline Copilot API',
+      status: 'online',
+      frontendUrl: 'http://localhost:3000',
+      health: '/health',
+    });
+  });
+
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // ── API routes ────────────────────────────────────────────────────────────
   app.use('/api/auth', authRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/billing', billingRouter);
   app.use('/api/org', organizationRouter);
   app.use('/api/organization', organizationRouter);
   app.use('/api/inbound', inboundRouter); // HMAC signature (JSON) or INBOUND_WEBHOOK_SECRET (multipart)
+  app.use('/api/inbound/whatsapp', whatsappWebhookRouter); // Meta WhatsApp Cloud API webhook
+  app.use('/api/webhooks/whatsapp', whatsappWebhookRouter); // Alias for Meta App Dashboard
   app.use('/api/webhooks', messagingWebhooksRouter); // Resend (Svix HMAC) & SendGrid delivery/bounce webhooks
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:id/conversations', conversationsRouter);
   app.use('/api/leads/:id/matches', leadMatchesRouter);
   app.use('/api/properties', propertiesRouter);
   app.use('/api/knowledge', knowledgeRouter);
+  app.use('/api/voice', voiceRouter);
+  app.use('/api/campaigns', requireAuth, campaignsRouter);
   app.use('/api/tasks', requireAuth, leadTasksRouter);
   app.use('/api/site-visits', requireAuth, siteVisitsRouter);
   app.use('/api/deals', requireAuth, dealsRouter);

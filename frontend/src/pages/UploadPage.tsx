@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dealsApi } from '@/services/api';
+import { useToast } from '@/context/ToastContext';
 import { UploadZone } from '@/components/UploadZone';
 import {
   ArrowRight,
@@ -9,7 +10,6 @@ import {
   AlertTriangle,
   Building2,
   FileText,
-  Sparkles,
   Calendar,
   User,
   ShieldCheck,
@@ -26,11 +26,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { StatutoryDatePicker, calculateStatutoryDayOne } from '@/components/ui/StatutoryDatePicker';
+import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function UploadPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'form' | 'upload' | 'done'>('form');
+  const { toast } = useToast();
+  const [step, setStep] = useState<'form' | 'upload'>('form');
   const [dealId, setDealId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -77,43 +80,49 @@ export function UploadPage() {
 
   const steps = [
     { key: 'form', label: 'Deal Entities', desc: 'Property & Parties' },
-    { key: 'upload', label: 'Contract Ingestion', desc: 'PDF Document & OCR' },
-    { key: 'done', label: 'AI Extraction', desc: 'Deadlines & E&O Guard' },
+    { key: 'upload', label: 'Contract Ingestion', desc: 'PDF Document & Auto-Extraction' },
   ] as const;
   const stepIndex = steps.findIndex((s) => s.key === step);
+
+  const handleUploadSuccess = () => {
+    toast.success(
+      'Contract Ingested & Analyzed',
+      'Contingency deadlines and statutory calendar generated.'
+    );
+    navigate(`/deals/${dealId}`);
+  };
 
   return (
     <div className="relative mx-auto max-w-3xl px-4 py-4 space-y-8">
       {/* Subtle Luxury Ambient Radial Glow */}
-      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-full max-w-2xl h-80 bg-[radial-gradient(ellipse_at_top,rgba(201,169,97,0.12),transparent_70%)]" />
+      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-full max-w-2xl h-80 bg-[radial-gradient(ellipse_at_top,rgba(37,99,235,0.08),transparent_70%)]" />
 
       {/* Page Header */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#C9A961]/30 bg-[#C9A961]/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#C9A961]">
-            <Sparkles className="h-3 w-3" />
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-700">
             Transaction Intake
           </span>
-          <Badge variant="neutral" className="text-[10px] border-white/10 bg-[#16161C] text-[#9A9AA5]">
-            Step {stepIndex + 1} of 3
+          <Badge variant="neutral" className="text-[10px] border-slate-200 bg-slate-100 text-slate-700 font-bold">
+            Step {stepIndex + 1} of 2
           </Badge>
-          <span className="inline-flex items-center gap-1 text-[11px] text-[#6E6E7A] font-mono ml-auto">
-            <Lock className="h-3 w-3 text-emerald-400" />
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-mono font-medium ml-auto">
+            <Lock className="h-3.5 w-3.5 text-emerald-700" />
             256-Bit Encrypted Escrow Room
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold tracking-tight text-[#F5F5F7] sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
           Ingest Purchase Agreement
         </h1>
-        <p className="text-xs text-[#9A9AA5] max-w-2xl leading-relaxed">
-          Enter transaction counterparties and upload your executed PDF contract. Contingency calendar deadlines, state-mandated statutory holidays, and citation embeddings will be generated deterministically.
+        <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+          Enter transaction counterparties and upload your executed PDF contract. Contingency calendar deadlines and statutory rules are calculated deterministically.
         </p>
       </div>
 
-      {/* Luxury Segmented Stepper Indicator */}
-      <div className="rounded-2xl border border-white/10 bg-[#141418]/90 p-3 sm:p-4 shadow-xl backdrop-blur-md">
-        <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3 select-none">
+      {/* Segmented Stepper Indicator */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs">
+        <ol className="grid grid-cols-1 sm:grid-cols-2 gap-3 select-none">
           {steps.map((s, i) => {
             const isCompleted = i < stepIndex;
             const isCurrent = i === stepIndex;
@@ -121,31 +130,31 @@ export function UploadPage() {
             return (
               <li
                 key={s.key}
-                className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
+                className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                   isCurrent
-                    ? 'bg-[#1E1E26] border border-[#C9A961]/40 shadow-[0_0_20px_rgba(201,169,97,0.1)]'
+                    ? 'bg-slate-50 border border-slate-300 shadow-xs'
                     : isCompleted
-                    ? 'bg-white/[0.02] border border-white/5'
+                    ? 'bg-emerald-50/50 border border-emerald-200/80'
                     : 'bg-transparent border border-transparent opacity-60'
                 }`}
               >
                 <span
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs font-mono font-bold transition-all ${
                     isCompleted
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : isCurrent
-                      ? 'bg-[#C9A961] text-[#0A0A0B] shadow-[0_0_15px_rgba(201,169,97,0.4)]'
-                      : 'bg-[#181820] text-[#6E6E7A] border border-white/10'
+                      ? 'bg-[#0A0A0A] text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
                   }`}
                 >
-                  {isCompleted ? <Check className="h-4 w-4" /> : i + 1}
+                  {isCompleted ? <Check className="h-4 w-4 text-emerald-800" /> : i + 1}
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <div className={`text-xs font-semibold truncate ${isCurrent ? 'text-[#F5F5F7]' : isCompleted ? 'text-[#D0D0D8]' : 'text-[#6E6E7A]'}`}>
+                  <div className={`text-xs font-bold truncate ${isCurrent ? 'text-slate-950 font-bold' : isCompleted ? 'text-slate-800 font-semibold' : 'text-slate-500'}`}>
                     {s.label}
                   </div>
-                  <div className="text-[10px] text-[#9A9AA5] truncate">
+                  <div className="text-[11px] text-slate-500 truncate">
                     {s.desc}
                   </div>
                 </div>
@@ -165,15 +174,15 @@ export function UploadPage() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <Card className="border-white/10 bg-gradient-to-b from-[#16161D] via-[#141418] to-[#101014] shadow-2xl backdrop-blur-xl">
+            <Card className="border-slate-200/90 bg-white shadow-2xl backdrop-blur-xl">
               <CardHeader className="pb-5 border-b border-white/5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <CardTitle className="text-base font-semibold text-[#F5F5F7] flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-[#C9A961]" />
+                    <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-emerald-700" />
                       Transaction Counterparties &amp; Terms
                     </CardTitle>
-                    <CardDescription className="text-xs text-[#9A9AA5] mt-1">
+                    <CardDescription className="text-xs text-slate-500 mt-1">
                       Primary metadata used for calculating business-day calendars and drafting reminder notices.
                     </CardDescription>
                   </div>
@@ -183,9 +192,9 @@ export function UploadPage() {
                     variant="outline"
                     size="xs"
                     onClick={fillSampleDeal}
-                    className="gap-1.5 text-[11px] h-8 px-3 border-[#C9A961]/30 bg-[#C9A961]/10 text-[#C9A961] hover:bg-[#C9A961]/20 hover:border-[#C9A961]/50 self-start sm:self-auto cursor-pointer transition-all"
+                    className="gap-1.5 text-[11px] h-8 px-3 border-slate-200 bg-emerald-50 text-emerald-800 text-emerald-700 hover:bg-emerald-100 hover:border-slate-400 self-start sm:self-auto cursor-pointer transition-all"
                   >
-                    <Zap className="h-3 w-3 text-[#C9A961]" />
+                    <Zap className="h-3 w-3 text-emerald-700" />
                     <span>Auto-Fill Sample (WA Form 21)</span>
                   </Button>
                 </div>
@@ -195,12 +204,12 @@ export function UploadPage() {
                 <form onSubmit={(e) => void handleDealCreate(e)} className="space-y-5">
                   {/* Property Address */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[#F5F5F7] flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-800 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-[#C9A961]" />
+                        <MapPin className="h-3.5 w-3.5 text-emerald-700" />
                         Property Address <span className="text-rose-400">*</span>
                       </span>
-                      <span className="text-[10px] font-mono text-[#6E6E7A]">Full Legal / MLS Address</span>
+                      <span className="text-[10px] font-mono text-slate-400">Full Legal / MLS Address</span>
                     </label>
                     <Input
                       required
@@ -210,19 +219,19 @@ export function UploadPage() {
                       className="h-10 text-xs"
                     />
                     <div className="flex items-center gap-2 pt-0.5">
-                      <span className="text-[10px] text-[#6E6E7A]">Supported MLS / Board standards:</span>
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-[#9A9AA5] border border-white/5">NWMLS</span>
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-[#9A9AA5] border border-white/5">CAR California</span>
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-[#9A9AA5] border border-white/5">TREC Texas</span>
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-[#9A9AA5] border border-white/5">NY MLS</span>
+                      <span className="text-[10px] text-slate-400">Supported MLS / Board standards:</span>
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-slate-500 border border-white/5">NWMLS</span>
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-slate-500 border border-white/5">CAR California</span>
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-slate-500 border border-white/5">TREC Texas</span>
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-slate-500 border border-white/5">NY MLS</span>
                     </div>
                   </div>
 
                   {/* Buyer & Seller Counterparties */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[#F5F5F7] flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-[#C9A961]" />
+                      <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-emerald-700" />
                         Buyer Full Name / Purchasing Entity
                       </label>
                       <Input
@@ -234,8 +243,8 @@ export function UploadPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[#F5F5F7] flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-[#C9A961]" />
+                      <label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-emerald-700" />
                         Seller Full Name / Entity / Trust
                       </label>
                       <Input
@@ -248,29 +257,55 @@ export function UploadPage() {
                   </div>
 
                   {/* Mutual Acceptance Date */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-[#F5F5F7] flex items-center justify-between">
+                  <div className="space-y-2.5">
+                    <label className="text-xs font-semibold text-slate-800 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-[#C9A961]" />
+                        <Calendar className="h-3.5 w-3.5 text-emerald-700" />
                         Contract Mutual Acceptance Date (Day 0)
                       </span>
-                      <span className="text-[10px] font-mono text-[#C9A961]">Statutory Window Anchor</span>
+                      <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Statutory Window Anchor</span>
                     </label>
-                    <Input
-                      type="date"
+
+                    {/* Bespoke Real Estate Statutory Date Picker */}
+                    <StatutoryDatePicker
                       value={acceptanceDate}
-                      onChange={(e) => setAcceptanceDate(e.target.value)}
-                      className="h-10 text-xs font-mono"
+                      onChange={setAcceptanceDate}
+                      placeholder="Select Mutual Acceptance Date (e.g. Oct 31, 2026)..."
                     />
 
+                    {/* Live Day 0 / Day 1 Statutory Calculation Badge */}
+                    {acceptanceDate && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-950 shadow-2xs font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-700 text-white text-[10px] font-bold">
+                            D0
+                          </span>
+                          <span className="font-bold">
+                            Mutual Acceptance: {format(parseISO(acceptanceDate), 'EEE, MMM d, yyyy')}
+                          </span>
+                        </div>
+                        {calculateStatutoryDayOne(acceptanceDate) && (
+                          <span className="text-[11px] font-semibold text-emerald-800 bg-white/90 px-2.5 py-1 rounded-md border border-emerald-200/80 self-start sm:self-auto shadow-2xs">
+                            Day 1 begins: {calculateStatutoryDayOne(acceptanceDate)?.formattedDayOne}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Explanatory E&O callout box */}
-                    <div className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-[#101014] p-3 text-xs text-[#9A9AA5]">
-                      <Info className="h-4 w-4 shrink-0 text-[#C9A961] mt-0.5" />
-                      <div className="space-y-0.5 text-[11px] leading-relaxed">
-                        <p>
-                          The date mutual acceptance was finalized. Used as <span className="text-[#F5F5F7] font-semibold">Day 0</span> to calculate relative business/calendar day windows.
+                    <div className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-slate-50/90 p-3.5 text-xs text-slate-700 shadow-2xs">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700 mt-0.5 border border-slate-300/60">
+                        <Info className="h-3.5 w-3.5 text-slate-700" />
+                      </div>
+                      <div className="space-y-1 text-xs leading-relaxed">
+                        <p className="text-slate-900 font-medium">
+                          The date mutual acceptance was finalized. Used as{' '}
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono font-bold text-slate-900 bg-slate-200 border border-slate-300 text-[11px]">
+                            Day 0
+                          </span>{' '}
+                          to calculate relative business/calendar day windows.
                         </p>
-                        <p className="text-[#6E6E7A]">
+                        <p className="text-slate-600 text-[11px]">
                           Per standard practice (e.g. WA RCW 64.06), Day 1 begins on the next business day. All state legal holidays and 9:00 PM cutoff rules are deterministically applied.
                         </p>
                       </div>
@@ -278,28 +313,33 @@ export function UploadPage() {
                   </div>
 
                   {/* E&O Compliance Strip */}
-                  <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-300">
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-[#C9A961]" />
-                    <span className="text-[11px]">
-                      <strong>Deterministic E&amp;O Protection:</strong> Date calculation is performed via audited legal math algorithms, eliminating LLM arithmetic mistakes.
+                  <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-emerald-50/80 px-3.5 py-2.5 text-xs text-emerald-950 shadow-2xs">
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-800" />
+                    </div>
+                    <span className="text-[11px] leading-snug">
+                      <strong className="font-bold text-emerald-950">Deterministic E&amp;O Protection:</strong>{' '}
+                      <span className="text-emerald-900 font-medium">
+                        Date calculation is performed via audited legal math algorithms, eliminating LLM arithmetic mistakes.
+                      </span>
                     </span>
                   </div>
 
                   {error && (
-                    <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
-                      <span>{error}</span>
+                    <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 shadow-2xs">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-rose-700" />
+                      <span className="font-bold">{error}</span>
                     </div>
                   )}
 
                   <Button
                     type="submit"
                     disabled={submitting}
-                    className="w-full gap-2 h-11 text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg cursor-pointer hover:shadow-[0_0_25px_rgba(201,169,97,0.35)] transition-all mt-2"
+                    className="w-full gap-2 h-11 text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs cursor-pointer bg-[#0A0A0A] hover:bg-black text-white transition-all mt-2"
                   >
                     {submitting ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin text-[#0A0A0B]" />
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
                         <span>Initializing Transaction Workspace...</span>
                       </>
                     ) : (
@@ -326,21 +366,21 @@ export function UploadPage() {
             className="space-y-5"
           >
             {/* Active Transaction Header Banner */}
-            <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-[#181822] via-[#14141A] to-[#101014] p-4 shadow-xl">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant="gold" className="text-[10px]">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">
                       Active Workspace
-                    </Badge>
-                    <span className="text-[11px] font-mono text-[#9A9AA5]">ID: {dealId.slice(0, 8)}...</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500">ID: {dealId.slice(0, 8)}...</span>
                   </div>
-                  <h3 className="text-sm font-bold text-[#F5F5F7] flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5 text-[#C9A961]" />
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                    <Building2 className="h-4 w-4 text-emerald-700" />
                     {propertyAddress || 'Transaction Workspace'}
                   </h3>
                   {(buyerName || sellerName) && (
-                    <p className="text-[11px] text-[#9A9AA5]">
+                    <p className="text-xs text-slate-500">
                       {buyerName ? `Buyer: ${buyerName}` : ''}
                       {buyerName && sellerName ? ' ↔ ' : ''}
                       {sellerName ? `Seller: ${sellerName}` : ''}
@@ -353,7 +393,7 @@ export function UploadPage() {
                   variant="outline"
                   size="xs"
                   onClick={() => setStep('form')}
-                  className="gap-1.5 text-[11px] h-7 self-start sm:self-auto border-white/10 hover:border-white/25"
+                  className="gap-1.5 text-xs font-semibold h-8 self-start sm:self-auto border-slate-200 hover:bg-slate-50 text-slate-700"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   <span>Edit Details</span>
@@ -362,108 +402,15 @@ export function UploadPage() {
             </div>
 
             {/* Success Initialized Pill */}
-            <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-950/30 p-3.5 text-xs text-emerald-300 ring-1 ring-emerald-500/10">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-              <span>
+            <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3.5 text-xs text-emerald-950 shadow-2xs">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
+              <span className="font-medium">
                 Transaction workspace initialized. Upload the executed Purchase Agreement PDF below to start automatic date extraction.
               </span>
             </div>
 
             {/* Drop Zone */}
-            <UploadZone dealId={dealId} onSuccess={() => setStep('done')} />
-          </motion.div>
-        )}
-
-        {/* Step 3: Done */}
-        {step === 'done' && dealId && (
-          <motion.div
-            key="done"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#181822] via-[#141418] to-[#101014] p-8 text-center shadow-2xl space-y-6"
-          >
-            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C9A961]/15 text-[#C9A961] ring-1 ring-[#C9A961]/30 shadow-[0_0_30px_rgba(201,169,97,0.25)]">
-              <CheckCircle2 className="h-8 w-8" />
-              <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-400 ring-2 ring-[#141418]" />
-            </div>
-
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400">
-                Extraction &amp; Calibration Complete
-              </div>
-              <h2 className="text-xl font-bold text-[#F5F5F7] tracking-tight sm:text-2xl">
-                Contract Ingested &amp; Indexed
-              </h2>
-              <p className="text-xs text-[#9A9AA5] max-w-md mx-auto leading-relaxed">
-                Deterministic deadline calculations, audit trail logging, and page-level citation anchors are active in your workspace.
-              </p>
-            </div>
-
-            {/* Highlights Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left max-w-lg mx-auto">
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-1">
-                <div className="text-[10px] font-mono uppercase text-[#6E6E7A] flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                  Deterministic Math
-                </div>
-                <div className="text-xs font-semibold text-[#F5F5F7]">100% Verified</div>
-                <div className="text-[10px] text-[#9A9AA5]">Statutory WA/CA rules applied</div>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-1">
-                <div className="text-[10px] font-mono uppercase text-[#6E6E7A] flex items-center gap-1">
-                  <FileText className="h-3 w-3 text-[#C9A961]" />
-                  Embeddings
-                </div>
-                <div className="text-xs font-semibold text-[#F5F5F7]">Citation Ready</div>
-                <div className="text-[10px] text-[#9A9AA5]">Page bounding boxes mapped</div>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-1">
-                <div className="text-[10px] font-mono uppercase text-[#6E6E7A] flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-sky-400" />
-                  E&amp;O Guard
-                </div>
-                <div className="text-xs font-semibold text-[#F5F5F7]">Active Monitoring</div>
-                <div className="text-[10px] text-[#9A9AA5]">Alert engine tracking milestones</div>
-              </div>
-            </div>
-
-            {/* CTAs */}
-            <div className="flex flex-wrap justify-center gap-3 pt-2">
-              <Button
-                type="button"
-                onClick={() => navigate(`/deals/${dealId}/assistant`)}
-                size="default"
-                className="gap-2 text-xs font-bold uppercase tracking-wider h-10 px-5 shadow-lg hover:shadow-[0_0_20px_rgba(201,169,97,0.35)]"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Launch AI Copilot</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate(`/deals/${dealId}/review`)}
-                size="default"
-                className="gap-2 text-xs font-semibold h-10 px-5 border-white/15 hover:border-[#C9A961]/40"
-              >
-                <span>Verify Deadlines</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => navigate('/deals')}
-                size="default"
-                className="text-xs font-semibold h-10 px-4"
-              >
-                <span>Portfolio View</span>
-              </Button>
-            </div>
+            <UploadZone dealId={dealId} onSuccess={handleUploadSuccess} />
           </motion.div>
         )}
       </AnimatePresence>

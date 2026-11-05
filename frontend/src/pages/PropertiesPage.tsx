@@ -1,31 +1,32 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { propertiesApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { PropertyMarketingModal } from '@/components/property/PropertyMarketingModal';
 import { PropertyCmaModal } from '@/components/property/PropertyCmaModal';
 import { CsvImportModal } from '@/components/CsvImportModal';
-import { formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
+import { formatPropertyPrice, formatPropertyPriceFull } from '@/utils/currency';
+import { useToast } from '@/context/ToastContext';
 import {
   Building2,
   Search,
   Plus,
   Loader2,
   AlertCircle,
-  IndianRupee,
+  Tag,
   BedDouble,
   Bath,
   MapPin,
-  Sparkles,
   Megaphone,
   BarChart3,
   FileSpreadsheet,
   TrendingUp,
-  SlidersHorizontal,
   ShieldCheck,
 } from 'lucide-react';
 
 export function PropertiesPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isOwner = user?.role === 'OWNER';
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,14 +88,17 @@ export function PropertiesPage() {
       setBedrooms('');
       setBathrooms('');
       fetchProperties();
+      toast.success('Property listing created successfully');
     } catch (err: any) {
-      alert(err.message || 'Failed to create property');
+      toast.error(err.message || 'Failed to create property');
     } finally {
       setSubmitting(false);
     }
   }
 
   const totalCount = properties.length;
+  const availableCount = properties.filter((p) => !p.status || p.status === 'AVAILABLE').length;
+  const underContractCount = properties.filter((p) => p.status === 'UNDER_CONTRACT' || p.status === 'PENDING').length;
   const avgPrice =
     totalCount > 0
       ? Math.round(properties.reduce((acc, p) => acc + (p.price || 0), 0) / totalCount)
@@ -103,21 +107,21 @@ export function PropertiesPage() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-12">
       {/* ── Page Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#181820] text-[#C9A961] border border-[#C9A961]/25 shrink-0 shadow-xs">
-            <Building2 className="h-5 w-5 text-[#C9A961]" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-800 border border-slate-200 shrink-0 shadow-xs">
+            <Building2 className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F7]">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 MLS Property Inventory &amp; Valuation
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C9A961]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#C9A961] border border-[#C9A961]/25">
-                <Sparkles className="h-3 w-3" /> MLS Grounded
+              <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-semibold text-zinc-700 border border-zinc-200">
+                MLS Grounded
               </span>
             </div>
-            <p className="text-xs text-[#9A9AA5] mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Verified property portfolio evaluated deterministically by the AI Lead Matcher and CMA Engine.
             </p>
           </div>
@@ -126,34 +130,43 @@ export function PropertiesPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowCsvModal(true)}
-            className="btn-stripe-secondary text-xs h-9 px-3.5 gap-1.5 cursor-pointer"
+            className="btn-stripe-secondary text-xs h-9 px-3.5 gap-1.5 cursor-pointer bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5 text-[#C9A961]" />
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" />
             <span>Import MLS / CSV</span>
           </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-stripe-primary text-xs h-9 px-4 gap-1.5 cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Listing</span>
-          </button>
+          {isOwner ? (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn-stripe-primary text-xs h-9 px-4 gap-1.5 cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Listing</span>
+            </button>
+          ) : (
+            <div title="Only organization owners can add listings">
+              <button disabled className="btn-stripe-secondary text-xs h-9 px-4 opacity-50 cursor-not-allowed">
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Listing (Owner Only)</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Metric Stat Cards Grid ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Listings */}
-        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/30 transition-all flex flex-col justify-between min-h-[136px] group shadow-sm">
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Total Listings</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#181820] text-[#C9A961] border border-[#C9A961]/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Listings</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-800 border border-slate-200 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-black text-[#F5F5F7] tracking-tight">{totalCount}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-[#C9A961] font-semibold mt-1.5">
+            <div className="text-2xl font-black text-slate-900 tracking-tight">{totalCount}</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold mt-1.5">
               <TrendingUp className="h-3.5 w-3.5" />
               <span>Active MLS Inventory</span>
             </div>
@@ -161,82 +174,78 @@ export function PropertiesPage() {
         </div>
 
         {/* Average Listing Price */}
-        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/30 transition-all flex flex-col justify-between min-h-[136px] group shadow-sm">
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Average Listing Price</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
-              <IndianRupee className="h-5 w-5" />
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Average Listing Price</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+              <Tag className="h-5 w-5 text-emerald-700" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight" title={avgPrice > 0 ? formatIndianPriceFull(avgPrice) : undefined}>
-              {formatIndianPrice(avgPrice)}
+            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight" title={avgPrice > 0 ? formatPropertyPriceFull(avgPrice) : undefined}>
+              {formatPropertyPrice(avgPrice)}
             </div>
-            <div className="text-[11px] text-[#6E6E7A] font-mono mt-1.5">
-              Portfolio Valuation {avgPrice > 0 ? `(${formatIndianPriceFull(avgPrice)})` : ''}
+            <div className="text-[11px] text-slate-500 font-mono mt-1.5">
+              Portfolio Valuation {avgPrice > 0 ? `(${formatPropertyPriceFull(avgPrice)})` : ''}
             </div>
           </div>
         </div>
 
-        {/* AI Match Rate */}
-        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/30 transition-all flex flex-col justify-between min-h-[136px] group shadow-sm">
+        {/* Available Inventory */}
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">AI Match Rate</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9A961]/10 text-[#C9A961] border border-[#C9A961]/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
-              <Sparkles className="h-5 w-5" />
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Available Inventory</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 border border-zinc-200 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+              <Building2 className="h-5 w-5" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-black text-[#C9A961] font-mono tracking-tight">
-              94.8%
+            <div className="text-2xl font-black text-indigo-600 font-mono tracking-tight">
+              {availableCount}
             </div>
-            <div className="text-[11px] text-[#C9A961]/90 font-medium mt-1.5">
-              Deterministic Ranking
+            <div className="text-[11px] text-indigo-600/90 font-medium mt-1.5">
+              Ready for Buyer Tours
             </div>
           </div>
         </div>
 
-        {/* Marketing Kits */}
-        <div className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/30 transition-all flex flex-col justify-between min-h-[136px] group shadow-sm">
+        {/* Pending / Escrow */}
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold text-[#9A9AA5] uppercase tracking-wider">Marketing Kits</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/25 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending / Escrow</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 border border-purple-100 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
               <Megaphone className="h-5 w-5" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-black text-[#F5F5F7] tracking-tight">
-              Ready
+            <div className="text-2xl font-black text-slate-900 tracking-tight">
+              {underContractCount}
             </div>
-            <div className="text-[11px] text-purple-400 font-medium mt-1.5">
-              Instant AI Generator
+            <div className="text-[11px] text-purple-600 font-medium mt-1.5">
+              Active Transactions Linked
             </div>
           </div>
         </div>
       </div>
 
       {/* ── Search Bar & Toolbar ── */}
-      <div className="glass-panel rounded-2xl p-3 bg-[#141418] border border-white/[0.08] flex items-center justify-between gap-4 shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6E6E7A]" />
+      <div className="rounded-2xl p-3 bg-white border border-slate-200/90 shadow-xs">
+        <div className="relative w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search listings by title, address, or city..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-[#101014] pl-10 pr-4 py-2 text-xs text-[#F5F5F7] placeholder-[#5E5E6C] focus:border-[#C9A961]/70 focus:ring-2 focus:ring-[#C9A961]/20 focus:outline-none transition-all"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none transition-all"
           />
         </div>
-        <button className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#181820] hover:bg-[#20202A] text-[#F5F5F7] px-3.5 py-2 text-xs font-semibold hover:border-[#C9A961]/40 transition-all cursor-pointer">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-[#C9A961]" />
-          <span>Filter Options</span>
-        </button>
       </div>
 
       {/* ── Content States ── */}
       {loading ? (
-        <div className="glass-panel rounded-2xl bg-[#141418] border border-white/[0.08] flex flex-col items-center justify-center py-20 text-xs text-[#9A9AA5] shadow-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-[#C9A961] mb-3" />
+        <div className="rounded-2xl bg-white border border-slate-200/90 flex flex-col items-center justify-center py-20 text-xs text-slate-500 shadow-xs">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-900 mb-3" />
           <span>Loading MLS property inventory...</span>
         </div>
       ) : error ? (
@@ -245,13 +254,13 @@ export function PropertiesPage() {
           <span>{error}</span>
         </div>
       ) : properties.length === 0 ? (
-        <div className="glass-panel rounded-2xl bg-[#141418] border border-dashed border-white/15 p-12 text-center">
-          <Building2 className="h-12 w-12 text-[#C9A961]/50 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-[#F5F5F7]">No properties in inventory</h3>
-          <p className="text-xs text-[#9A9AA5] mt-1 max-w-sm mx-auto">
+        <div className="rounded-2xl bg-white border border-dashed border-slate-200 p-12 text-center shadow-xs">
+          <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-slate-900">No properties in inventory</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             Add your first real estate listing to enable AI matching and automated CMA valuation.
           </p>
-          <button onClick={() => setShowAddModal(true)} className="btn-stripe-primary mt-4 text-xs">
+          <button onClick={() => setShowAddModal(true)} className="btn-stripe-primary mt-4 text-xs bg-slate-900 hover:bg-slate-800 text-white">
             <Plus className="h-3.5 w-3.5" /> Add First Listing
           </button>
         </div>
@@ -260,50 +269,51 @@ export function PropertiesPage() {
           {properties.map((p) => (
             <div
               key={p.id}
-              className="glass-panel rounded-2xl p-5 bg-[#141418] border border-white/[0.08] hover:border-[#C9A961]/40 flex flex-col justify-between transition-all duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] group"
+              className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-lg flex flex-col justify-between transition-all duration-200 group shadow-xs"
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3.5">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-[#F5F5F7] group-hover:text-[#C9A961] transition-colors truncate">
+                    <h3 className="text-sm font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
                       {p.title}
                     </h3>
-                    <div className="text-xs text-[#9A9AA5] flex items-center gap-1.5 mt-1 truncate">
-                      <MapPin className="h-3.5 w-3.5 text-[#C9A961] shrink-0" />
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 truncate">
+                      <MapPin className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
                       <span className="truncate">{p.address}, {p.city}</span>
                     </div>
                   </div>
-                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${p.status === 'AVAILABLE'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                    : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
-                    }`}>
+                  <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${
+                    p.status === 'AVAILABLE'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
                     {p.status}
                   </span>
                 </div>
 
-                <div className="rounded-xl bg-[#101014] p-3.5 border border-white/[0.06] space-y-2.5 text-xs my-3.5 shadow-2xs">
+                <div className="rounded-xl bg-slate-50/80 p-3.5 border border-slate-100 space-y-2.5 text-xs my-3.5">
                   <div className="flex items-center justify-between font-bold">
-                    <span className="flex items-center gap-1.5 text-[#9A9AA5] text-xs font-medium">
-                      <IndianRupee className="h-3.5 w-3.5 text-[#C9A961]" /> Asking Price:
+                    <span className="flex items-center gap-1.5 text-slate-600 text-xs font-semibold">
+                      <Tag className="h-3.5 w-3.5 text-emerald-700" /> Asking Price:
                     </span>
                     <div className="text-right">
-                      <span className="text-base font-extrabold text-emerald-400 font-mono tracking-tight" title={formatIndianPriceFull(p.price)}>
-                        {formatIndianPrice(p.price)}
+                      <span className="text-base font-extrabold text-emerald-700 font-mono tracking-tight" title={formatPropertyPriceFull(p.price, p.city)}>
+                        {formatPropertyPrice(p.price, p.city)}
                       </span>
-                      <span className="block text-[10px] text-[#6E6E7A] font-mono">
-                        {formatIndianPriceFull(p.price)}
+                      <span className="block text-[10px] text-slate-500 font-mono">
+                        {formatPropertyPriceFull(p.price, p.city)}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[#9A9AA5] pt-2 border-t border-white/[0.06] text-xs">
-                    <span className="flex items-center gap-1.5 font-medium text-[#F5F5F7]">
-                      <BedDouble className="h-3.5 w-3.5 text-[#C9A961]" /> {p.bedrooms} Beds
+                  <div className="flex items-center justify-between text-slate-500 pt-2 border-t border-slate-100 text-xs">
+                    <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                      <BedDouble className="h-3.5 w-3.5 text-emerald-700" /> {p.bedrooms} Beds
                     </span>
-                    <span className="flex items-center gap-1.5 font-medium text-[#F5F5F7]">
-                      <Bath className="h-3.5 w-3.5 text-[#C9A961]" /> {p.bathrooms} Baths
+                    <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                      <Bath className="h-3.5 w-3.5 text-emerald-700" /> {p.bathrooms} Baths
                     </span>
-                    <span className="font-semibold text-[#C9A961] bg-[#181820] px-2 py-0.5 rounded-md border border-[#C9A961]/25 text-[10px] uppercase font-mono tracking-wide">
+                    <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 text-[10px] uppercase font-mono tracking-wide shadow-2xs">
                       {p.propertyType}
                     </span>
                   </div>
@@ -313,25 +323,25 @@ export function PropertiesPage() {
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     onClick={() => setSelectedMarketingProperty(p)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#181820] text-[#F5F5F7] hover:bg-[#20202A] hover:border-[#C9A961]/40 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
-                    <Megaphone className="h-3.5 w-3.5 text-[#C9A961]" />
+                    <Megaphone className="h-3.5 w-3.5 text-purple-600" />
                     <span>Marketing Kit</span>
                   </button>
                   <button
                     onClick={() => setSelectedCmaProperty(p)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#181820] text-[#F5F5F7] hover:bg-[#20202A] hover:border-emerald-500/40 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                   >
-                    <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+                    <BarChart3 className="h-3.5 w-3.5 text-emerald-600" />
                     <span>CMA Valuation</span>
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3.5 pt-2.5 border-t border-white/[0.06] text-[10px] text-[#6E6E7A] flex items-center justify-between font-mono">
+              <div className="mt-3.5 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between font-mono">
                 <span>ID: {p.id.slice(-8)}</span>
-                <span className="text-[#C9A961] font-semibold flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-[#C9A961]" /> Verified MLS
+                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3 text-emerald-700" /> Verified MLS
                 </span>
               </div>
             </div>
@@ -358,123 +368,130 @@ export function PropertiesPage() {
       )}
 
       {/* ── Add Property Modal ── */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#141418] p-6 border border-white/10 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-              <h2 className="text-base font-bold text-[#F5F5F7] flex items-center gap-2">
-                <Building2 className="h-4.5 w-4.5 text-[#C9A961]" />
-                Add Property Listing to Inventory
-              </h2>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-[#6E6E7A] hover:text-[#F5F5F7] transition-colors p-1 rounded-lg hover:bg-white/5 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateProperty} className="space-y-3.5 text-xs">
-              <div>
-                <label className="label-base">Listing Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Modern Downtown Penthouse"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input-base"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-base">Address *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="100 Main St"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="input-base"
-                  />
-                </div>
-                <div>
-                  <label className="label-base">City *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Downtown"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="input-base"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="label-base">Price (₹ INR) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="21500000 (e.g. ₹2.15 Cr)"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
-                    className="input-base font-mono"
-                  />
-                  {typeof price === 'number' && price > 0 && (
-                    <span className="text-[11px] text-[#C9A961] font-mono mt-1 block">
-                      Preview: {formatIndianPrice(price)} ({formatIndianPriceFull(price)})
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <label className="label-base">Bedrooms *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="3"
-                    value={bedrooms}
-                    onChange={(e) => setBedrooms(e.target.value ? Number(e.target.value) : '')}
-                    className="input-base font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="label-base">Type</label>
-                  <select
-                    value={propertyType}
-                    onChange={(e) => setPropertyType(e.target.value)}
-                    className="input-base"
-                  >
-                    <option value="CONDO" className="bg-[#141418] text-[#F5F5F7]">Condo</option>
-                    <option value="SINGLE_FAMILY" className="bg-[#141418] text-[#F5F5F7]">Single Family</option>
-                    <option value="TOWNHOUSE" className="bg-[#141418] text-[#F5F5F7]">Townhouse</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-white/10">
+      {showAddModal &&
+        createPortal(
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowAddModal(false);
+            }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto"
+          >
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 border border-slate-200 shadow-2xl space-y-4 my-auto relative">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="h-4.5 w-4.5 text-emerald-700" />
+                  Add Property Listing to Inventory
+                </h2>
                 <button
-                  type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="btn-stripe-secondary text-xs"
+                  className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn-stripe-primary text-xs"
-                >
-                  {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Save Listing
+                  ✕
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+              <form onSubmit={handleCreateProperty} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Listing Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Modern Downtown Penthouse"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Address *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="100 Main St"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">City *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Downtown"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Price ($ USD) *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="1250000 (e.g. $1.25M)"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    />
+                    {typeof price === 'number' && price > 0 && (
+                      <span className="text-[11px] text-emerald-700 font-mono mt-1 block">
+                        Preview: {formatPropertyPrice(price, city)} ({formatPropertyPriceFull(price, city)})
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Bedrooms *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="3"
+                      value={bedrooms}
+                      onChange={(e) => setBedrooms(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                    <select
+                      value={propertyType}
+                      onChange={(e) => setPropertyType(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    >
+                      <option value="CONDO">Condo</option>
+                      <option value="SINGLE_FAMILY">Single Family</option>
+                      <option value="TOWNHOUSE">Townhouse</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="rounded-xl bg-[#0A0A0A] px-4 py-2 text-xs font-bold text-white hover:bg-black transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Save Listing
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* ── CSV Import Modal ── */}
       <CsvImportModal

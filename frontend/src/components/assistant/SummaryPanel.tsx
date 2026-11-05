@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileText,
-  Sparkles,
   Copy,
   Check,
   Download,
@@ -26,7 +25,7 @@ export function SummaryPanel({ summary, loading }: Props) {
 
   if (loading || !summary) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#141418] p-6 animate-pulse space-y-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 animate-pulse space-y-3">
         <div className="h-4 bg-white/10 rounded w-1/3"></div>
         <div className="h-16 bg-white/5 rounded-xl"></div>
         <div className="h-32 bg-white/5 rounded-xl"></div>
@@ -49,7 +48,7 @@ export function SummaryPanel({ summary, loading }: Props) {
   healthScore = Math.max(20, Math.min(100, healthScore));
 
   const gaugeColor =
-    healthScore >= 80 ? 'text-emerald-400' : healthScore >= 60 ? 'text-[#C9A961]' : 'text-rose-400';
+    healthScore >= 80 ? 'text-emerald-500' : healthScore >= 60 ? 'text-amber-500' : 'text-rose-500';
 
   const generateMarkdownBrief = () => {
     return `# TRANSACTION EXECUTIVE BRIEF
@@ -105,7 +104,7 @@ ${
   return (
     <div className="space-y-4">
       {/* Top Health Gauge & Action Bar */}
-      <div className="flex items-center justify-between gap-3 p-4 bg-[#16161D] rounded-2xl border border-white/10 shadow-lg">
+      <div className="flex items-center justify-between gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 shadow-lg">
         <div className="flex items-center gap-3.5">
           {/* Circular Progress Gauge */}
           <div className="relative flex h-12 w-12 items-center justify-center shrink-0">
@@ -133,7 +132,7 @@ ${
               />
             </svg>
             <div className="absolute flex flex-col items-center justify-center text-center">
-              <span className="text-xs font-bold tracking-tight text-[#F5F5F7] leading-none font-mono">
+              <span className="text-xs font-bold tracking-tight text-slate-800 leading-none font-mono">
                 {healthScore}
               </span>
             </div>
@@ -141,7 +140,7 @@ ${
 
           <div>
             <div className="flex items-center gap-1.5">
-              <h4 className="text-xs font-bold text-[#F5F5F7]">
+              <h4 className="text-xs font-bold text-slate-800">
                 Transaction Health Score
               </h4>
               <Badge variant="neutral" className="text-[10px] px-1.5 py-0 bg-[#34D399]/15 text-[#34D399] border-[#34D399]/25">
@@ -149,7 +148,7 @@ ${
                 Audited
               </Badge>
             </div>
-            <p className="text-[11px] text-[#9A9AA5] mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               {healthScore >= 80
                 ? 'High compliance — low risk detected'
                 : 'Attention needed on unverified terms'}
@@ -161,18 +160,18 @@ ${
           variant="outline"
           size="xs"
           onClick={() => setShowBriefModal(true)}
-          className="shrink-0 h-8 px-3 text-xs border-white/10 hover:border-[#C9A961]/40"
+          className="shrink-0 h-8 px-3 text-xs border-slate-200 hover:border-slate-300"
         >
-          <FileText className="h-3.5 w-3.5 mr-1.5 text-[#C9A961]" />
+          <FileText className="h-3.5 w-3.5 mr-1.5 text-slate-700" />
           <span>Export Brief</span>
         </Button>
       </div>
 
       {/* Executive Summary */}
-      <div className="rounded-2xl border border-white/10 bg-[#121217] p-4 space-y-2">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
         <div className="flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-[#C9A961]" />
-          <h3 className="text-xs font-bold text-[#F5F5F7] uppercase tracking-wider">
+          <FileText className="h-3.5 w-3.5 text-slate-700" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Executive Brief
           </h3>
         </div>
@@ -183,10 +182,10 @@ ${
 
       {/* Risk Matrix */}
       {summary.riskMatrix.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-[#141418] p-4 space-y-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-            <h3 className="text-xs font-bold text-[#F5F5F7] uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Identified Risks ({summary.riskMatrix.length})
             </h3>
           </div>
@@ -207,7 +206,7 @@ ${
                     {risk.severity}
                   </Badge>
                 </div>
-                <p className="mt-1 text-[#9A9AA5] text-[11px] leading-relaxed">{risk.description}</p>
+                <p className="mt-1 text-slate-500 text-[11px] leading-relaxed">{risk.description}</p>
               </div>
             ))}
           </div>
@@ -215,18 +214,18 @@ ${
       )}
 
       {/* Contingency Matrix */}
-      <div className="rounded-2xl border border-white/10 bg-[#141418] overflow-hidden">
-        <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-[#121217]">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-[#121217]">
           <div>
-            <h3 className="text-xs font-bold text-[#F5F5F7] uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Contingency Milestones ({summary.contingencyMatrix.length})
             </h3>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-[#9A9AA5]">
-            <thead className="bg-[#101014] text-[#F5F5F7] border-b border-white/10 text-[11px]">
+          <table className="w-full text-left text-xs text-slate-500">
+            <thead className="bg-slate-50 text-slate-800 border-b border-slate-200 text-[11px]">
               <tr>
                 <th className="py-2.5 px-3.5 font-semibold">Contingency</th>
                 <th className="py-2.5 px-3.5 font-semibold">Target Date</th>
@@ -237,9 +236,9 @@ ${
             <tbody className="divide-y divide-white/5">
               {summary.contingencyMatrix.map((item, idx) => (
                 <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-2.5 px-3.5 font-semibold text-[#F5F5F7]">{item.label}</td>
-                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-[#C9A961] font-medium">{item.targetDate}</td>
-                  <td className="py-2.5 px-3.5 text-[#9A9AA5] truncate max-w-[140px] text-[11px]">
+                  <td className="py-2.5 px-3.5 font-semibold text-slate-800">{item.label}</td>
+                  <td className="py-2.5 px-3.5 font-mono text-[11px] text-emerald-700 font-semibold">{item.targetDate}</td>
+                  <td className="py-2.5 px-3.5 text-slate-500 truncate max-w-[140px] text-[11px]">
                     {item.sourceDocument ? (
                       <span>
                         {item.sourceDocument} {item.pageNumber ? `(P.${item.pageNumber})` : ''}
@@ -262,32 +261,32 @@ ${
 
       {/* Export Executive Brief Modal */}
       {showBriefModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#141418] rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-white/10">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-[#16161D]">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#C9A961]" />
-                <h3 className="text-sm font-bold text-[#F5F5F7]">Executive Deal Brief</h3>
+                <FileText className="h-4 w-4 text-slate-800" />
+                <h3 className="text-sm font-bold text-slate-800">Executive Deal Brief</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowBriefModal(false)}
-                className="text-[#6E6E7A] hover:text-[#F5F5F7] cursor-pointer transition-colors p-1"
+                className="text-slate-400 hover:text-slate-800 cursor-pointer transition-colors p-1"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-              <div className="p-3.5 bg-[#0E0E12] text-[#D0D0D8] rounded-xl border border-white/10 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-all">
+              <div className="p-3.5 bg-[#0E0E12] text-[#D0D0D8] rounded-xl border border-slate-200 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-all">
                 {generateMarkdownBrief()}
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#16161D] border-t border-white/10">
-              <span className="text-[11px] text-[#9A9AA5]">Ready to export or distribute</span>
+            <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-t border-slate-200">
+              <span className="text-[11px] text-slate-500">Ready to export or distribute</span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="xs" onClick={handleDownloadBrief} className="border-white/10">
+                <Button variant="outline" size="xs" onClick={handleDownloadBrief} className="border-slate-200">
                   <Download className="h-3 w-3 mr-1" />
                   <span>Download .md</span>
                 </Button>

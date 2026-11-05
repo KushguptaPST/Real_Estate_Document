@@ -7,8 +7,17 @@ interface AuthState {
   user: User | null;
   /** True while an existing session token is being validated on first load. */
   loading: boolean;
+  registerOrg: (data: {
+    ownerName: string;
+    email: string;
+    password?: string;
+    organizationName: string;
+    stateJurisdiction?: string;
+    planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+  }) => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (credential: string, inviteToken?: string) => Promise<void>;
-  signInAsDemoAgent: () => Promise<void>;
+  signInAsDemoAgent: (role?: 'AGENT' | 'OWNER') => Promise<void>;
   signOut: () => void;
 }
 
@@ -29,14 +38,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => onUnauthorized(() => setUser(null)), []);
 
+  const registerOrg = useCallback(async (data: {
+    ownerName: string;
+    email: string;
+    password?: string;
+    organizationName: string;
+    stateJurisdiction?: string;
+    planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+  }) => {
+    const session = await authApi.registerOrg(data);
+    setToken(session.token);
+    setUser(session.user);
+  }, []);
+
+  const loginWithPassword = useCallback(async (email: string, password: string) => {
+    const session = await authApi.loginWithPassword({ email, password });
+    setToken(session.token);
+    setUser(session.user);
+  }, []);
+
   const signInWithGoogle = useCallback(async (credential: string, inviteToken?: string) => {
     const session = await authApi.signInWithGoogle(credential, inviteToken);
     setToken(session.token);
     setUser(session.user);
   }, []);
 
-  const signInAsDemoAgent = useCallback(async () => {
-    const session = await authApi.signInAsDemoAgent();
+  const signInAsDemoAgent = useCallback(async (role?: 'AGENT' | 'OWNER') => {
+    const session = await authApi.signInAsDemoAgent(role);
     setToken(session.token);
     setUser(session.user);
   }, []);
@@ -48,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, signInWithGoogle, signInAsDemoAgent, signOut }),
-    [user, loading, signInWithGoogle, signInAsDemoAgent, signOut],
+    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, signOut }),
+    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
