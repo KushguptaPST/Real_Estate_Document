@@ -107,7 +107,7 @@ router.post(
       data: {
         leadId: lead.id,
         organizationId: orgId,
-        callerId: req.user!.id,
+        userId: req.user!.id,
         direction: 'OUTBOUND',
         outcome: 'CONNECTED',
         durationSeconds: 120,
@@ -152,7 +152,7 @@ router.post(
       data: {
         leadId,
         organizationId: orgId,
-        callerId: req.user!.id,
+        userId: req.user!.id,
         direction: 'OUTBOUND',
         outcome: 'CONNECTED',
         durationSeconds: 180,

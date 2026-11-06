@@ -90,12 +90,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Resolve tenant organization
-    const metaPhoneId = change?.metadata?.phone_number_id;
     let orgId = process.env['DEFAULT_ORG_ID'] || 'demo-sandbox-org';
 
-    if (metaPhoneId) {
+    if (!process.env['DEFAULT_ORG_ID']) {
       const tenantOrg = await prisma.organization.findFirst({
-        where: { metaPhoneNumberId: metaPhoneId },
         select: { id: true },
       });
       if (tenantOrg) {
