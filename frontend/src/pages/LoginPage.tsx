@@ -189,20 +189,29 @@ export function LoginPage() {
 
             {/* Google SSO Container (rendered only if client ID configured) */}
             {CLIENT_ID && (
-              <div className="flex min-h-[44px] w-full flex-col justify-center items-center overflow-hidden">
-                {signingIn && (
-                  <div className="flex items-center justify-center gap-2 rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-700 w-full">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-900" />
-                    <span>Signing in...</span>
-                  </div>
-                )}
-                <div
-                  ref={buttonRef}
-                  className={`flex w-full justify-center overflow-hidden ${
-                    signingIn ? 'hidden' : 'block'
-                  }`}
-                />
-              </div>
+              <>
+                <div className="flex min-h-[44px] w-full flex-col justify-center items-center overflow-hidden">
+                  {signingIn && (
+                    <div className="flex items-center justify-center gap-2 rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-700 w-full">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-900" />
+                      <span>Signing in...</span>
+                    </div>
+                  )}
+                  <div
+                    ref={buttonRef}
+                    className={`flex w-full justify-center overflow-hidden ${
+                      signingIn ? 'hidden' : 'block'
+                    }`}
+                  />
+                </div>
+
+                <div className="relative flex items-center justify-center pt-1 pb-1">
+                  <div className="w-full border-t border-zinc-200" />
+                  <span className="absolute bg-white px-3 text-[11px] font-medium text-zinc-400">
+                    or continue with email
+                  </span>
+                </div>
+              </>
             )}
 
             {/* Standard Login Form */}
