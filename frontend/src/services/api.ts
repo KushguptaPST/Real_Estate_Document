@@ -385,7 +385,7 @@ export const conversationsApi = {
 // ── Feature 3: Property Inventory & Matcher API ──────────────────────────────
 
 export const propertiesApi = {
-  list: (params?: { search?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string }) => {
+  list: (params?: { search?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string; status?: string }) => {
     const cleanParams: Record<string, string> = {};
     if (params) {
       Object.entries(params).forEach(([k, v]) => {

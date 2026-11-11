@@ -228,14 +228,18 @@ export async function getProperties(params: {
   maxPrice?: number;
   bedrooms?: number;
   city?: string;
+  status?: string;
   organizationId: string;
 }) {
-  const { search, minPrice, maxPrice, bedrooms, city, organizationId } = params;
+  const { search, minPrice, maxPrice, bedrooms, city, status, organizationId } = params;
 
   const andConditions: any[] = [
     { organizationId },
-    { status: 'AVAILABLE' },
   ];
+
+  if (status && status !== 'ALL') {
+    andConditions.push({ status });
+  }
 
   if (minPrice != null && minPrice > 0) {
     andConditions.push({ price: { gte: minPrice } });

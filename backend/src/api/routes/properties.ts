@@ -19,7 +19,7 @@ const CreatePropertySchema = z.object({
   address: z.string().min(1, 'Address is required'),
   city: z.string().min(1, 'City is required'),
   price: z.number().positive('Price must be greater than 0'),
-  bedrooms: z.number().int().min(1, 'Bedrooms must be between 1 and 3').max(3, 'Bedrooms must be between 1 and 3'),
+  bedrooms: z.number().int().min(1, 'Bedrooms must be at least 1').max(20, 'Bedrooms must be a realistic number'),
   bathrooms: z.number().min(0),
   propertyType: z.string().min(1),
   status: z.enum(['AVAILABLE', 'UNDER_CONTRACT', 'SOLD', 'OFF_MARKET']).optional(),
@@ -38,6 +38,7 @@ router.get(
     const maxPrice = req.query['maxPrice'] ? Number(req.query['maxPrice']) : undefined;
     const bedrooms = req.query['bedrooms'] ? Number(req.query['bedrooms']) : undefined;
     const city = req.query['city'] as string | undefined;
+    const status = req.query['status'] as string | undefined;
 
     const properties = await getProperties({
       search,
@@ -45,6 +46,7 @@ router.get(
       maxPrice,
       bedrooms,
       city,
+      status,
       organizationId: orgId,
     });
     res.json(properties);
