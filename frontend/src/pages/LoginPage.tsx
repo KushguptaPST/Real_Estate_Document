@@ -17,7 +17,7 @@ import {
 import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
-const CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'];
+const CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] || import.meta.env['GOOGLE_CLIENT_ID'];
 
 export function LoginPage() {
   const { signInWithGoogle, loginWithPassword } = useAuth();
