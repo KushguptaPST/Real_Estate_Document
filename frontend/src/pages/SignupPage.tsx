@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { billingApi } from '@/services/api';
+import { billingApi, authApi } from '@/services/api';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 const JURISDICTIONS = [
   {
@@ -115,6 +116,7 @@ export function SignupPage() {
   const [isAnnual, setIsAnnual] = useState(true);
   const [selectedJurisdiction, setSelectedJurisdiction] = useState('KA');
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -156,8 +158,26 @@ export function SignupPage() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && validateStep1()) {
+      try {
+        setCheckingEmail(true);
+        const res = await authApi.checkEmail(formData.email.trim());
+        if (res.exists) {
+          setErrors({
+            email: 'An account with this email address already exists. Please log in.',
+          });
+          toast.warning(
+            'This email is already registered. Please sign in to your existing account.',
+            'Account Exists',
+          );
+          return;
+        }
+      } catch (err) {
+        // network fallback
+      } finally {
+        setCheckingEmail(false);
+      }
       setStep(2);
     } else if (step === 2 && validateStep2()) {
       setStep(3);
@@ -221,18 +241,15 @@ export function SignupPage() {
     <div className="relative min-h-screen bg-[#FFFFFF] text-[#0A0A0A] font-sans flex flex-col justify-between">
       {/* ── Top Pinned Header ── */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-[#E5E7EB]">
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0A0A0A] text-white shadow-xs group-hover:scale-105 transition-transform">
-            <Building2 className="h-4.5 w-4.5 text-white" />
-          </div>
-          <div>
-            <span className="text-sm font-bold tracking-tight text-[#0A0A0A] block leading-none">
-              Contingency Copilot
-            </span>
-            <span className="text-[10px] text-zinc-500 font-medium block mt-0.5">
-              Brokerage Workspace Onboarding
-            </span>
-          </div>
+        <Link to="/" className="flex items-center gap-3 group py-1">
+          <img
+            src="/brand/eigen-estate-full.png"
+            alt="EigenEstate"
+            className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
+          />
+          <span className="hidden sm:inline-block text-[11px] text-zinc-400 font-medium pl-3 border-l border-zinc-200">
+            Brokerage Workspace Onboarding
+          </span>
         </Link>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-zinc-500 hidden sm:inline">Already have a brokerage account?</span>
@@ -366,7 +383,19 @@ export function SignupPage() {
                       }`}
                     />
                   </div>
-                  {errors.email && <p className="text-[11px] text-red-600 mt-1">{errors.email}</p>}
+                  {errors.email && (
+                    <div className="mt-1.5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+                      <span className="text-[11px] font-medium">{errors.email}</span>
+                      {errors.email.toLowerCase().includes('already exists') && (
+                        <Link
+                          to={`/login?email=${encodeURIComponent(formData.email.trim())}`}
+                          className="inline-flex items-center gap-1 font-bold text-slate-900 hover:underline px-2.5 py-1 rounded-lg bg-amber-200/80 text-[11px] shrink-0"
+                        >
+                          Sign In &rarr;
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -416,10 +445,20 @@ export function SignupPage() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 bg-[#0A0A0A] hover:bg-zinc-800 text-white font-semibold text-xs shadow-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                  disabled={checkingEmail}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 bg-[#0A0A0A] hover:bg-zinc-800 text-white font-semibold text-xs shadow-xs transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
                 >
-                  <span>Continue to Brokerage Profile</span>
-                  <ArrowRight className="h-4 w-4" />
+                  {checkingEmail ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Checking email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue to Brokerage Profile</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -451,7 +490,7 @@ export function SignupPage() {
                       type="text"
                       value={formData.organizationName}
                       onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                      placeholder="e.g. Prestige Estates, Sobha Realty, or Apex Channel Partners"
+                      placeholder="e.g. Eigen Estate, Prestige Realty, or Apex Advisory"
                       className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
                         errors.organizationName ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
                       }`}
@@ -625,6 +664,30 @@ export function SignupPage() {
                 })}
               </div>
 
+              {/* Inline Error & Sign In Action Banner */}
+              {errors.form && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-900 space-y-2.5">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>{errors.form}</span>
+                  </div>
+                  {errors.form.toLowerCase().includes('already exists') && (
+                    <div className="pt-2 border-t border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <span className="text-[11px] text-rose-700">
+                        An account is already registered with <strong>{formData.email}</strong>.
+                      </span>
+                      <Link
+                        to={`/login?email=${encodeURIComponent(formData.email)}`}
+                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#0A0A0A] hover:bg-black text-white font-bold text-xs shadow-xs transition-all shrink-0 cursor-pointer"
+                      >
+                        <span>Sign In to Existing Account</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Bottom Submit Actions */}
               <div className="pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <button
@@ -673,7 +736,7 @@ export function SignupPage() {
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 text-center text-xs text-zinc-400 border-t border-[#E5E7EB]">
-        <span>&copy; {new Date().getFullYear()} Contingency Copilot Inc. &bull; AES-256 Vault &bull; SOC2 Type II Certified</span>
+        <span>&copy; {new Date().getFullYear()} Eigen Estate Inc. &bull; eigenestate.com &bull; AES-256 Vault &bull; SOC2 Type II Certified</span>
       </footer>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -85,13 +86,21 @@ export function PropertyDetailModal({
       ? property.features
       : defaultAmenities;
 
-  return (
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-[#141418] rounded-2xl border border-white/10 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+      <div
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+        className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 select-none"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl border border-slate-200/90 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 select-text"
+        >
           
           {/* Header */}
-          <div className="p-6 bg-[#181820] text-white flex items-center justify-between border-b border-white/10">
+          <div className="p-6 bg-slate-50/80 text-slate-900 flex items-center justify-between border-b border-slate-100">
             <div className="min-w-0 pr-4">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <Badge variant="gold" className="text-[10px] tracking-wide uppercase font-mono">
@@ -100,22 +109,22 @@ export function PropertyDetailModal({
                 <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${statusColor}`}>
                   {property.status.replace(/_/g, ' ')}
                 </span>
-                <span className="text-[10px] text-[#6E6E7A] font-mono">
+                <span className="text-[10px] text-slate-400 font-mono">
                   ID: {property.id.slice(-8)}
                 </span>
               </div>
-              <h2 className="text-lg font-bold text-[#F5F5F7] truncate">
+              <h2 className="text-lg font-bold text-slate-900 truncate">
                 {property.title}
               </h2>
-              <div className="text-xs text-[#9A9AA5] flex items-center gap-1.5 mt-1">
-                <MapPin className="h-3.5 w-3.5 text-[#C9A961] shrink-0" />
+              <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span className="truncate">{property.address}, {property.city}</span>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="text-[#6E6E7A] hover:text-[#F5F5F7] p-1.5 rounded-xl hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
               aria-label="Close modal"
             >
               <X className="h-5 w-5" />
@@ -128,52 +137,52 @@ export function PropertyDetailModal({
             {/* Key Valuation & Specs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Asking Price */}
-              <div className="p-4 rounded-xl bg-[#101014] border border-white/[0.08] shadow-sm">
-                <div className="text-[10px] font-mono text-[#9A9AA5] uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <IndianRupee className="h-3.5 w-3.5 text-[#C9A961]" /> Asking Price
+              <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <IndianRupee className="h-3.5 w-3.5 text-emerald-600" /> Asking Price
                 </div>
-                <div className="text-xl font-black text-emerald-400 font-mono tracking-tight" title={formatIndianPriceFull(property.price)}>
+                <div className="text-xl font-black text-emerald-700 font-mono tracking-tight" title={formatIndianPriceFull(property.price)}>
                   {formatIndianPrice(property.price)}
                 </div>
-                <div className="text-[10px] text-[#6E6E7A] font-mono mt-0.5 truncate">
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
                   {formatIndianPriceFull(property.price)}
                 </div>
               </div>
 
               {/* Space & Bed/Bath */}
-              <div className="p-4 rounded-xl bg-[#101014] border border-white/[0.08] shadow-sm">
-                <div className="text-[10px] font-mono text-[#9A9AA5] uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <Maximize2 className="h-3.5 w-3.5 text-[#C9A961]" /> Layout & Space
+              <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <Maximize2 className="h-3.5 w-3.5 text-slate-500" /> Layout & Space
                 </div>
-                <div className="text-lg font-black text-[#F5F5F7] font-mono tracking-tight">
+                <div className="text-lg font-black text-slate-900 font-mono tracking-tight">
                   {property.bedrooms} Beds · {property.bathrooms} Baths
                 </div>
-                <div className="text-[10px] text-[#9A9AA5] font-mono mt-0.5">
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   ~{estSqFt.toLocaleString()} sq ft (₹{pricePerSqFt.toLocaleString()}/sqft)
                 </div>
               </div>
 
               {/* Status / Compliance */}
-              <div className="p-4 rounded-xl bg-[#101014] border border-white/[0.08] shadow-sm">
-                <div className="text-[10px] font-mono text-[#9A9AA5] uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-blue-400" /> Verification
+              <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Verification
                 </div>
-                <div className="text-lg font-black text-[#F5F5F7] font-mono tracking-tight flex items-center gap-1.5">
-                  <span className="text-emerald-400">Verified MLS</span>
+                <div className="text-lg font-black text-slate-900 font-mono tracking-tight flex items-center gap-1.5">
+                  <span className="text-emerald-700">Verified MLS</span>
                 </div>
-                <div className="text-[10px] text-[#6E6E7A] font-mono mt-0.5">
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                   Clear Title · RERA Ready
                 </div>
               </div>
             </div>
 
             {/* Micro-market & Description */}
-            <div className="p-4 rounded-xl bg-[#101014] border border-white/[0.08] space-y-2">
-              <h3 className="text-xs font-semibold text-[#F5F5F7] flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5 text-[#C9A961]" />
+            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-2">
+              <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-slate-500" />
                 Property Overview & Micro-Market Insights
               </h3>
-              <p className="text-xs text-[#9A9AA5] leading-relaxed">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {property.description ||
                   `Premium ${property.bedrooms} BHK residential listing located in ${property.address}, ${property.city}. Positioned in a high-demand micro-market with robust connectivity to key transit corridors, tech hubs, and educational institutions.`}
               </p>
@@ -181,17 +190,17 @@ export function PropertyDetailModal({
 
             {/* Features & Amenities */}
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-[#F5F5F7] flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5 text-[#C9A961]" />
+              <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-slate-500" />
                 Highlights & Amenities
               </h3>
               <div className="flex flex-wrap gap-2">
                 {amenities.map((amenity, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#181820] border border-white/[0.06] text-xs text-[#9A9AA5]"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700"
                   >
-                    <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
                     <span>{amenity}</span>
                   </span>
                 ))}
@@ -200,7 +209,7 @@ export function PropertyDetailModal({
           </div>
 
           {/* Footer Action Bar */}
-          <div className="p-4 bg-[#181820] border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+          <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -208,9 +217,9 @@ export function PropertyDetailModal({
                   if (onOpenCma) onOpenCma(property);
                   else setShowLocalCma(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-[#141418] hover:bg-[#20202A] text-xs font-semibold text-[#F5F5F7] hover:border-emerald-500/40 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 hover:border-slate-300 transition-all cursor-pointer shadow-2xs"
               >
-                <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+                <BarChart3 className="h-3.5 w-3.5 text-emerald-600" />
                 <span>CMA Valuation</span>
               </button>
 
@@ -220,9 +229,9 @@ export function PropertyDetailModal({
                   if (onOpenMarketing) onOpenMarketing(property);
                   else setShowLocalMarketing(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-[#141418] hover:bg-[#20202A] text-xs font-semibold text-[#F5F5F7] hover:border-[#C9A961]/40 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 hover:border-slate-300 transition-all cursor-pointer shadow-2xs"
               >
-                <Megaphone className="h-3.5 w-3.5 text-[#C9A961]" />
+                <Megaphone className="h-3.5 w-3.5 text-slate-600" />
                 <span>Marketing Kit</span>
               </button>
             </div>
@@ -234,7 +243,7 @@ export function PropertyDetailModal({
                   onClose();
                   navigate(`/upload?address=${encodeURIComponent(`${property.address}, ${property.city}`)}`);
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#C9A961] hover:bg-[#D4B572] text-[#0A0A0B] text-xs font-bold transition-all cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-2xs"
               >
                 <FileText className="h-3.5 w-3.5" />
                 <span>Ingest Contract PDF</span>
@@ -262,6 +271,7 @@ export function PropertyDetailModal({
           onClose={() => setShowLocalMarketing(false)}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 }

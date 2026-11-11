@@ -4,23 +4,23 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import {
   Building2,
-  ShieldCheck,
   Lock,
   Mail,
   AlertTriangle,
   Loader2,
-  UserCheck,
   ArrowRight,
   Eye,
   EyeOff,
   ArrowLeft,
+  UserCheck,
 } from 'lucide-react';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 const CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'];
 
 export function LoginPage() {
-  const { signInWithGoogle, loginWithPassword, signInAsDemoAgent } = useAuth();
+  const { signInWithGoogle, loginWithPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const buttonRef = useRef<HTMLDivElement>(null);
@@ -28,7 +28,6 @@ export function LoginPage() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
-  const [demoLoading, setDemoLoading] = useState<'AGENT' | 'OWNER' | null>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -102,23 +101,17 @@ export function LoginPage() {
     });
   }, [ready, signingIn]);
 
-  const handleDemoLogin = async (role: 'AGENT' | 'OWNER' = 'AGENT') => {
-    setDemoLoading(role);
-    setError(null);
-    try {
-      await signInAsDemoAgent(role);
-      navigate(from, { replace: true });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to initialize demo sandbox session';
-      setError(msg);
-    } finally {
-      setDemoLoading(null);
-    }
-  };
-
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || submittingPassword) return;
+    if (!email.trim()) {
+      setError('Please enter your work email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+    if (submittingPassword) return;
     setSubmittingPassword(true);
     setError(null);
     try {
@@ -142,13 +135,12 @@ export function LoginPage() {
 
       {/* ── Minimal Header ── */}
       <header className="relative z-10 w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0A0A0A] text-white shadow-2xs group-hover:scale-105 transition-transform">
-            <Building2 className="h-4.5 w-4.5 text-white" />
-          </div>
-          <span className="text-sm font-bold tracking-tight text-[#0A0A0A]">
-            Contingency Copilot
-          </span>
+        <Link to="/" className="flex items-center group py-1">
+          <img
+            src="/brand/eigen-estate-full.png"
+            alt="EigenEstate"
+            className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
+          />
         </Link>
 
         <Link
@@ -172,6 +164,13 @@ export function LoginPage() {
           <div className="rounded-3xl border border-zinc-200/90 bg-white p-7 sm:p-9 shadow-[0_20px_50px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] space-y-5">
             {/* Card Header: Short & Clean */}
             <div className="text-center space-y-1">
+              <div className="flex justify-center pb-2">
+                <img
+                  src="/brand/eigen-estate-full.png"
+                  alt="EigenEstate"
+                  className="h-8 w-auto object-contain"
+                />
+              </div>
               <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A]">
                 Welcome back
               </h1>
@@ -187,58 +186,6 @@ export function LoginPage() {
                 <span className="text-[11px] font-medium">Workspace Invitation Active</span>
               </div>
             )}
-
-            {/* ── 1-Click Instant Demo Sandbox ── */}
-            <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-3.5 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-zinc-900">Instant Demo Access</span>
-                </div>
-                <span className="text-[10px] font-medium text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
-                  No password needed
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('AGENT')}
-                  disabled={demoLoading !== null || signingIn}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 text-zinc-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {demoLoading === 'AGENT' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-900" />
-                  ) : (
-                    <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  )}
-                  <span>Demo Agent</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('OWNER')}
-                  disabled={demoLoading !== null || signingIn}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0A0A0A] hover:bg-zinc-800 text-white text-xs font-semibold shadow-2xs transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
-                >
-                  {demoLoading === 'OWNER' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-                  ) : (
-                    <ShieldCheck className="h-3.5 w-3.5 text-white" />
-                  )}
-                  <span>Broker Owner</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Subtle Divider */}
-            <div className="relative flex py-0.5 items-center">
-              <div className="flex-grow border-t border-zinc-200"></div>
-              <span className="flex-shrink mx-3 text-[10px] text-zinc-400 font-mono tracking-wider">
-                OR EMAIL
-              </span>
-              <div className="flex-grow border-t border-zinc-200"></div>
-            </div>
 
             {/* Google SSO Container (rendered only if client ID configured) */}
             {CLIENT_ID && (
@@ -259,7 +206,7 @@ export function LoginPage() {
             )}
 
             {/* Standard Login Form */}
-            <form onSubmit={handlePasswordLogin} className="space-y-3.5">
+            <form noValidate onSubmit={handlePasswordLogin} className="space-y-3.5">
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-zinc-700 block">
                   Email
@@ -269,10 +216,12 @@ export function LoginPage() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError(null);
+                    }}
                     placeholder="name@brokerage.com"
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50/50 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all"
-                    required
                   />
                 </div>
               </div>
@@ -284,7 +233,7 @@ export function LoginPage() {
                     href="#forgot"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Password reset link dispatched to your email.');
+                      setError('Contact your brokerage owner or administrator to reset your credentials.');
                     }}
                     className="text-[11px] text-zinc-500 hover:text-zinc-900 transition-colors"
                   >
@@ -296,10 +245,12 @@ export function LoginPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError(null);
+                    }}
                     placeholder="••••••••••••"
                     className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50/50 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all"
-                    required
                   />
                   <button
                     type="button"
@@ -377,7 +328,7 @@ export function LoginPage() {
 
       {/* ── Minimal Bottom Footer ── */}
       <footer className="relative z-10 w-full max-w-6xl mx-auto px-6 py-4 flex items-center justify-between text-xs text-zinc-400">
-        <span>&copy; {new Date().getFullYear()} Contingency Copilot</span>
+        <span>&copy; {new Date().getFullYear()} Eigen Estate Inc. &bull; eigenestate.com</span>
         <div className="flex items-center gap-4">
           <Link to="/pricing" className="hover:text-zinc-600 transition-colors">Pricing</Link>
           <Link to="/security" className="hover:text-zinc-600 transition-colors">Security</Link>

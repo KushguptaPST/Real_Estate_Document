@@ -192,6 +192,7 @@ export function CopilotDrawer({ isOpen, onClose, dealAddress }: Props) {
           {/* Input Footer */}
           <div className="border-t border-slate-800 bg-slate-950 p-3">
             <form
+              noValidate
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSend();

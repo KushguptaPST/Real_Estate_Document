@@ -452,7 +452,10 @@ export function LeadDetailPage() {
 
   async function handleTriggerTestCall(e: React.FormEvent) {
     e.preventDefault();
-    if (!testPhoneNumber.trim()) return;
+    if (!testPhoneNumber.trim()) {
+      toast.error('Mobile phone number is required');
+      return;
+    }
     try {
       setTestingCall(true);
       const res = await voiceApi.triggerTestCall(testPhoneNumber.trim());
@@ -690,7 +693,11 @@ export function LeadDetailPage() {
 
   async function handleScheduleVisit(e: React.FormEvent) {
     e.preventDefault();
-    if (!id || !visitStartAt) return;
+    if (!id) return;
+    if (!visitStartAt) {
+      setVisitFormError('Please select a start date and time for the visit');
+      return;
+    }
     try {
       setSchedulingVisit(true);
       setVisitFormError(null);
@@ -727,6 +734,10 @@ export function LeadDetailPage() {
   async function handleRescheduleVisit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedVisit) return;
+    if (!rescheduleStartAt) {
+      setRescheduleError('Please select a new date and time');
+      return;
+    }
     try {
       setRescheduling(true);
       setRescheduleError(null);
@@ -1007,6 +1018,10 @@ export function LeadDetailPage() {
   async function handleConfirmReassign(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
+    if (!targetAdvisorId) {
+      toast.error('Please select a target advisor');
+      return;
+    }
     try {
       setReassigning(true);
       setActionFeedback(null);
@@ -1602,401 +1617,14 @@ export function LeadDetailPage() {
               Reassign Advisor
             </button>
           )}
-
-          {/* AI Voice Agent Outbound Call Trigger */}
-          <button
-            onClick={handleTriggerOutboundCall}
-            disabled={dispatchingCall || !lead.phone}
-            className="px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs bg-[#0A0A0A] hover:bg-slate-800 text-white disabled:opacity-50 transition-all cursor-pointer"
-            title={lead.phone ? `Dispatch AI Voice Agent call to ${lead.phone}` : 'No phone number for this lead'}
-          >
-            {dispatchingCall ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <PhoneCall className="h-3.5 w-3.5" />
-            )}
-            Call Lead (AI Voice)
-          </button>
-
-          {/* Test AI Voice Agent on My Cell Phone */}
-          <button
-            onClick={() => {
-              setTestPhoneNumber(lead.phone || '');
-              setShowTestCallModal(true);
-            }}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-all cursor-pointer shadow-2xs"
-            title="Interactive test dialer: rings your personal cell phone to test voice latency & negotiation"
-          >
-            <Bot className="h-3.5 w-3.5 text-purple-600" />
-            Test Voice Call
-          </button>
         </div>
       </div>
 
-      {/* ── 3-Column Layout: Requirements | Conversation | Inventory Matches ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* ── 2-Column Responsive Workspace: Conversation & Inventory (Left 7 Cols) | Requirements & Tasks (Right 5 Cols) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-        {/* ── Left Column: Editable Requirements (4 Cols) ── */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs">
-            <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-              <Bot className="h-4 w-4 text-emerald-700" />
-              Structured Requirements
-            </h2>
-
-            {(() => {
-              const pendingReqProposals = memoryData?.memory?.requirements?.pendingProposals;
-              if (!pendingReqProposals || pendingReqProposals.length === 0) return null;
-              const latest = pendingReqProposals[0];
-              return (
-                <div className="mb-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-2.5">
-                  <div className="min-w-0">
-                    <span className="font-bold text-amber-700 text-xs flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                      {pendingReqProposals.length} Proposal{pendingReqProposals.length > 1 ? 's' : ''} Ready
-                    </span>
-                    <span className="text-[11px] text-slate-500 block truncate mt-0.5">
-                      Apply latest criteria to this form & database
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAcceptProposal(latest)}
-                    disabled={!!processingProposalId}
-                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
-                  >
-                    <Check className="h-3 w-3" />
-                    {processingProposalId === latest?.id ? 'Applying...' : 'Apply Latest'}
-                  </button>
-                </div>
-              );
-            })()}
-
-            <form onSubmit={handleSaveRequirements} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Min Budget ($ USD)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 750000 ($750K)"
-                    value={minBudget}
-                    onChange={(e) => setMinBudget(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                  />
-                  {typeof minBudget === 'number' && minBudget > 0 && (
-                    <span className="text-[10px] text-emerald-700 font-mono mt-0.5 block">{formatIndianPrice(minBudget)}</span>
-                  )}
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Max Budget ($ USD)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 1500000 ($1.5M)"
-                    value={maxBudget}
-                    onChange={(e) => setMaxBudget(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                  />
-                  {typeof maxBudget === 'number' && maxBudget > 0 && (
-                    <span className="text-[10px] text-emerald-700 font-mono mt-0.5 block">{formatIndianPrice(maxBudget)}</span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Preferred Locations</label>
-                <input
-                  type="text"
-                  placeholder="Downtown, Westside"
-                  value={locations}
-                  onChange={(e) => setLocations(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Property Type</label>
-                  <select
-                    value={propertyType}
-                    onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                  >
-                    <option value="">Any Type</option>
-                    <option value="APARTMENT">Apartment</option>
-                    <option value="VILLA">Villa</option>
-                    <option value="CONDO">Condo</option>
-                    <option value="SINGLE_FAMILY">Single Family</option>
-                    <option value="TOWNHOUSE">Townhouse</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Min Bedrooms</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 3"
-                    value={minBedrooms}
-                    onChange={(e) => setMinBedrooms(e.target.value ? Number(e.target.value) : '')}
-                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Possession Timeline</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 60_DAYS or Immediate"
-                  value={possessionTimeline}
-                  onChange={(e) => setPossessionTimeline(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingReqs}
-                className="w-full btn-stripe-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                {savingReqs && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Save &amp; Recalculate Matches
-              </button>
-            </form>
-          </div>
-
-          {/* ── Real Property Site Visits Card ── */}
-          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Building2 className="h-4 w-4 text-emerald-600" />
-                Property Site Visits
-                <span className="text-[11px] text-slate-500 font-medium">
-                  ({siteVisits.length})
-                </span>
-              </h2>
-              <button
-                onClick={handleOpenScheduleVisitModal}
-                className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors"
-              >
-                <Plus className="h-3 w-3" /> Schedule
-              </button>
-            </div>
-
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-semibold">
-              {(['ALL', 'SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const).map((tab) => {
-                const count = tab === 'ALL'
-                  ? siteVisits.length
-                  : siteVisits.filter((v) => v.status === tab).length;
-                const active = visitTabFilter === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setVisitTabFilter(tab)}
-                    className={`px-2 py-0.5 rounded-lg border transition-all whitespace-nowrap ${
-                      active
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {tab === 'NO_SHOW' ? 'No-Show' : tab.charAt(0) + tab.slice(1).toLowerCase()} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Visits List */}
-            {(() => {
-              const filteredVisits = siteVisits.filter((v) =>
-                visitTabFilter === 'ALL' ? true : v.status === visitTabFilter,
-              );
-
-              if (filteredVisits.length === 0) {
-                return (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center space-y-2">
-                    <Building2 className="h-6 w-6 text-slate-400 mx-auto" />
-                    <p className="text-xs text-slate-400">
-                      No {visitTabFilter !== 'ALL' ? visitTabFilter.toLowerCase() : ''} site visits recorded.
-                    </p>
-                    <button
-                      onClick={handleOpenScheduleVisitModal}
-                      className="text-xs text-emerald-600 font-bold hover:underline"
-                    >
-                      Schedule a property tour &rarr;
-                    </button>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                  {filteredVisits.map((visit) => {
-                    const badge = getSiteVisitStatusBadge(visit.status);
-                    const startDate = new Date(visit.startAt);
-                    const endDate = new Date(visit.endAt);
-
-                    return (
-                      <div
-                        key={visit.id}
-                        className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 hover:shadow-xs transition-all text-xs space-y-2"
-                      >
-                        <div className="flex items-start justify-between gap-1.5">
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 text-[11px]">
-                                {startDate.toLocaleDateString([], {
-                                  weekday: 'short',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-medium">
-                                {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} –{' '}
-                                {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            {visit.property && (
-                              <p className="font-semibold text-slate-800 text-[11px] flex items-center gap-1">
-                                <Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
-                                {visit.property.title}
-                              </p>
-                            )}
-                          </div>
-                          <Badge className={`${badge.bg} text-[10px] shrink-0 font-bold`}>
-                            {badge.label}
-                          </Badge>
-                        </div>
-
-                        {visit.meetingLocation && (
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-                            {visit.meetingLocation}
-                          </p>
-                        )}
-
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                          <span>Advisor: {visit.assignedUser?.name || visit.assignedUser?.email || 'Assigned'}</span>
-                          {visit.leadTask && (
-                            <span className="text-slate-500">
-                              Task: {visit.leadTask.status}
-                            </span>
-                          )}
-                        </div>
-
-                        {visit.outcomeNotes && (
-                          <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px]">
-                            <span className="font-bold">Outcome: </span>
-                            {visit.outcomeNotes}
-                          </div>
-                        )}
-
-                        {visit.cancelReason && (
-                          <div className="p-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px]">
-                            <span className="font-bold">Cancelled: </span>
-                            {visit.cancelReason}
-                          </div>
-                        )}
-
-                        {/* Action buttons if SCHEDULED */}
-                        {visit.status === 'SCHEDULED' && (
-                          <div className="flex items-center gap-1.5 pt-1">
-                            <button
-                              onClick={() => handleOpenOutcomeModal(visit)}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-[10px] transition-colors"
-                            >
-                              Complete Outcome
-                            </button>
-                            <button
-                              onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-2 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 font-semibold text-[10px] transition-colors"
-                            >
-                              Reschedule
-                            </button>
-                            <button
-                              onClick={() => handleMarkNoShow(visit)}
-                              className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-semibold text-[10px] transition-colors"
-                            >
-                              No-Show
-                            </button>
-                            <button
-                              onClick={() => handleOpenCancelVisitModal(visit)}
-                              className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200 font-semibold text-[10px] transition-colors ml-auto"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* ── Assignment History Card ── */}
-          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-3">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <History className="h-4 w-4 text-emerald-700" />
-                Assignment History
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {assignmentHistory.length} events
-              </span>
-            </h2>
-
-            {assignmentHistory.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3 text-center">
-                No reassignment history recorded yet.
-              </p>
-            ) : (
-              <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
-                {assignmentHistory.map((item) => {
-                  let transitionLabel = 'Assigned';
-                  if (!item.previousUserId && item.assignedUserId) {
-                    transitionLabel = `Claimed by ${item.assignedUser?.name || item.assignedUser?.email || 'Advisor'}`;
-                  } else if (item.previousUserId && !item.assignedUserId) {
-                    transitionLabel = `Released to pool from ${item.previousUser?.name || item.previousUser?.email || 'Advisor'}`;
-                  } else if (item.previousUserId && item.assignedUserId) {
-                    transitionLabel = `Reassigned: ${item.previousUser?.name || item.previousUser?.email} → ${item.assignedUser?.name || item.assignedUser?.email}`;
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs space-y-1"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-bold text-slate-800 text-[11px]">
-                          {transitionLabel}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(item.createdAt).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      {item.reason && (
-                        <p className="text-[11px] text-slate-500 italic">
-                          "{item.reason}"
-                        </p>
-                      )}
-                      <p className="text-[10px] text-slate-400">
-                        Actor: {item.changedBy?.name || item.changedBy?.email || 'System'}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Middle Column: Customer Conversation & Phone Call History (4 Cols) ── */}
-        <div className="lg:col-span-4 space-y-4">
+        {/* ── Main Left Column (7 Cols): Omnichannel Chat & Verified Inventory Matches ── */}
+        <div className="lg:col-span-7 space-y-6 min-w-0">
           {/* ── Advisor Escalation & Handoff Card (Phase 2D) ── */}
           {(() => {
             const latestEscalationMsg = thread?.messages
@@ -2554,7 +2182,7 @@ export function LeadDetailPage() {
             </div>
 
             {/* ── Advisor Message Input Form ── */}
-            <form onSubmit={handleSendAdvisorMessage} className="pt-3 border-t border-slate-100 flex gap-2">
+            <form noValidate onSubmit={handleSendAdvisorMessage} className="pt-3 border-t border-slate-100 flex gap-2">
               <input
                 type="text"
                 placeholder={thread?.isHumanTakeover ? "Type message as Advisor..." : "Send advisor reply (will activate takeover)..."}
@@ -2579,160 +2207,367 @@ export function LeadDetailPage() {
             </form>
           </div>
 
-          {/* ── AI Voice Telephony & Call Cockpit Card (Section 5 & 11) ── */}
-          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
-                  <PhoneCall className="h-4 w-4 text-purple-600" />
-                </span>
+
+            <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="h-4 w-4 text-emerald-700" />
+                Verified Property Matches ({matches.length})
+              </h2>
+              <button
+                onClick={handleRefreshMatches}
+                disabled={refreshingMatches}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
+                title="Refresh matches"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshingMatches ? 'animate-spin text-slate-900' : ''}`} />
+              </button>
+            </div>
+
+            {matches.length === 0 ? (
+              <div className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500 border border-slate-100">
+                No inventory properties match current mandatory filters (budget &amp; bedrooms).
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+                {matches.map((m: any) => (
+                  <div key={m.id} className="rounded-xl border border-slate-200 p-3 bg-slate-50/60 space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-slate-900">{m.property.title}</h4>
+                        <p className="text-[11px] text-slate-500">{m.property.address}, {m.property.city}</p>
+                      </div>
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        {Math.round(m.matchScore * 100)}% Match
+                      </span>
+                    </div>
+
+                    <div className="text-slate-700 font-semibold flex items-center gap-3 text-[11px]">
+                      <span title={formatIndianPriceFull(m.property.price)}>{formatIndianPrice(m.property.price)}</span>
+                      <span>•</span>
+                      <span>{m.property.bedrooms} Beds / {m.property.bathrooms} Baths</span>
+                    </div>
+
+                    {/* ── Verified Match Reasons ── */}
+                    <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-1">
+                      <p className="font-bold text-slate-800 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-700" /> Match Breakdown:
+                      </p>
+                      <p className="whitespace-pre-wrap text-[10.5px] leading-relaxed">{m.matchReason}</p>
+                    </div>
+
+                    {/* ── Failed Soft Criteria Tags ── */}
+                    {m.failedCriteria?.length > 0 && (
+                      <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-md border border-amber-200">
+                        <span className="font-bold">Unmet Preference:</span> {m.failedCriteria.join('; ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right Column (5 Cols): Structured Requirements, Property Visits & Tasks ── */}
+        <div className="lg:col-span-5 space-y-6 min-w-0">
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs">
+            <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+              <Bot className="h-4 w-4 text-emerald-700" />
+              Structured Requirements
+            </h2>
+
+            {(() => {
+              const pendingReqProposals = memoryData?.memory?.requirements?.pendingProposals;
+              if (!pendingReqProposals || pendingReqProposals.length === 0) return null;
+              const latest = pendingReqProposals[0];
+              return (
+                <div className="mb-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <span className="font-bold text-amber-700 text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      {pendingReqProposals.length} Proposal{pendingReqProposals.length > 1 ? 's' : ''} Ready
+                    </span>
+                    <span className="text-[11px] text-slate-500 block truncate mt-0.5">
+                      Apply latest criteria to this form & database
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptProposal(latest)}
+                    disabled={!!processingProposalId}
+                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                  >
+                    <Check className="h-3 w-3" />
+                    {processingProposalId === latest?.id ? 'Applying...' : 'Apply Latest'}
+                  </button>
+                </div>
+              );
+            })()}
+
+            <form noValidate onSubmit={handleSaveRequirements} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    Autonomous Voice Agent &amp; Calls
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Duplex streaming via Plivo &bull; Deepgram Nova-2 STT &bull; Cartesia / ElevenLabs
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setShowLogCallModal(true)}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Log a manual phone call"
-                >
-                  <Plus className="h-3 w-3" />
-                  Log Call
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Dialer Banner */}
-            <div className="rounded-xl p-3.5 bg-gradient-to-r from-emerald-50/50 via-slate-50 to-emerald-50/30 border border-purple-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-slate-900">
-                    Voice Agent: {lead.phone || 'No phone on file'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  Sub-500ms real-time negotiation, property matching &amp; site visit booking over live phone.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={handleTriggerOutboundCall}
-                  disabled={dispatchingCall || !lead.phone}
-                  className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                  {dispatchingCall ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <PhoneOutgoing className="h-3.5 w-3.5" />
+                  <label className="block font-semibold text-slate-700 mb-1">Min Budget ($ USD)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 750000 ($750K)"
+                    value={minBudget}
+                    onChange={(e) => setMinBudget(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                  />
+                  {typeof minBudget === 'number' && minBudget > 0 && (
+                    <span className="text-[10px] text-emerald-700 font-mono mt-0.5 block">{formatIndianPrice(minBudget)}</span>
                   )}
-                  Call Now
-                </button>
-                <button
-                  onClick={() => {
-                    setTestPhoneNumber(lead.phone || '');
-                    setShowTestCallModal(true);
-                  }}
-                  className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-white text-purple-700 border border-purple-300 hover:bg-purple-50 text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  title="Test voice agent with your own mobile phone"
-                >
-                  <Bot className="h-3.5 w-3.5 text-purple-600" />
-                  Test Sandbox
-                </button>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Max Budget ($ USD)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1500000 ($1.5M)"
+                    value={maxBudget}
+                    onChange={(e) => setMaxBudget(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                  />
+                  {typeof maxBudget === 'number' && maxBudget > 0 && (
+                    <span className="text-[10px] text-emerald-700 font-mono mt-0.5 block">{formatIndianPrice(maxBudget)}</span>
+                  )}
+                </div>
               </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Preferred Locations</label>
+                <input
+                  type="text"
+                  placeholder="Downtown, Westside"
+                  value={locations}
+                  onChange={(e) => setLocations(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Property Type</label>
+                  <select
+                    value={propertyType}
+                    onChange={(e) => setPropertyType(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                  >
+                    <option value="">Any Type</option>
+                    <option value="APARTMENT">Apartment</option>
+                    <option value="VILLA">Villa</option>
+                    <option value="CONDO">Condo</option>
+                    <option value="SINGLE_FAMILY">Single Family</option>
+                    <option value="TOWNHOUSE">Townhouse</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Min Bedrooms</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 3"
+                    value={minBedrooms}
+                    onChange={(e) => setMinBedrooms(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Possession Timeline</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 60_DAYS or Immediate"
+                  value={possessionTimeline}
+                  onChange={(e) => setPossessionTimeline(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingReqs}
+                className="w-full btn-stripe-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                {savingReqs && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Save &amp; Recalculate Matches
+              </button>
+            </form>
+          </div>
+
+
+          {/* ── Real Property Site Visits Card ── */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="h-4 w-4 text-emerald-600" />
+                Property Site Visits
+                <span className="text-[11px] text-slate-500 font-medium">
+                  ({siteVisits.length})
+                </span>
+              </h2>
+              <button
+                onClick={handleOpenScheduleVisitModal}
+                className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors"
+              >
+                <Plus className="h-3 w-3" /> Schedule
+              </button>
             </div>
 
-            {/* Call History Stream */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 px-1">
-                <span>Recent Calls ({callLogs.length})</span>
-                {callLogs.length > 0 && (
-                  <span>
-                    Total Duration:{' '}
-                    <strong className="text-slate-800">
-                      {formatDuration(callLogs.reduce((acc, c) => acc + (c.durationSeconds || 0), 0))}
-                    </strong>
-                  </span>
-                )}
-              </div>
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-semibold">
+              {(['ALL', 'SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const).map((tab) => {
+                const count = tab === 'ALL'
+                  ? siteVisits.length
+                  : siteVisits.filter((v) => v.status === tab).length;
+                const active = visitTabFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setVisitTabFilter(tab)}
+                    className={`px-2 py-0.5 rounded-lg border transition-all whitespace-nowrap ${
+                      active
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {tab === 'NO_SHOW' ? 'No-Show' : tab.charAt(0) + tab.slice(1).toLowerCase()} ({count})
+                  </button>
+                );
+              })}
+            </div>
 
-              {callLogs.length === 0 ? (
-                <div className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500 border border-slate-100 space-y-1">
-                  <Phone className="h-5 w-5 mx-auto text-slate-400 mb-1" />
-                  <p className="font-semibold text-slate-700">No calls recorded yet</p>
-                  <p className="text-[11px]">
-                    Dispatch an autonomous call or trigger the test dialer to begin live duplex voice sessions.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                  {callLogs.map((log) => {
-                    const badge = getOutcomeBadge(log.outcome);
-                    const isInbound = log.direction === 'INBOUND';
-                    const DirIcon = isInbound ? PhoneIncoming : PhoneOutgoing;
+            {/* Visits List */}
+            {(() => {
+              const filteredVisits = siteVisits.filter((v) =>
+                visitTabFilter === 'ALL' ? true : v.status === visitTabFilter,
+              );
+
+              if (filteredVisits.length === 0) {
+                return (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center space-y-2">
+                    <Building2 className="h-6 w-6 text-slate-400 mx-auto" />
+                    <p className="text-xs text-slate-400">
+                      No {visitTabFilter !== 'ALL' ? visitTabFilter.toLowerCase() : ''} site visits recorded.
+                    </p>
+                    <button
+                      onClick={handleOpenScheduleVisitModal}
+                      className="text-xs text-emerald-600 font-bold hover:underline"
+                    >
+                      Schedule a property tour &rarr;
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  {filteredVisits.map((visit) => {
+                    const badge = getSiteVisitStatusBadge(visit.status);
+                    const startDate = new Date(visit.startAt);
+                    const endDate = new Date(visit.endAt);
+
                     return (
                       <div
-                        key={log.id}
-                        className="rounded-xl border border-slate-200/90 p-3 bg-slate-50/50 hover:bg-slate-50 transition-colors space-y-1.5 text-xs"
+                        key={visit.id}
+                        className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 hover:shadow-xs transition-all text-xs space-y-2"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`p-1.5 rounded-lg border ${
-                                isInbound
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : 'bg-purple-50 text-purple-600 border-purple-200'
-                              }`}
-                            >
-                              <DirIcon className="h-3.5 w-3.5" />
-                            </span>
-                            <div>
-                              <span className="font-bold text-slate-900">
-                                {isInbound ? 'Inbound Customer Call' : 'Outbound AI Advisor Call'}
-                              </span>
-                              <p className="text-[10px] text-slate-500 font-mono">
-                                {new Date(log.calledAt).toLocaleString([], {
+                        <div className="flex items-start justify-between gap-1.5">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 text-[11px]">
+                                {startDate.toLocaleDateString([], {
+                                  weekday: 'short',
                                   month: 'short',
                                   day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
                                 })}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {log.durationSeconds !== null && log.durationSeconds !== undefined && (
-                              <span className="text-[11px] font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
-                                {formatDuration(log.durationSeconds)}
                               </span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} –{' '}
+                                {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            {visit.property && (
+                              <p className="font-semibold text-slate-800 text-[11px] flex items-center gap-1">
+                                <Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                                {visit.property.title}
+                              </p>
                             )}
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge.bg}`}
-                            >
-                              {badge.label}
-                            </span>
                           </div>
+                          <Badge className={`${badge.bg} text-[10px] shrink-0 font-bold`}>
+                            {badge.label}
+                          </Badge>
                         </div>
 
-                        {log.notes && (
-                          <div className="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-slate-100 mt-1 leading-relaxed">
-                            {log.notes}
+                        {visit.meetingLocation && (
+                          <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                            {visit.meetingLocation}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                          <span>Advisor: {visit.assignedUser?.name || visit.assignedUser?.email || 'Assigned'}</span>
+                          {visit.leadTask && (
+                            <span className="text-slate-500">
+                              Task: {visit.leadTask.status}
+                            </span>
+                          )}
+                        </div>
+
+                        {visit.outcomeNotes && (
+                          <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px]">
+                            <span className="font-bold">Outcome: </span>
+                            {visit.outcomeNotes}
+                          </div>
+                        )}
+
+                        {visit.cancelReason && (
+                          <div className="p-2 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-[11px]">
+                            <span className="font-bold">Cancelled: </span>
+                            {visit.cancelReason}
+                          </div>
+                        )}
+
+                        {/* Action buttons if SCHEDULED */}
+                        {visit.status === 'SCHEDULED' && (
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <button
+                              onClick={() => handleOpenOutcomeModal(visit)}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-[10px] transition-colors"
+                            >
+                              Complete Outcome
+                            </button>
+                            <button
+                              onClick={() => handleOpenRescheduleModal(visit)}
+                              className="px-2 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 font-semibold text-[10px] transition-colors"
+                            >
+                              Reschedule
+                            </button>
+                            <button
+                              onClick={() => handleMarkNoShow(visit)}
+                              className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-semibold text-[10px] transition-colors"
+                            >
+                              No-Show
+                            </button>
+                            <button
+                              onClick={() => handleOpenCancelVisitModal(visit)}
+                              className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200 font-semibold text-[10px] transition-colors ml-auto"
+                            >
+                              Cancel
+                            </button>
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
-          {/* ── Follow-Up Tasks & Reminders Card ── */}
+
           <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -2911,72 +2746,69 @@ export function LeadDetailPage() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* ── Right Column: AI Verified Property Matches (4 Cols) ── */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Building2 className="h-4 w-4 text-emerald-700" />
-                Verified Property Matches ({matches.length})
-              </h2>
-              <button
-                onClick={handleRefreshMatches}
-                disabled={refreshingMatches}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-slate-100 transition-colors"
-                title="Refresh matches"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshingMatches ? 'animate-spin text-slate-900' : ''}`} />
-              </button>
-            </div>
+          {/* ── Assignment History Card ── */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs space-y-3">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <History className="h-4 w-4 text-emerald-700" />
+                Assignment History
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {assignmentHistory.length} events
+              </span>
+            </h2>
 
-            {matches.length === 0 ? (
-              <div className="rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500 border border-slate-100">
-                No inventory properties match current mandatory filters (budget &amp; bedrooms).
-              </div>
+            {assignmentHistory.length === 0 ? (
+              <p className="text-xs text-slate-400 py-3 text-center">
+                No reassignment history recorded yet.
+              </p>
             ) : (
-              <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
-                {matches.map((m: any) => (
-                  <div key={m.id} className="rounded-xl border border-slate-200 p-3 bg-slate-50/60 space-y-2 text-xs">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="font-bold text-slate-900">{m.property.title}</h4>
-                        <p className="text-[11px] text-slate-500">{m.property.address}, {m.property.city}</p>
+              <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                {assignmentHistory.map((item) => {
+                  let transitionLabel = 'Assigned';
+                  if (!item.previousUserId && item.assignedUserId) {
+                    transitionLabel = `Claimed by ${item.assignedUser?.name || item.assignedUser?.email || 'Advisor'}`;
+                  } else if (item.previousUserId && !item.assignedUserId) {
+                    transitionLabel = `Released to pool from ${item.previousUser?.name || item.previousUser?.email || 'Advisor'}`;
+                  } else if (item.previousUserId && item.assignedUserId) {
+                    transitionLabel = `Reassigned: ${item.previousUser?.name || item.previousUser?.email} → ${item.assignedUser?.name || item.assignedUser?.email}`;
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-slate-800 text-[11px]">
+                          {transitionLabel}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(item.createdAt).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
                       </div>
-                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        {Math.round(m.matchScore * 100)}% Match
-                      </span>
-                    </div>
-
-                    <div className="text-slate-700 font-semibold flex items-center gap-3 text-[11px]">
-                      <span title={formatIndianPriceFull(m.property.price)}>{formatIndianPrice(m.property.price)}</span>
-                      <span>•</span>
-                      <span>{m.property.bedrooms} Beds / {m.property.bathrooms} Baths</span>
-                    </div>
-
-                    {/* ── Verified Match Reasons ── */}
-                    <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-1">
-                      <p className="font-bold text-slate-800 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-700" /> Match Breakdown:
+                      {item.reason && (
+                        <p className="text-[11px] text-slate-500 italic">
+                          "{item.reason}"
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400">
+                        Actor: {item.changedBy?.name || item.changedBy?.email || 'System'}
                       </p>
-                      <p className="whitespace-pre-wrap text-[10.5px] leading-relaxed">{m.matchReason}</p>
                     </div>
-
-                    {/* ── Failed Soft Criteria Tags ── */}
-                    {m.failedCriteria?.length > 0 && (
-                      <div className="text-[10px] text-amber-800 bg-amber-50 p-1.5 rounded-md border border-amber-200">
-                        <span className="font-bold">Unmet Preference:</span> {m.failedCriteria.join('; ')}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
-
       {/* ── Full-Width: Unified Activity Timeline ── */}
       <div className="mt-8 rounded-2xl bg-white border border-slate-200 p-6 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
@@ -3168,7 +3000,7 @@ export function LeadDetailPage() {
               Releasing this lead will remove the current assignment and return it to the organization's unassigned pool where other advisors can claim it.
             </p>
 
-            <form onSubmit={handleConfirmRelease} className="space-y-3">
+            <form noValidate onSubmit={handleConfirmRelease} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Reason for Release (Optional)
@@ -3226,7 +3058,7 @@ export function LeadDetailPage() {
               Select an advisor from your team or choose unassigned pool. Target advisor must have fewer than 25 active leads.
             </p>
 
-            <form onSubmit={handleConfirmReassign} className="space-y-3">
+            <form noValidate onSubmit={handleConfirmReassign} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Target Advisor *
@@ -3234,7 +3066,6 @@ export function LeadDetailPage() {
                 <select
                   value={targetAdvisorId}
                   onChange={(e) => setTargetAdvisorId(e.target.value)}
-                  required
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-900 focus:outline-none"
                 >
                   <option value="">Select advisor...</option>
@@ -3302,7 +3133,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTask} className="mt-4 space-y-4 text-xs">
+            <form noValidate onSubmit={handleCreateTask} className="mt-4 space-y-4 text-xs">
               {taskFormError && (
                 <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-700" />
@@ -3317,7 +3148,6 @@ export function LeadDetailPage() {
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Call lead to discuss 3BHK site visit options"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
@@ -3369,7 +3199,6 @@ export function LeadDetailPage() {
                   </label>
                   <input
                     type="datetime-local"
-                    required
                     value={taskDueDate}
                     onChange={(e) => setTaskDueDate(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-800 px-3 py-2 text-xs focus:border-slate-900 focus:outline-none"
@@ -3462,7 +3291,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleScheduleVisit} className="mt-4 space-y-4 text-xs">
+            <form noValidate onSubmit={handleScheduleVisit} className="mt-4 space-y-4 text-xs">
               {visitFormError && (
                 <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-700" />
@@ -3504,7 +3333,6 @@ export function LeadDetailPage() {
                   </label>
                   <input
                     type="datetime-local"
-                    required
                     value={visitStartAt}
                     onChange={(e) => {
                       setVisitStartAt(e.target.value);
@@ -3653,7 +3481,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleRescheduleVisit} className="mt-4 space-y-4 text-xs">
+            <form noValidate onSubmit={handleRescheduleVisit} className="mt-4 space-y-4 text-xs">
               {rescheduleError && (
                 <div className="p-3 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-700" />
@@ -3668,7 +3496,6 @@ export function LeadDetailPage() {
                   </label>
                   <input
                     type="datetime-local"
-                    required
                     value={rescheduleStartAt}
                     onChange={(e) => setRescheduleStartAt(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-sky-500 focus:outline-none"
@@ -3762,17 +3589,16 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCompleteVisit} className="mt-4 space-y-4 text-xs">
+            <form noValidate onSubmit={handleCompleteVisit} className="mt-4 space-y-4 text-xs">
               <p className="text-slate-500 text-[11px]">
                 Record the client’s impressions, interest level, and next steps for this showing.
               </p>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Outcome Notes *
+                  Outcome Notes
                 </label>
                 <textarea
-                  required
                   rows={4}
                   value={outcomeNotes}
                   onChange={(e) => setOutcomeNotes(e.target.value)}
@@ -3827,7 +3653,7 @@ export function LeadDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCancelVisit} className="mt-4 space-y-4 text-xs">
+            <form noValidate onSubmit={handleCancelVisit} className="mt-4 space-y-4 text-xs">
               <p className="text-slate-500 text-[11px]">
                 Are you sure you want to cancel this visit? This will release the advisor slot and cancel any linked task.
               </p>
@@ -3963,7 +3789,7 @@ export function LeadDetailPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleConvertToDeal} className="mt-4 space-y-4 text-xs">
+              <form noValidate onSubmit={handleConvertToDeal} className="mt-4 space-y-4 text-xs">
                 {/* Lead Summary Info */}
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="flex justify-between items-center mb-1">
@@ -4043,7 +3869,6 @@ export function LeadDetailPage() {
                   </label>
                   <input
                     type="text"
-                    required
                     value={convertAddress}
                     onChange={(e) => setConvertAddress(e.target.value)}
                     placeholder="e.g. 301 West Ave, Unit 3402, Austin, TX"
@@ -4185,14 +4010,13 @@ export function LeadDetailPage() {
               Enter your mobile phone number below. Our server will initiate an outbound call via Plivo and bridge your voice directly into the Gemini real estate agent brain with sub-80ms interruption barge-in.
             </p>
 
-            <form onSubmit={handleTriggerTestCall} className="space-y-4 text-xs">
+            <form noValidate onSubmit={handleTriggerTestCall} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Mobile Phone Number (E.164 with Country Code)
                 </label>
                 <input
                   type="tel"
-                  required
                   placeholder="+1 (555) 234-5678"
                   value={testPhoneNumber}
                   onChange={(e) => setTestPhoneNumber(e.target.value)}
@@ -4277,7 +4101,7 @@ export function LeadDetailPage() {
               </div>
             )}
 
-            <form onSubmit={handleConfirmLogCall} className="space-y-3.5 text-xs">
+            <form noValidate onSubmit={handleConfirmLogCall} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Direction</label>

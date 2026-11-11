@@ -57,7 +57,7 @@ let pathwayNodes: VisualPathwayNode[] = [
     goal: 'Acknowledge lead name & exact property seen on Instagram/Google Ads in under 3 seconds',
     type: 'HOOK',
     targetDurationSeconds: 15,
-    promptSnippet: 'Hey {{lead_name}}! Arjun here from Apex Realty. Saw you checked out the 3BHK at {{project_name}}.',
+    promptSnippet: 'Hey {{lead_name}}! Arjun here from Eigen Estate. Saw you checked out the 3BHK at {{project_name}}.',
     active: true,
   },
   {
@@ -118,7 +118,7 @@ router.get('/metrics', requireAuth, async (req: Request, res: Response) => {
   const tenants = [
     {
       id: 'org-1',
-      name: 'Apex Brokerage Group (Flagship)',
+      name: 'Eigen Estate Flagship',
       tier: 'ENTERPRISE',
       status: 'ACTIVE',
       stateJurisdiction: 'KA (Bengaluru)',

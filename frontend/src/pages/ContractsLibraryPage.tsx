@@ -202,7 +202,7 @@ export function ContractsLibraryPage() {
             50-State Statutory Contract Rules
           </h1>
           <p className="mt-4 text-base text-[#4B5563] max-w-2xl mx-auto leading-relaxed">
-            Contingency Copilot automatically adapts day calculations, weekend roll-forward rules, and cutoffs based on official state association guidelines.
+            Eigen Estate automatically adapts day calculations, weekend roll-forward rules, and cutoffs based on official state association guidelines.
           </p>
         </div>
       </section>

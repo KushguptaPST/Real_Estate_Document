@@ -192,7 +192,7 @@ export function PricingPage() {
       a: 'Inbound and outbound duplex calling runs on carrier-direct rates ($0.18/minute) billed second-by-second from your pre-paid wallet. There are no monthly minutes that expire, and auto-recharge ensures your AI copilot never drops a prospective buyer call.',
     },
     {
-      q: 'Does Contingency Copilot replace our Transaction Coordinator?',
+      q: 'Does Eigen Estate replace our Transaction Coordinator?',
       a: 'No, it supercharges them. Our 50-state statutory engine performs the deterministic date math, coordinates line citations (§4.2, Pg 4, Line 18), and dispatches warning alerts so your TC can manage 4x more files without E&O liability risk.',
     },
     {

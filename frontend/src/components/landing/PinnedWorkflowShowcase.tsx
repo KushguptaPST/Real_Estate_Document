@@ -128,7 +128,7 @@ export function PinnedWorkflowShowcase() {
             From first lead click to final escrow closing.
           </h2>
           <p className="text-sm sm:text-base text-[#52525B] leading-relaxed max-w-[62ch] mx-auto">
-            Experience how Contingency Copilot unifies autonomous front-office lead sales with bulletproof back-office transaction surveillance.
+            Experience how Eigen Estate unifies autonomous front-office lead sales with bulletproof back-office transaction surveillance.
           </p>
         </div>
 

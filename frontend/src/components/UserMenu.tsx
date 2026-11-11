@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import type { User } from '@/types';
-import { LogOut, ChevronDown, User as UserIcon, Shield, RefreshCw } from 'lucide-react';
+import { LogOut, ChevronDown, User as UserIcon, Shield } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 function Avatar({ user, size }: { user: User; size: 'sm' | 'md' }) {
@@ -18,7 +18,7 @@ function Avatar({ user, size }: { user: User; size: 'sm' | 'md' }) {
 }
 
 export function UserMenu() {
-  const { user, signOut, signInAsDemoAgent } = useAuth();
+  const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -86,25 +86,6 @@ export function UserMenu() {
                   {user.role === 'OWNER' ? 'Brokerage Admin' : 'Real Estate Advisor'}
                 </Badge>
               </div>
-
-              {user.organizationId === 'demo-sandbox-org' && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={async () => {
-                    const nextRole = user.role === 'OWNER' ? 'AGENT' : 'OWNER';
-                    await signInAsDemoAgent(nextRole);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs font-semibold text-emerald-700 transition-colors hover:bg-slate-100 cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <RefreshCw className="h-3.5 w-3.5 text-emerald-700" />
-                    <span>Switch to {user.role === 'OWNER' ? 'Advisor Agent' : 'Broker Owner'}</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Sandbox</span>
-                </button>
-              )}
 
               <div className="h-px bg-slate-100 my-1" />
 

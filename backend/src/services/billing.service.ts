@@ -131,7 +131,7 @@ export async function createCheckoutSession(params: CreateCheckoutParams): Promi
         price_data: {
           currency: 'inr',
           product_data: {
-            name: `Contingency Copilot — ${planInfo.name}`,
+            name: `Eigen Estate — ${planInfo.name}`,
             description: `${planInfo.features[0]} • ${planInfo.features[1]}`,
           },
           unit_amount: unitAmount,

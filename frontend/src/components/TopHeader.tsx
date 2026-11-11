@@ -125,11 +125,11 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
 
   return (
     <>
-      <header className="h-14 bg-[#0D0D11]/85 backdrop-blur-xl border-b border-white/[0.08] px-6 flex items-center justify-between sticky top-0 z-30 select-none">
+      <header className="h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-30 select-none shadow-2xs">
         
         {/* Global Real Estate Search Bar with Suggestions */}
         <div ref={containerRef} className="relative w-full max-w-lg">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6E6E7A]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             ref={inputRef}
             type="text"
@@ -140,7 +140,7 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
               setIsOpen(true);
             }}
             placeholder="Search property address, title, MLS #, or deal..."
-            className="w-full rounded-xl border border-white/[0.08] bg-[#141418] pl-9 pr-14 py-1.5 text-xs text-[#F5F5F7] placeholder:text-[#6E6E7A] focus:border-[#C9A961] focus:bg-[#181820] focus:outline-none focus:ring-2 focus:ring-[#C9A961]/20 transition-all"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-14 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/5 transition-all"
           />
 
           {/* Right Action: Clear or Shortcut Key */}
@@ -151,12 +151,12 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-white/10 text-[#9A9AA5] transition-colors cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
             >
               <X className="h-3 w-3" />
             </button>
           ) : (
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[#1E1E26] border border-white/[0.08] text-[10px] text-[#9A9AA5] font-mono pointer-events-none">
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] text-slate-500 font-mono pointer-events-none shadow-2xs">
               <Command className="h-2.5 w-2.5" />
               <span>K</span>
             </div>
@@ -164,29 +164,29 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
 
           {/* Autocomplete Suggestions Dropdown */}
           {isOpen && (
-            <div className="absolute left-0 top-full mt-2 w-full min-w-[340px] sm:min-w-[480px] rounded-2xl bg-[#141418] border border-white/10 shadow-2xl overflow-hidden backdrop-blur-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute left-0 top-full mt-2 w-full min-w-[340px] sm:min-w-[480px] rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden backdrop-blur-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
               
               {/* Header / Loading state */}
-              <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between text-[11px] text-[#9A9AA5] bg-[#181820]">
-                <span className="font-semibold text-[#C9A961] uppercase tracking-wider text-[10px]">
+              <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50/80">
+                <span className="font-semibold text-slate-700 uppercase tracking-wider text-[10px]">
                   {query ? `Suggestions for "${query}"` : 'Quick Property & Transaction Search'}
                 </span>
                 {loading && (
-                  <span className="flex items-center gap-1.5 text-xs text-[#C9A961]">
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Searching...
                   </span>
                 )}
               </div>
 
-              <div className="max-h-[380px] overflow-y-auto divide-y divide-white/[0.04] custom-scrollbar">
+              <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
                 
                 {/* 1. Property Inventory Results */}
                 {properties.length > 0 && (
                   <div className="p-2">
-                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[#6E6E7A] flex items-center justify-between">
+                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center justify-between">
                       <span>Properties in Inventory</span>
-                      <span className="text-[#9A9AA5]">{properties.length} matches</span>
+                      <span className="text-slate-600 font-semibold">{properties.length} matches</span>
                     </div>
 
                     <div className="space-y-1 mt-1">
@@ -194,37 +194,37 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
                         <div
                           key={prop.id}
                           onClick={() => handleSelectProperty(prop)}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.06] hover:border-[#C9A961]/30 border border-transparent transition-all cursor-pointer group"
+                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 hover:border-slate-200 border border-transparent transition-all cursor-pointer group"
                         >
                           <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C9A961]/10 text-[#C9A961] border border-[#C9A961]/25 shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
                               <Building2 className="h-4 w-4" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-[#F5F5F7] group-hover:text-[#C9A961] transition-colors truncate">
+                                <span className="text-xs font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
                                   {prop.title}
                                 </span>
                                 <span className={`px-1.5 py-0.2 text-[9px] font-bold rounded-full border shrink-0 ${
                                   prop.status === 'AVAILABLE'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                                    : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
                                 }`}>
                                   {prop.status}
                                 </span>
                               </div>
-                              <div className="text-[11px] text-[#9A9AA5] flex items-center gap-1 mt-0.5 truncate">
-                                <MapPin className="h-3 w-3 text-[#C9A961] shrink-0" />
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                                <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
                                 <span className="truncate">{prop.address}, {prop.city}</span>
                               </div>
                             </div>
                           </div>
 
                           <div className="text-right pl-3 shrink-0">
-                            <div className="text-xs font-bold text-emerald-400 font-mono">
+                            <div className="text-xs font-bold text-emerald-700 font-mono">
                               {formatIndianPrice(prop.price)}
                             </div>
-                            <div className="text-[10px] text-[#6E6E7A] font-mono">
+                            <div className="text-[10px] text-slate-400 font-mono">
                               {prop.bedrooms}B · {prop.bathrooms}Ba
                             </div>
                           </div>
@@ -237,9 +237,9 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
                 {/* 2. Transaction / Deal Results */}
                 {deals.length > 0 && (
                   <div className="p-2">
-                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[#6E6E7A] flex items-center justify-between">
+                    <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center justify-between">
                       <span>Transactions & Contracts</span>
-                      <span className="text-[#9A9AA5]">{deals.length} deals</span>
+                      <span className="text-slate-600 font-semibold">{deals.length} deals</span>
                     </div>
 
                     <div className="space-y-1 mt-1">
@@ -247,29 +247,29 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
                         <div
                           key={deal.id}
                           onClick={() => handleSelectDeal(deal.id)}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.06] hover:border-blue-500/30 border border-transparent transition-all cursor-pointer group"
+                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 hover:border-slate-200 border border-transparent transition-all cursor-pointer group"
                         >
                           <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/25 shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700 border border-blue-200 shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
                               <FileText className="h-4 w-4" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-semibold text-[#F5F5F7] group-hover:text-blue-400 transition-colors truncate">
+                              <div className="text-xs font-semibold text-slate-900 group-hover:text-blue-700 transition-colors truncate">
                                 {deal.propertyAddress}
                               </div>
-                              <div className="text-[11px] text-[#9A9AA5] flex items-center gap-1.5 mt-0.5 truncate">
-                                <span>Buyer: <strong className="text-white">{deal.buyerName || 'Unassigned'}</strong></span>
-                                <span className="text-[#6E6E7A]">·</span>
-                                <span>Seller: <strong className="text-white">{deal.sellerName || 'Unassigned'}</strong></span>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
+                                <span>Buyer: <strong className="text-slate-700">{deal.buyerName || 'Unassigned'}</strong></span>
+                                <span className="text-slate-300">·</span>
+                                <span>Seller: <strong className="text-slate-700">{deal.sellerName || 'Unassigned'}</strong></span>
                               </div>
                             </div>
                           </div>
 
                           <div className="text-right pl-3 shrink-0 flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/25">
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                               {deal.status}
                             </span>
-                            <ChevronRight className="h-3.5 w-3.5 text-[#6E6E7A] group-hover:text-white transition-colors" />
+                            <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-700 transition-colors" />
                           </div>
                         </div>
                       ))}
@@ -280,11 +280,11 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
                 {/* Empty State */}
                 {!loading && !hasResults && (
                   <div className="py-8 px-4 text-center">
-                    <Building2 className="h-8 w-8 text-[#6E6E7A] mx-auto mb-2 opacity-50" />
-                    <p className="text-xs font-semibold text-[#F5F5F7]">
+                    <Building2 className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-slate-800">
                       No properties or deals found matching "{query}"
                     </p>
-                    <p className="text-[11px] text-[#6E6E7A] mt-1">
+                    <p className="text-[11px] text-slate-500 mt-1">
                       Try searching with street address, locality name (e.g. Whitefield), or buyer name.
                     </p>
                   </div>
@@ -293,9 +293,9 @@ export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
               </div>
 
               {/* Suggestions Footer */}
-              <div className="px-4 py-2 border-t border-white/[0.06] bg-[#101014] flex items-center justify-between text-[10px] text-[#6E6E7A]">
+              <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
                 <span>Click a property to view complete details</span>
-                <span>Press <strong className="text-white">ESC</strong> to close</span>
+                <span>Press <strong className="text-slate-700">ESC</strong> to close</span>
               </div>
 
             </div>

@@ -93,7 +93,10 @@ export function CampaignsPage() {
 
   const handleImportLeads = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rawCsvText.trim()) return;
+    if (!rawCsvText.trim()) {
+      toast.error('Please enter CSV lead data to import');
+      return;
+    }
 
     try {
       setImporting(true);
@@ -419,14 +422,13 @@ export function CampaignsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleImportLeads} className="space-y-4 text-xs">
+            <form noValidate onSubmit={handleImportLeads} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   CSV Lead Data (Header: FullName,Phone,Budget,PreferredLocation)
                 </label>
                 <textarea
                   rows={8}
-                  required
                   value={rawCsvText}
                   onChange={(e) => setRawCsvText(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 font-mono text-[11px] text-slate-800 p-3 focus:border-slate-900 focus:outline-none"

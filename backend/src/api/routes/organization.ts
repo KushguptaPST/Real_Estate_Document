@@ -74,8 +74,7 @@ function requireOwnerOrDemo(req: any, _res: any, next: any): void {
     next(createError('Authentication required', 401));
     return;
   }
-  const isDemo = req.user.organizationId === 'demo-sandbox-org';
-  if (req.user.role !== 'OWNER' && !isDemo) {
+  if (req.user.role !== 'OWNER') {
     next(createError('You do not have permission to perform this action', 403));
     return;
   }
@@ -119,7 +118,7 @@ router.post(
       role: parsed.data.role,
       inviterName: req.user!.name,
       inviterEmail: req.user!.email,
-      organizationName: org?.name || 'Apex Brokerage Group',
+      organizationName: org?.name || 'Eigen Estate Brokerage Group',
       inviteUrl: targetInviteUrl,
     });
 

@@ -47,7 +47,7 @@ export class ResendMessagingProvider implements IMessagingProvider {
     const isProd = process.env['NODE_ENV'] === 'production';
     const isTest = process.env['NODE_ENV'] === 'test';
     const apiKey = process.env['RESEND_API_KEY'];
-    const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Contingency Copilot <onboarding@resend.dev>';
+    const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Eigen Estate <onboarding@resend.dev>';
 
     // Safety: In test or dev without key, safely simulate
     if (!apiKey) {
@@ -136,7 +136,7 @@ export class SendGridMessagingProvider implements IMessagingProvider {
     const isProd = process.env['NODE_ENV'] === 'production';
     const isTest = process.env['NODE_ENV'] === 'test';
     const apiKey = process.env['SENDGRID_API_KEY'];
-    const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Contingency Copilot <onboarding@resend.dev>';
+    const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Eigen Estate <onboarding@resend.dev>';
 
     if (!apiKey) {
       if (isProd) {

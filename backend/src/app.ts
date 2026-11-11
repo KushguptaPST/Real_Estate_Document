@@ -40,7 +40,14 @@ export function createApp() {
       ...(process.env['CORS_ORIGIN'] ?? '').split(','),
       ...(process.env['NODE_ENV'] === 'production'
         ? []
-        : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173']),
+        : [
+            'http://localhost:3000',
+            'http://localhost:3002',
+            'http://localhost:5173',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:3002',
+            'http://127.0.0.1:5173',
+          ]),
     ]
       .map((o) => o.trim())
       .filter(Boolean),

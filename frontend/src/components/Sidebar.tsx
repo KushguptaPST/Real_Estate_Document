@@ -16,16 +16,17 @@ import {
   Settings,
   UserPlus,
   Copy,
-  RefreshCw,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useSidebar } from '@/context/SidebarContext';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 const MAIN_NAV = [
   { href: '/deals', label: 'Deals & Escrows', shortLabel: 'Deals', icon: Layers },
   { href: '/leads', label: 'Lead Pipeline', shortLabel: 'Leads', icon: Users },
-  { href: '/campaigns', label: 'AI Voice Dialer', shortLabel: 'Dialer', icon: PhoneCall },
   { href: '/properties', label: 'Properties', shortLabel: 'Properties', icon: Building2 },
   { href: '/analytics', label: 'Analytics', shortLabel: 'Analytics', icon: TrendingUp },
 ];
@@ -40,12 +41,11 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
-  const { user, signOut, signInAsDemoAgent } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
-  const [switchingRole, setSwitchingRole] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Close workspace dropdown on outside click or escape
@@ -85,32 +85,27 @@ export function Sidebar() {
   }, [navigate]);
 
   const handleCopyOrgId = () => {
-    const orgId = user?.organizationId || 'demo-sandbox-org';
-    navigator.clipboard.writeText(orgId);
-    toast.success('Workspace ID Copied', orgId);
+    navigator.clipboard.writeText(window.location.origin);
+    toast.success('Workspace Link Copied', window.location.origin);
     setWorkspaceMenuOpen(false);
   };
 
-  const handleToggleSandboxRole = async () => {
-    if (!user || switchingRole) return;
-    try {
-      setSwitchingRole(true);
-      const nextRole = user.role === 'OWNER' ? 'AGENT' : 'OWNER';
-      await signInAsDemoAgent(nextRole);
-      toast.success(
-        nextRole === 'OWNER'
-          ? 'Switched to Broker Admin (Owner privileges)'
-          : 'Switched to Real Estate Advisor'
-      );
-      setWorkspaceMenuOpen(false);
-    } catch {
-      toast.error('Failed to switch sandbox role');
-    } finally {
-      setSwitchingRole(false);
-    }
-  };
+  const orgName = user?.organizationName || 'Eigen Estate';
 
-  const orgName = user?.organizationName || 'Demo Sandbox Brokerage';
+  const planLabel =
+    user?.subscriptionTier === 'ENTERPRISE'
+      ? 'Enterprise'
+      : user?.subscriptionTier === 'TEAM'
+      ? 'Brokerage Team'
+      : user?.subscriptionTier === 'SOLO'
+      ? 'Solo Channel Partner'
+      : user?.role === 'OWNER'
+      ? 'Broker Admin'
+      : 'Licensed Advisor';
+
+  const workspaceSubtitle = user?.stateJurisdiction
+    ? `${planLabel} • ${user.stateJurisdiction}`
+    : `${planLabel} • Active`;
 
   return (
     <aside
@@ -129,14 +124,19 @@ export function Sidebar() {
         >
           {isCollapsed ? (
             /* Collapsed Monogram Button with Floating Tooltip */
-            <div className="relative group flex items-center justify-center">
+            <div className="relative group flex items-center justify-center w-full">
               <button
                 type="button"
                 onClick={() => setWorkspaceMenuOpen((prev) => !prev)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A0A0A] text-white font-bold shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                title={orgName}
+                className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-slate-100 transition-colors cursor-pointer p-1.5"
+                title={`${orgName} (Click to manage)`}
               >
-                <Building2 className="h-5 w-5 text-emerald-400" />
+                <img
+                  src="/brand/eigen-estate-icon.png"
+                  alt="EigenEstate"
+                  style={{ height: '24px', width: 'auto', maxHeight: '24px' }}
+                  className="h-6 w-auto max-h-6 object-contain"
+                />
               </button>
 
               {/* Tooltip */}
@@ -153,23 +153,26 @@ export function Sidebar() {
               title="Switch workspace or manage organization"
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {/* Branded Monogram Badge */}
-                <div className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-[#0A0A0A] text-white font-bold shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                  <Building2 className="h-4.5 w-4.5 text-emerald-400" />
-                </div>
+                {/* Official Clean Aerodynamic 'E' Wing Logo Mark */}
+                <img
+                  src="/brand/eigen-estate-icon.png"
+                  alt="EigenEstate"
+                  style={{ height: '26px', width: 'auto', maxHeight: '26px' }}
+                  className="h-[26px] w-auto max-h-[26px] object-contain shrink-0"
+                />
 
                 {/* Title & Plan Metadata */}
                 <div className="min-w-0 flex-1">
                   <span
-                    className="text-sm font-bold tracking-tight text-slate-900 truncate block max-w-[175px]"
+                    className="text-sm font-bold tracking-tight text-slate-900 truncate block max-w-[170px]"
                     title={orgName}
                   >
                     {orgName}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-xs text-slate-500 font-medium tracking-tight">
-                      Enterprise • WA MLS
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="text-xs text-slate-500 font-medium tracking-tight truncate">
+                      {workspaceSubtitle}
                     </span>
                   </div>
                 </div>
@@ -189,10 +192,15 @@ export function Sidebar() {
               }`}
             >
               {/* Active Workspace Card */}
-              <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-                <p className="text-xs font-bold text-slate-900 truncate">{orgName}</p>
-                <p className="text-[11px] font-mono text-slate-500 mt-0.5">
-                  ID: {user?.organizationId || 'demo-sandbox-org'}
+              <div className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-900 truncate">{orgName}</p>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                  {workspaceSubtitle}
                 </p>
               </div>
 
@@ -214,32 +222,13 @@ export function Sidebar() {
                 </button>
               </div>
 
-              {/* Sandbox Role Switcher Option */}
-              {user?.organizationId === 'demo-sandbox-org' && (
-                <div className="pt-1 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={handleToggleSandboxRole}
-                    disabled={switchingRole}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className={`h-3.5 w-3.5 text-slate-400 ${switchingRole ? 'animate-spin' : ''}`} />
-                      <span>
-                        Switch View: <strong className="font-semibold">{user.role === 'OWNER' ? 'Broker Admin' : 'Agent'}</strong>
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              )}
-
               {/* Management Shortcuts */}
               <div className="pt-1 border-t border-slate-100 space-y-0.5">
                 <button
                   type="button"
                   onClick={() => {
                     setWorkspaceMenuOpen(false);
-                    navigate('/organization');
+                    navigate('/organization?tab=branding');
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
@@ -251,7 +240,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => {
                     setWorkspaceMenuOpen(false);
-                    navigate('/organization?tab=team');
+                    navigate('/organization?tab=team&invite=true');
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
@@ -265,7 +254,7 @@ export function Sidebar() {
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <Copy className="h-4 w-4 text-slate-400" />
-                  <span>Copy Workspace CUID</span>
+                  <span>Copy Workspace Link</span>
                 </button>
               </div>
             </div>
@@ -278,7 +267,13 @@ export function Sidebar() {
             <div className="relative group">
               <Link
                 to="/upload"
-                className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A0A0A] hover:bg-slate-800 text-white shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                onClick={(e) => {
+                  if (pathname === '/upload') {
+                    e.preventDefault();
+                    document.getElementById('contract-pdf-input')?.click();
+                  }
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A0A0A] hover:bg-zinc-800 active:bg-zinc-900 text-white shadow-xs transition-colors cursor-pointer"
                 title="Upload Agreement (⌘I)"
               >
                 <Plus className="h-5 w-5 text-emerald-400" />
@@ -290,11 +285,17 @@ export function Sidebar() {
           ) : (
             <Link
               to="/upload"
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#0A0A0A] hover:bg-slate-800 text-white text-sm font-semibold shadow-xs transition-all hover:-translate-y-0.5 group cursor-pointer"
+              onClick={(e) => {
+                if (pathname === '/upload') {
+                  e.preventDefault();
+                  document.getElementById('contract-pdf-input')?.click();
+                }
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#0A0A0A] hover:bg-zinc-800 active:bg-zinc-900 text-white text-sm font-semibold shadow-xs transition-colors cursor-pointer"
               title="Ingest executed purchase agreement PDF"
             >
               <div className="flex items-center gap-2.5">
-                <Plus className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <Plus className="h-4 w-4 text-emerald-400" />
                 <span>Upload Agreement</span>
               </div>
               <kbd className="text-xs font-mono bg-white/15 px-2 py-0.5 rounded text-white/90 font-normal">
@@ -359,7 +360,7 @@ export function Sidebar() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`h-4.5 w-4.5 ${active ? 'text-slate-900' : 'text-slate-400'}`} />
+                    <Icon className={`h-4 w-4 ${active ? 'text-slate-900' : 'text-slate-400'}`} />
                     <span>{item.label}</span>
                   </div>
                   {active && <span className="h-1.5 w-1.5 rounded-full bg-slate-900" />}
@@ -421,7 +422,7 @@ export function Sidebar() {
                       : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`h-4.5 w-4.5 ${active ? 'text-slate-900' : 'text-slate-400'}`} />
+                  <Icon className={`h-4 w-4 ${active ? 'text-slate-900' : 'text-slate-400'}`} />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -439,6 +440,21 @@ export function Sidebar() {
         {isCollapsed ? (
           <>
             <div className="relative group">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="flex h-9 w-9 items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200/80 rounded-lg transition-colors cursor-pointer"
+                title="Expand sidebar (⌘B)"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </button>
+              <div className="absolute left-full ml-3 px-3 py-1.5 rounded-lg bg-[#0A0A0A] text-white text-xs font-semibold whitespace-nowrap shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                Expand Sidebar (⌘B)
+              </div>
+            </div>
+
+            <div className="relative group">
               <div className="flex h-9 w-9 items-center justify-center text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors">
                 <ShieldCheck className="h-5 w-5" />
               </div>
@@ -453,7 +469,7 @@ export function Sidebar() {
                 className="flex h-9 w-9 items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                 title="Sign Out"
               >
-                <LogOut className="h-4.5 w-4.5" />
+                <LogOut className="h-4 w-4" />
               </button>
               <div className="absolute left-full ml-3 px-3 py-1.5 rounded-lg bg-[#0A0A0A] text-white text-xs font-semibold whitespace-nowrap shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
                 Sign Out
@@ -463,17 +479,29 @@ export function Sidebar() {
         ) : (
           <>
             <div className="flex items-center gap-2 text-slate-700">
-              <ShieldCheck className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
               <span className="text-xs font-semibold text-slate-800">50-State Statutory SLA</span>
             </div>
 
-            <button
-              onClick={signOut}
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 rounded-lg transition-colors cursor-pointer"
+                title="Collapse sidebar (⌘B)"
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+
+              <button
+                onClick={signOut}
+                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
           </>
         )}
       </div>

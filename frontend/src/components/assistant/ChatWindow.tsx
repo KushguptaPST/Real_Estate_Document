@@ -301,7 +301,7 @@ export function ChatWindow({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <form noValidate onSubmit={handleSubmit} className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleToggleVoice}

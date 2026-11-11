@@ -1,7 +1,7 @@
 {
-  "name": "contingency-copilot-backend",
+  "name": "eigen-estate-backend",
   "version": "1.0.0",
-  "description": "Contingency Deadline Copilot — Express API",
+  "description": "Eigen Estate (eigenestate.com) — Autonomous Real Estate OS & Escrow Surveillance API",
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
