@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { TopHeader } from '@/components/TopHeader';
+import { CommandPalette } from '@/components/CommandPalette';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -30,6 +32,7 @@ import { AdminPage } from '@/pages/AdminPage';
 function ProtectedLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   if (loading) {
     return (
@@ -48,7 +51,7 @@ function ProtectedLayout() {
       {/* 2. Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Fixed Top Header (h-14) */}
-        <TopHeader />
+        <TopHeader onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
 
         {/* Dedicated Scrollable Content Area */}
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 w-full">
@@ -60,6 +63,9 @@ function ProtectedLayout() {
           </div>
         </main>
       </div>
+
+      {/* Global Navigation Command Palette (⌘K) */}
+      <CommandPalette isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
     </div>
   );
 }

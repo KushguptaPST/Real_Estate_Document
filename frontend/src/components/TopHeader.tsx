@@ -21,7 +21,11 @@ import {
 } from '@/components/property/PropertyDetailModal';
 import { type Deal } from '@/types';
 
-export function TopHeader() {
+interface TopHeaderProps {
+  onOpenCommandPalette?: () => void;
+}
+
+export function TopHeader({ onOpenCommandPalette }: TopHeaderProps = {}) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -33,20 +37,24 @@ export function TopHeader() {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut listener: ⌘K or Ctrl+K to focus search input
+  // Keyboard shortcut listener: ⌘K or Ctrl+K to open Command Palette or focus search
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        inputRef.current?.focus();
-        setIsOpen(true);
+        if (onOpenCommandPalette) {
+          onOpenCommandPalette();
+        } else {
+          inputRef.current?.focus();
+          setIsOpen(true);
+        }
       } else if (e.key === 'Escape') {
         setIsOpen(false);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [onOpenCommandPalette]);
 
   // Click outside listener to close suggestions
   useEffect(() => {
@@ -295,7 +303,19 @@ export function TopHeader() {
         </div>
 
         {/* Right Utility Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {onOpenCommandPalette && (
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              title="Open Navigation Command Palette (⌘K)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-white/[0.08] bg-[#141418] text-[11px] font-medium text-[#9A9AA5] hover:text-white hover:border-[#C9A961]/40 hover:bg-[#181820] transition-colors cursor-pointer"
+            >
+              <Command className="h-3 w-3 text-[#C9A961]" />
+              <span className="hidden sm:inline">Commands</span>
+              <kbd className="hidden sm:inline text-[9px] bg-white/[0.08] px-1 py-0.2 rounded font-mono text-[#F5F5F7]">⌘K</kbd>
+            </button>
+          )}
           <UserMenu />
         </div>
       </header>
