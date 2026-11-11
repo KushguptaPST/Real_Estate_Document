@@ -32,6 +32,8 @@ export function PropertiesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'AVAILABLE' | 'UNDER_CONTRACT' | 'SOLD'>('ALL');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [selectedMarketingProperty, setSelectedMarketingProperty] = useState<any | null>(null);
@@ -47,15 +49,26 @@ export function PropertiesPage() {
   const [propertyType, setPropertyType] = useState('CONDO');
   const [submitting, setSubmitting] = useState(false);
 
+  // Debounce search keystrokes by 250ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   useEffect(() => {
     fetchProperties();
-  }, [search]);
+  }, [debouncedSearch, statusFilter]);
 
   async function fetchProperties() {
     try {
       setLoading(true);
       setError(null);
-      const data = await propertiesApi.list({ search: search || undefined });
+      const data = await propertiesApi.list({
+        search: debouncedSearch || undefined,
+        status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      });
       setProperties(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load properties');
@@ -157,7 +170,12 @@ export function PropertiesPage() {
       {/* ── Metric Stat Cards Grid ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Listings */}
-        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
+        <div
+          onClick={() => setStatusFilter('ALL')}
+          className={`rounded-2xl p-5 bg-white border hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs cursor-pointer ${
+            statusFilter === 'ALL' ? 'border-slate-900 ring-2 ring-slate-900/10' : 'border-slate-200/90'
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Listings</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-800 border border-slate-200 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
@@ -192,7 +210,12 @@ export function PropertiesPage() {
         </div>
 
         {/* Available Inventory */}
-        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
+        <div
+          onClick={() => setStatusFilter('AVAILABLE')}
+          className={`rounded-2xl p-5 bg-white border hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs cursor-pointer ${
+            statusFilter === 'AVAILABLE' ? 'border-indigo-600 ring-2 ring-indigo-600/10' : 'border-slate-200/90'
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Available Inventory</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 border border-zinc-200 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
@@ -210,7 +233,12 @@ export function PropertiesPage() {
         </div>
 
         {/* Pending / Escrow */}
-        <div className="rounded-2xl p-5 bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs">
+        <div
+          onClick={() => setStatusFilter('UNDER_CONTRACT')}
+          className={`rounded-2xl p-5 bg-white border hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[136px] group shadow-xs cursor-pointer ${
+            statusFilter === 'UNDER_CONTRACT' ? 'border-purple-600 ring-2 ring-purple-600/10' : 'border-slate-200/90'
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending / Escrow</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 border border-purple-100 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
@@ -228,9 +256,9 @@ export function PropertiesPage() {
         </div>
       </div>
 
-      {/* ── Search Bar & Toolbar ── */}
-      <div className="rounded-2xl p-3 bg-white border border-slate-200/90 shadow-xs">
-        <div className="relative w-full">
+      {/* ── Search Bar & Status Filter Tabs Toolbar ── */}
+      <div className="rounded-2xl p-3 bg-white border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative w-full flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
@@ -239,6 +267,22 @@ export function PropertiesPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none transition-all"
           />
+        </div>
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          {(['ALL', 'AVAILABLE', 'UNDER_CONTRACT', 'SOLD'] as const).map((st) => (
+            <button
+              key={st}
+              type="button"
+              onClick={() => setStatusFilter(st)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                statusFilter === st
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {st === 'ALL' ? 'All' : st === 'AVAILABLE' ? 'Available' : st === 'UNDER_CONTRACT' ? 'Under Contract' : 'Sold'}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -430,11 +474,11 @@ export function PropertiesPage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Price ($ USD) *</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Asking Price *</label>
                     <input
                       type="number"
                       required
-                      placeholder="1250000 (e.g. $1.25M)"
+                      placeholder="e.g. 15000000 or 1250000"
                       value={price}
                       onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
@@ -446,11 +490,13 @@ export function PropertiesPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Bedrooms *</label>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Bedrooms (BHK) *</label>
                     <input
                       type="number"
+                      min={1}
+                      max={20}
                       required
-                      placeholder="3"
+                      placeholder="e.g. 3 or 4"
                       value={bedrooms}
                       onChange={(e) => setBedrooms(e.target.value ? Number(e.target.value) : '')}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
