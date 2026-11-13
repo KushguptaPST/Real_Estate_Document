@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Building2, Plus, ShieldCheck, Layers, History, Users, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { UserMenu } from './UserMenu';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 const NAV_LINKS = [
   { href: '/leads', label: 'Lead Pipeline', icon: Users },
@@ -20,26 +21,13 @@ export function Navbar() {
     <header className="sticky top-0 z-40 stripe-nav bg-white">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-2.5 sm:px-6">
         {/* Brand Logo */}
-        <Link to="/deals" className="flex items-center gap-2.5 group">
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-[#0f172a] text-white shadow-xs group-hover:bg-[#1e293b] ring-1 ring-slate-900/10 transition-all">
-            <Building2 className="h-4.5 w-4.5 text-white" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold tracking-tight text-[#0f172a] group-hover:text-emerald-700 transition-colors">
-                Contingency Copilot
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                <CheckCircle2 className="h-3 w-3 text-[#059669]" />
-                MLS &amp; Escrow Suite
-              </span>
-            </div>
-            <span className="text-[10px] text-[#64748b] font-medium">Brokerage Escrow &amp; Contract Surveillance</span>
-          </div>
+        <Link to="/deals" className="flex items-center gap-3 group py-0.5">
+          <img
+            src="/brand/eigen-estate-full.png"
+            alt="EigenEstate"
+            style={{ height: '28px', width: 'auto' }}
+            className="h-7 w-auto object-contain hover:opacity-90 transition-opacity"
+          />
         </Link>
 
         {/* Center Navigation Links */}

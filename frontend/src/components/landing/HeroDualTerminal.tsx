@@ -73,7 +73,7 @@ export function HeroDualTerminal() {
             <span className="h-3 w-3 rounded-full bg-zinc-300" />
           </div>
           <span className="text-[11px] font-mono text-zinc-400 font-medium hidden sm:inline">
-            Contingency Copilot &bull; Unified Real Estate OS
+            Eigen Estate (eigenestate.com) &bull; Unified Real Estate OS
           </span>
         </div>
 

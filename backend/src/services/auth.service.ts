@@ -24,6 +24,8 @@ export interface SessionUser {
   pictureUrl: string | null;
   organizationId: string;
   organizationName?: string;
+  subscriptionTier?: string;
+  stateJurisdiction?: string | null;
   role: UserRole;
 }
 
@@ -76,7 +78,7 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function toSessionUser(user: User & { organization?: { name: string } | null }): SessionUser {
+function toSessionUser(user: User & { organization?: { name: string; subscriptionTier?: string; stateJurisdiction?: string | null } | null }): SessionUser {
   if (!user.organizationId) {
     throw createError('Your account is not a member of any organization. Ask an organization owner for an invitation.', 403);
   }
@@ -87,12 +89,14 @@ function toSessionUser(user: User & { organization?: { name: string } | null }):
     pictureUrl: user.pictureUrl,
     organizationId: user.organizationId,
     organizationName: user.organization?.name,
+    subscriptionTier: user.organization?.subscriptionTier,
+    stateJurisdiction: user.organization?.stateJurisdiction,
     role: user.role,
   };
 }
 
 /** Issues a session JWT for a user that belongs to an organization. */
-export function signSessionToken(user: User & { organization?: { name: string } | null }): { token: string; user: SessionUser } {
+export function signSessionToken(user: User & { organization?: { name: string; subscriptionTier?: string; stateJurisdiction?: string | null } | null }): { token: string; user: SessionUser } {
   const sessionUser = toSessionUser(user);
   const claims: SessionClaims = {
     sub: user.id,
@@ -224,13 +228,13 @@ export async function signInAsDemoAgent(targetRole: 'AGENT' | 'OWNER' = 'AGENT')
 
   await prisma.organization.upsert({
     where: { id: DEMO_ORG_ID },
-    update: {},
-    create: { id: DEMO_ORG_ID, name: 'Demo Sandbox Brokerage' },
+    update: { name: 'Eigen Estate Brokerage' },
+    create: { id: DEMO_ORG_ID, name: 'Eigen Estate Brokerage' },
   });
 
   const isOwner = targetRole === 'OWNER';
   const profile = {
-    email: isOwner ? 'owner.demo@contingencycopilot.com' : 'agent.demo@contingencycopilot.com',
+    email: isOwner ? 'owner.demo@eigenestate.com' : 'agent.demo@eigenestate.com',
     name: isOwner ? 'Marcus Vance (Demo Broker Owner)' : 'Sarah Jenkins (Demo Agent)',
     pictureUrl: isOwner
       ? 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150'
@@ -247,7 +251,7 @@ export async function signInAsDemoAgent(targetRole: 'AGENT' | 'OWNER' = 'AGENT')
     where: { googleId: DEMO_GOOGLE_ID },
     update: { ...profile, organizationId: DEMO_ORG_ID, role: targetRole },
     create: { googleId: DEMO_GOOGLE_ID, ...profile, organizationId: DEMO_ORG_ID, role: targetRole },
-    include: { organization: { select: { name: true } } },
+    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
   });
 
   return signSessionToken(user);
@@ -277,7 +281,7 @@ export async function verifySessionToken(token: string): Promise<SessionUser> {
 
   const user = await prisma.user.findUnique({
     where: { id: claims.sub },
-    include: { organization: { select: { name: true } } },
+    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
   });
   if (!user || !user.organizationId || user.organizationId !== claims.org || user.sessionVersion !== claims.sv) {
     throw createError('Session expired or invalid — please sign in again', 401);
@@ -355,7 +359,14 @@ export async function registerOrganization(input: RegisterOrganizationInput): Pr
       },
     });
 
-    const { token, user: sessionUser } = signSessionToken({ ...user, organization: { name: org.name } });
+    const { token, user: sessionUser } = signSessionToken({
+      ...user,
+      organization: {
+        name: org.name,
+        subscriptionTier: org.subscriptionTier,
+        stateJurisdiction: org.stateJurisdiction,
+      },
+    });
     return {
       token,
       user: sessionUser,
@@ -374,7 +385,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    include: { organization: { select: { name: true } } },
+    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
   });
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
     throw createError('Invalid email or password', 401);

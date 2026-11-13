@@ -26,7 +26,7 @@ export interface SendEmailResult {
  */
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   const driver = process.env['EMAIL_DRIVER'] ?? 'resend';
-  const from = options.from ?? process.env['EMAIL_FROM'] ?? 'Contingency Copilot <onboarding@resend.dev>';
+  const from = options.from ?? process.env['EMAIL_FROM'] ?? 'Eigen Estate <onboarding@resend.dev>';
   const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
   if (recipients.length === 0) {
@@ -155,7 +155,7 @@ function emailShell(content: string, preheader: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contingency Copilot</title>
+  <title>Eigen Estate</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px 12px; }
     .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
@@ -399,7 +399,7 @@ export async function sendInvitationEmail(params: {
   const roleTitle = params.role === 'OWNER' ? 'Broker Administrator' : 'Real Estate Agent';
   const days = params.expiresDays || 7;
 
-  const subject = `You're invited to join ${orgName} on Contingency Copilot`;
+  const subject = `You're invited to join ${orgName} on Eigen Estate`;
   const preheader = `${inviter} invited you to collaborate on ${orgName} as a ${roleTitle}.`;
 
   const html = emailShell(
@@ -409,7 +409,7 @@ export async function sendInvitationEmail(params: {
       Join ${orgName} Workspace
     </h2>
     <p style="font-size: 14px; color: #475569; line-height: 1.5; margin: 0 0 16px;">
-      <strong>${inviter}</strong> has invited you to join the <strong>${orgName}</strong> team on Contingency Copilot as a <strong>${roleTitle}</strong>.
+      <strong>${inviter}</strong> has invited you to join the <strong>${orgName}</strong> team on Eigen Estate as a <strong>${roleTitle}</strong>.
     </p>
     <div class="info-card">
       <div class="info-row"><span class="info-label">Organization:</span><span class="info-value">${orgName}</span></div>

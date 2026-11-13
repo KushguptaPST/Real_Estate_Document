@@ -97,7 +97,7 @@ export function SecurityPage() {
             </div>
             <h3 className="text-base font-bold text-[#0A0A0A]">Verifiable Page Citation Engine</h3>
             <p className="text-xs text-[#6B7280] leading-relaxed">
-              Never trust raw LLM text generation. Contingency Copilot anchors every extracted deadline directly to exact line numbers and page coordinates in your signed PDF.
+              Never trust raw LLM text generation. Eigen Estate anchors every extracted deadline directly to exact line numbers and page coordinates in your signed PDF.
             </p>
             <ul className="space-y-2 text-xs text-[#4B5563] pt-3 border-t border-[#F3F4F6]">
               <li className="flex items-center gap-2">
@@ -225,11 +225,11 @@ export function SecurityPage() {
               </div>
             </div>
 
-            {/* Contingency Copilot Deterministic FSM */}
+            {/* Eigen Estate Deterministic FSM */}
             <div className="rounded-2xl bg-[#ECFDF5] border border-[#A7F3D0] p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#047857] flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4" /> Contingency Copilot Engine
+                  <CheckCircle2 className="h-4 w-4" /> Eigen Estate Engine
                 </span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#065F46]">
                   100% Deterministic
@@ -286,7 +286,7 @@ export function SecurityPage() {
               Protect your brokerage transactions today.
             </h2>
             <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-xl mx-auto">
-              Request a full SOC2 Type II compliance dossier or try Contingency Copilot free on your next active purchase agreement.
+              Request a full SOC2 Type II compliance dossier or try Eigen Estate free on your next active purchase agreement.
             </p>
             <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button asChild size="lg" className="rounded-full bg-[#0A0A0A] text-white hover:bg-[#1F2937] font-semibold text-xs px-6 h-11 shadow-xs">

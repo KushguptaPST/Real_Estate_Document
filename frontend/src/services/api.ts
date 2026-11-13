@@ -72,6 +72,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const authApi = {
   getConfig: () => request<{ demoLoginEnabled: boolean }>('/auth/config'),
+  checkEmail: (email: string) => request<{ exists: boolean }>(`/auth/check-email?email=${encodeURIComponent(email)}`),
   registerOrg: (data: {
     ownerName: string;
     email: string;

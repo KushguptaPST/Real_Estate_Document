@@ -9,7 +9,8 @@
 **Omnichannel Messaging:** Meta WhatsApp Business Cloud API, Facebook/Instagram Lead Ads Webhooks, Telegram Bot  
 **Backend:** Node.js 22 LTS / TypeScript / PostgreSQL 16 (Prisma) / Express  
 
----
+---yes
+
 
 ## 1. Executive Summary & Vision
 

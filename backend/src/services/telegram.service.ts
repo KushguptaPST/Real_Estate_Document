@@ -327,7 +327,7 @@ export async function sendTelegramVoiceMessage(
 async function resolveDefaultOrganization(): Promise<string> {
   const preferredOrg = await prisma.organization.findFirst({
     where: {
-      OR: [{ name: { contains: 'Apex' } }, { id: 'cmuyc3rxl0001xj888pzcoyop' }],
+      OR: [{ name: { contains: 'Eigen' } }, { id: 'cmuyc3rxl0001xj888pzcoyop' }],
     },
   });
   if (preferredOrg) return preferredOrg.id;
@@ -337,7 +337,7 @@ async function resolveDefaultOrganization(): Promise<string> {
 
   // Fallback create demo org
   const newOrg = await prisma.organization.create({
-    data: { name: 'Apex Realty Brokerage' },
+    data: { name: 'Eigen Estate Brokerage' },
   });
   return newOrg.id;
 }
@@ -530,7 +530,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
     const welcome =
       `👋 <b>Hello ${msg.from.first_name}!</b>\n\n` +
-      `Welcome to <b>Apex Realty AI Copilot</b>. I am your autonomous real estate sales advisor.\n\n` +
+      `Welcome to <b>Eigen Estate AI Copilot</b> (eigenestate.com). I am your autonomous real estate sales advisor.\n\n` +
       `Here is what I can do for you:\n` +
       `• 🔍 <b>Find Properties:</b> Tell me your budget, preferred city, or bedroom requirements.\n` +
       `• 📅 <b>Book Tours:</b> Schedule an on-site property walkthrough.\n` +
@@ -709,6 +709,7 @@ async function pollUpdates(orgId: string): Promise<void> {
   const token = process.env['TELEGRAM_BOT_TOKEN'];
   if (!token) return;
 
+  let consecutiveErrors = 0;
   while (isRunning) {
     try {
       pollingAbortController = new AbortController();
@@ -726,6 +727,7 @@ async function pollUpdates(orgId: string): Promise<void> {
       }
 
       const data = (await response.json()) as { ok: boolean; result: TelegramUpdate[] };
+      consecutiveErrors = 0;
       if (data.ok && Array.isArray(data.result)) {
         for (const update of data.result) {
           lastUpdateId = Math.max(lastUpdateId, update.update_id);
@@ -740,8 +742,12 @@ async function pollUpdates(orgId: string): Promise<void> {
       if (err.name === 'AbortError' || !isRunning) {
         break;
       }
-      logger.error(`[Telegram Polling] Polling network error: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 3000));
+      consecutiveErrors++;
+      if (consecutiveErrors <= 2) {
+        logger.warn(`[Telegram Polling] Network notice: ${err.message}. Retrying with backoff...`);
+      }
+      const backoffMs = Math.min(consecutiveErrors * 5000, 30000);
+      await new Promise((r) => setTimeout(r, backoffMs));
     }
   }
 }

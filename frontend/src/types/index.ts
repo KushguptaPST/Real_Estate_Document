@@ -163,6 +163,8 @@ export interface User {
   pictureUrl: string | null;
   organizationId?: string;
   organizationName?: string;
+  subscriptionTier?: string;
+  stateJurisdiction?: string;
   role?: 'OWNER' | 'AGENT';
   createdAt?: string;
   lastLoginAt?: string;

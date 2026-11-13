@@ -373,7 +373,10 @@ export function LeadsPage() {
 
   async function handleCreateLead(e: React.FormEvent) {
     e.preventDefault();
-    if (!newFullName.trim()) return;
+    if (!newFullName.trim()) {
+      toast.error('Lead full name is required');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -1678,12 +1681,11 @@ export function LeadsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateLead} className="space-y-4">
+            <form noValidate onSubmit={handleCreateLead} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">Full Name *</label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Sarah Connor"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}

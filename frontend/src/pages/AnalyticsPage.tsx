@@ -491,8 +491,8 @@ export function AnalyticsPage() {
       </div>
 
       {/* ── Conversion Funnel Card ── */}
-      <div className="glass-panel rounded-2xl p-6 bg-[#101014] border border-slate-200/90 text-slate-900 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200/90 pb-3">
+      <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200/90 text-slate-900 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
               <TrendingUp className="h-4 w-4 text-emerald-700" /> Inbound Lead Conversion Funnel
@@ -501,43 +501,43 @@ export function AnalyticsPage() {
               How AI Lead Matcher converts cold website/portal inquiries into closed commissions.
             </p>
           </div>
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+          <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
             22.8% Tour Conversion Rate
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-1">
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-white/10 text-center">
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 text-center">
             <p className="text-[10px] text-slate-500 uppercase font-bold">1. Inbound Leads</p>
             <p className="text-xl font-bold font-mono mt-1 text-slate-800">342</p>
             <p className="text-[10px] text-slate-400 mt-1">Web, Zillow, WhatsApp</p>
           </div>
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-white/10 text-center">
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 text-center">
             <p className="text-[10px] text-slate-500 uppercase font-bold">2. AI Extracted</p>
             <p className="text-xl font-bold font-mono mt-1 text-slate-800">328</p>
-            <p className="text-[10px] text-emerald-400 mt-1">95.9% Parsed</p>
+            <p className="text-[10px] text-emerald-600 font-medium mt-1">95.9% Parsed</p>
           </div>
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-white/10 text-center">
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 text-center">
             <p className="text-[10px] text-slate-500 uppercase font-bold">3. Property Matches</p>
             <p className="text-xl font-bold font-mono mt-1 text-slate-800">214</p>
-            <p className="text-[10px] text-emerald-700 mt-1">Matched 70%+ score</p>
+            <p className="text-[10px] text-emerald-700 font-medium mt-1">Matched 70%+ score</p>
           </div>
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-white/10 text-center">
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 text-center">
             <p className="text-[10px] text-slate-500 uppercase font-bold">4. Tours Booked</p>
             <p className="text-xl font-bold font-mono mt-1 text-slate-800">78</p>
-            <p className="text-[10px] text-amber-400 mt-1">23.8% Conversion</p>
+            <p className="text-[10px] text-amber-600 font-medium mt-1">23.8% Conversion</p>
           </div>
-          <div className="bg-emerald-500/15 p-3.5 rounded-xl border border-emerald-500/30 text-center">
-            <p className="text-[10px] text-emerald-400 uppercase font-bold">5. Deals Won</p>
-            <p className="text-xl font-bold font-mono mt-1 text-emerald-400">18</p>
-            <p className="text-[10px] text-emerald-300 mt-1">$891K Commission</p>
+          <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 text-center">
+            <p className="text-[10px] text-emerald-800 uppercase font-bold">5. Deals Won</p>
+            <p className="text-xl font-bold font-mono mt-1 text-emerald-700">18</p>
+            <p className="text-[10px] text-emerald-600 font-medium mt-1">$891K Commission</p>
           </div>
         </div>
       </div>
 
       {/* ── Agent Performance Leaderboard ── */}
       <div className="glass-panel rounded-2xl overflow-hidden bg-white border border-slate-200/90 shadow-sm">
-        <div className="p-4 border-b border-slate-200/90 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Award className="h-4 w-4 text-emerald-700" /> Advisor Performance Benchmarks (Prototype Demo)
@@ -548,7 +548,7 @@ export function AnalyticsPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#101014] text-slate-500 font-bold border-b border-slate-200/90">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/90">
               <tr>
                 <th className="py-3 px-4">Rank</th>
                 <th className="py-3 px-4">Agent Name</th>
@@ -560,7 +560,7 @@ export function AnalyticsPage() {
                 <th className="py-3 px-4 text-right">Commission Earned</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.06] text-slate-800">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {leaderboard.map((agent) => (
                 <tr key={agent.rank} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3.5 px-4 font-bold text-slate-800">

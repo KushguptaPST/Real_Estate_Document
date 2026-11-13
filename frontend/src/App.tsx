@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { TopHeader } from '@/components/TopHeader';
@@ -33,6 +33,14 @@ function ProtectedLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  // Always reset scroll to top on page navigation
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
 
   if (loading) {
     return (
@@ -54,7 +62,7 @@ function ProtectedLayout() {
         <TopHeader onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
 
         {/* Dedicated Scrollable Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 w-full">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-6 lg:p-8 w-full">
           <div className="max-w-[1600px] w-full mx-auto">
             <Breadcrumbs />
             <div key={location.pathname} className="smooth-transition">
@@ -77,7 +85,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/signup" element={user ? <Navigate to="/deals" replace /> : <SignupPage />} />
-      <Route path="/login" element={user ? <Navigate to="/upload" replace /> : <LoginPage />} />
+      <Route path="/login" element={user ? <Navigate to="/deals" replace /> : <LoginPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/security" element={<SecurityPage />} />
       <Route path="/contracts-library" element={<ContractsLibraryPage />} />

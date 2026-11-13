@@ -74,7 +74,7 @@ export function KnowledgePage() {
 
       {/* ── Search Input Form Container ── */}
       <div className="stripe-card p-5 space-y-4 bg-white border border-slate-200/90 rounded-2xl">
-        <form onSubmit={handleAskQuestion} className="flex flex-col sm:flex-row gap-3">
+        <form noValidate onSubmit={handleAskQuestion} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <input
               type="text"

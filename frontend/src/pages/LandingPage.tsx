@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
   Building2,
@@ -11,8 +11,6 @@ import {
   Lock,
   Menu,
   X,
-  UserCheck,
-  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
@@ -25,6 +23,7 @@ import { PinnedWorkflowShowcase } from '@/components/landing/PinnedWorkflowShowc
 import { BentoFeatures } from '@/components/landing/BentoFeatures';
 import { BrokerageRoiCalculator } from '@/components/landing/BrokerageRoiCalculator';
 import { PublicHeader } from '@/components/landing/PublicHeader';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 import { BrokerageTestimonials } from '@/components/landing/BrokerageTestimonials';
 
 if (typeof window !== 'undefined') {
@@ -103,27 +102,12 @@ const METRICS = [
 ];
 
 export function LandingPage() {
-  const { user, signInAsDemoAgent } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const rootRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
   const [selectedState, setSelectedState] = useState(STATE_TEMPLATES[0]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
-
-  const handleDemoLogin = async () => {
-    if (demoLoading) return;
-    setDemoLoading(true);
-    try {
-      await signInAsDemoAgent('AGENT');
-      navigate('/deals');
-    } catch (err) {
-      console.error('Demo sandbox login failed:', err);
-    } finally {
-      setDemoLoading(false);
-    }
-  };
 
   // ── 1. Lenis Smooth Scrolling Engine ─────────────────────────────────────
   useEffect(() => {
@@ -278,20 +262,12 @@ export function LandingPage() {
             </Link>
 
             {!user && (
-              <button
-                type="button"
-                onClick={handleDemoLogin}
-                disabled={demoLoading}
-                className="inline-flex items-center justify-center gap-2 h-12 px-6 text-xs font-semibold rounded-full border border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 transition-all hover:-translate-y-0.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                title="Instant 1-click login into live sandbox"
+              <Link
+                to="/login"
+                className="inline-flex items-center justify-center gap-2 h-12 px-6 text-xs font-semibold rounded-full border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 transition-all hover:-translate-y-0.5 shadow-2xs"
               >
-                {demoLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
-                ) : (
-                  <UserCheck className="h-4 w-4 text-emerald-700" />
-                )}
-                <span>Enter Demo Sandbox</span>
-              </button>
+                <span>Sign In to Platform</span>
+              </Link>
             )}
 
             <a
@@ -476,16 +452,15 @@ export function LandingPage() {
       {/* ── 11. Minimalist Corporate Footer ── */}
       <footer className="border-t border-[#E5E7EB] py-12 px-6 sm:px-8 text-xs text-[#52525B] bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-900">
-              <Building2 className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="font-bold text-[#0A0A0A] block">Contingency Copilot</span>
-              <span className="text-[10px] text-zinc-400">
-                Autonomous Real Estate Closing Suite &copy; {new Date().getFullYear()}
-              </span>
-            </div>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <img
+              src="/brand/eigen-estate-full.png"
+              alt="EigenEstate"
+              className="h-7 w-auto object-contain"
+            />
+            <span className="text-[11px] text-zinc-400 sm:border-l sm:border-zinc-200 sm:pl-3">
+              Autonomous Real Estate OS &amp; Closing Suite &copy; {new Date().getFullYear()} &bull; eigenestate.com
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs font-medium">

@@ -92,7 +92,7 @@ export function DealDetailPage() {
       });
       refetch();
     } catch (err) {
-      alert(`Failed to confirm deadline: ${(err as Error).message}`);
+      toast.error(`Failed to confirm deadline: ${(err as Error).message}`);
     }
   };
 

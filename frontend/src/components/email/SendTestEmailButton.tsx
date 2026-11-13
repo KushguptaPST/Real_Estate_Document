@@ -79,7 +79,7 @@ export function SendTestEmailButton({ dealId, defaultRecipient = '', onSent }: P
               </button>
             </div>
 
-            <form onSubmit={handleSend} className="space-y-3 pt-3">
+            <form noValidate onSubmit={handleSend} className="space-y-3 pt-3">
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                   Recipient Email

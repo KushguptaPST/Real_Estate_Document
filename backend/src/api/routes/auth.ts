@@ -39,6 +39,22 @@ router.get('/config', (_req, res) => {
   res.json({ demoLoginEnabled: isDemoLoginEnabled() });
 });
 
+// GET /api/auth/check-email — fast availability check for signup wizard
+router.get(
+  '/check-email',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+    if (!email || !email.includes('@')) {
+      res.json({ exists: false });
+      return;
+    }
+    const { prisma } = await import('../../utils/prisma.js');
+    const existing = await prisma.user.findUnique({ where: { email } });
+    res.json({ exists: Boolean(existing) });
+  })
+);
+
 // POST /api/auth/register-org — self-serve onboarding wizard for brokerage owners
 router.post(
   '/register-org',

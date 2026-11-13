@@ -48,6 +48,7 @@ export function PropertiesPage() {
   const [bathrooms, setBathrooms] = useState<number | ''>('');
   const [propertyType, setPropertyType] = useState('CONDO');
   const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Debounce search keystrokes by 250ms
   useEffect(() => {
@@ -79,14 +80,25 @@ export function PropertiesPage() {
 
   async function handleCreateProperty(e: React.FormEvent) {
     e.preventDefault();
-    if (!title || !address || !city || !price || !bedrooms) return;
+    const errs: Record<string, string> = {};
+    if (!title.trim()) errs.title = 'Listing title is required';
+    if (!address.trim()) errs.address = 'Street address is required';
+    if (!city.trim()) errs.city = 'City / locality is required';
+    if (!price || Number(price) <= 0) errs.price = 'Valid asking price is required';
+    if (!bedrooms || Number(bedrooms) <= 0) errs.bedrooms = 'Bedrooms count is required';
+
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs);
+      toast.error('Missing Required Fields', 'Please complete the highlighted fields before saving.');
+      return;
+    }
 
     try {
       setSubmitting(true);
       await propertiesApi.create({
-        title,
-        address,
-        city,
+        title: title.trim(),
+        address: address.trim(),
+        city: city.trim(),
         price: Number(price),
         bedrooms: Number(bedrooms),
         bathrooms: Number(bathrooms || 2),
@@ -100,6 +112,7 @@ export function PropertiesPage() {
       setPrice('');
       setBedrooms('');
       setBathrooms('');
+      setFormErrors({});
       fetchProperties();
       toast.success('Property listing created successfully');
     } catch (err: any) {
@@ -434,80 +447,141 @@ export function PropertiesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateProperty} className="space-y-3.5 text-xs">
+              <form noValidate onSubmit={handleCreateProperty} className="space-y-3.5 text-xs">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Listing Title *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Listing Title *</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Modern Downtown Penthouse"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      if (formErrors.title) setFormErrors((p) => ({ ...p, title: '' }));
+                    }}
+                    className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-all ${
+                      formErrors.title
+                        ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                        : 'border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+                    }`}
                   />
+                  {formErrors.title && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      {formErrors.title}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Address *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Address *</label>
                     <input
                       type="text"
-                      required
                       placeholder="100 Main St"
                       value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        if (formErrors.address) setFormErrors((p) => ({ ...p, address: '' }));
+                      }}
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-all ${
+                        formErrors.address
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+                      }`}
                     />
+                    {formErrors.address && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {formErrors.address}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">City *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">City *</label>
                     <input
                       type="text"
-                      required
                       placeholder="Downtown"
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                      onChange={(e) => {
+                        setCity(e.target.value);
+                        if (formErrors.city) setFormErrors((p) => ({ ...p, city: '' }));
+                      }}
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-all ${
+                        formErrors.city
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+                      }`}
                     />
+                    {formErrors.city && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {formErrors.city}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Asking Price *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Asking Price *</label>
                     <input
                       type="number"
                       required
                       placeholder="e.g. 15000000 or 1250000"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                      onChange={(e) => {
+                        setPrice(e.target.value ? Number(e.target.value) : '');
+                        if (formErrors.price) setFormErrors((p) => ({ ...p, price: '' }));
+                      }}
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:outline-none transition-all ${
+                        formErrors.price
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+                      }`}
                     />
-                    {typeof price === 'number' && price > 0 && (
+                    {formErrors.price && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {formErrors.price}
+                      </p>
+                    )}
+                    {typeof price === 'number' && price > 0 && !formErrors.price && (
                       <span className="text-[11px] text-emerald-700 font-mono mt-1 block">
-                        Preview: {formatPropertyPrice(price, city)} ({formatPropertyPriceFull(price, city)})
+                        Preview: {formatPropertyPrice(price, city)}
                       </span>
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Bedrooms (BHK) *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Bedrooms (BHK) *</label>
                     <input
                       type="number"
                       min={1}
-                      max={20}
                       required
                       placeholder="e.g. 3 or 4"
                       value={bedrooms}
-                      onChange={(e) => setBedrooms(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                      onChange={(e) => {
+                        setBedrooms(e.target.value ? Number(e.target.value) : '');
+                        if (formErrors.bedrooms) setFormErrors((p) => ({ ...p, bedrooms: '' }));
+                      }}
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:outline-none transition-all ${
+                        formErrors.bedrooms
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                          : 'border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10'
+                      }`}
                     />
+                    {formErrors.bedrooms && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {formErrors.bedrooms}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Type</label>
                     <select
                       value={propertyType}
                       onChange={(e) => setPropertyType(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none font-medium"
                     >
                       <option value="CONDO">Condo</option>
                       <option value="SINGLE_FAMILY">Single Family</option>

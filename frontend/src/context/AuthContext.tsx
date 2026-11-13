@@ -17,7 +17,6 @@ interface AuthState {
   }) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: (credential: string, inviteToken?: string) => Promise<void>;
-  signInAsDemoAgent: (role?: 'AGENT' | 'OWNER') => Promise<void>;
   signOut: () => void;
 }
 
@@ -63,12 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user);
   }, []);
 
-  const signInAsDemoAgent = useCallback(async (role?: 'AGENT' | 'OWNER') => {
-    const session = await authApi.signInAsDemoAgent(role);
-    setToken(session.token);
-    setUser(session.user);
-  }, []);
-
   const signOut = useCallback(() => {
     setToken(null);
     setUser(null);
@@ -76,8 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, signOut }),
-    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, signOut],
+    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, signOut }),
+    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

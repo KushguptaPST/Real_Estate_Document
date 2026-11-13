@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Deadline, DayType } from '@/types';
 import { IconX, IconCheckCircle, IconCalendar, IconClock, IconExclamationTriangle } from './icons';
 import { deadlinesApi } from '@/services/api';
@@ -23,6 +24,10 @@ export function EditDeadlineModal({ isOpen, deadline, dealId, onClose, onSuccess
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!date) {
+      setError('Please select a confirmed target date.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -42,9 +47,17 @@ export function EditDeadlineModal({ isOpen, deadline, dealId, onClose, onSuccess
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5">
+  return createPortal(
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fadeIn select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5 select-text"
+      >
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
@@ -70,14 +83,16 @@ export function EditDeadlineModal({ isOpen, deadline, dealId, onClose, onSuccess
           </p>
         )}
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+        <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
             <label className="label">Confirmed Target Date</label>
             <input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
+              onChange={(e) => {
+                setDate(e.target.value);
+                if (error) setError(null);
+              }}
               className="input"
             />
           </div>
@@ -135,6 +150,7 @@ export function EditDeadlineModal({ isOpen, deadline, dealId, onClose, onSuccess
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

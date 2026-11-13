@@ -154,7 +154,7 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-border/70 bg-card p-6 shadow-sm space-y-6">
+    <form noValidate onSubmit={handleSubmit} className="rounded-xl border border-border/70 bg-card p-6 shadow-sm space-y-6">
       {/* Header Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
         <div className="space-y-1">

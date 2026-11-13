@@ -1,29 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, ArrowRight, Menu, X, UserCheck, Loader2 } from 'lucide-react';
+import { Building2, ArrowRight, Menu, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 export function PublicHeader() {
-  const { user, signInAsDemoAgent } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
-
-  const handleDemoLogin = async () => {
-    if (demoLoading) return;
-    setDemoLoading(true);
-    try {
-      await signInAsDemoAgent('AGENT');
-      navigate('/deals');
-    } catch (err) {
-      console.error('Demo login error:', err);
-    } finally {
-      setDemoLoading(false);
-    }
-  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -60,13 +46,13 @@ export function PublicHeader() {
     >
       <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo & Wordmark */}
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A0A0A] text-white shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-            <Building2 className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-[#0A0A0A]">
-            Contingency Copilot
-          </span>
+        <Link to="/" className="flex items-center group py-1">
+          <img
+            src="/brand/eigen-estate-full.png"
+            alt="EigenEstate"
+            style={{ height: '32px', width: 'auto' }}
+            className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
+          />
         </Link>
 
         {/* Desktop Navigation Links */}
@@ -112,25 +98,9 @@ export function PublicHeader() {
             </Link>
           ) : (
             <>
-              {/* 1-Click Instant Demo Login */}
-              <button
-                type="button"
-                onClick={handleDemoLogin}
-                disabled={demoLoading}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 transition-all shadow-2xs hover:border-emerald-400 cursor-pointer disabled:opacity-50"
-                title="Instant 1-Click Demo Sandbox (no password required)"
-              >
-                {demoLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-700" />
-                ) : (
-                  <UserCheck className="h-3.5 w-3.5 text-emerald-700" />
-                )}
-                <span>Demo Login</span>
-              </button>
-
               <Link
                 to="/login"
-                className="hidden sm:inline-flex text-[13px] font-medium text-zinc-600 hover:text-zinc-950 transition-colors"
+                className="inline-flex text-[13px] font-semibold text-zinc-700 hover:text-zinc-950 px-3.5 py-1.5 rounded-full hover:bg-zinc-100 transition-all"
               >
                 Sign In
               </Link>
@@ -204,26 +174,10 @@ export function PublicHeader() {
                 </Link>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setMobileMenuOpen(false);
-                      await handleDemoLogin();
-                    }}
-                    disabled={demoLoading}
-                    className="w-full py-2.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-950 border border-emerald-300 shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {demoLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
-                    ) : (
-                      <UserCheck className="h-4 w-4 text-emerald-700" />
-                    )}
-                    <span>1-Click Demo Login</span>
-                  </button>
                   <Link
                     to="/login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 text-xs font-medium rounded-full border border-zinc-200 text-zinc-800"
+                    className="w-full text-center py-2.5 text-xs font-semibold rounded-full border border-zinc-200 text-zinc-800 hover:bg-zinc-50"
                   >
                     Sign In
                   </Link>

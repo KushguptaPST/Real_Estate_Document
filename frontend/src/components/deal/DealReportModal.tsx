@@ -135,12 +135,17 @@ export function DealReportModal({ isOpen, onClose, deal, notifSettings: initialS
             <div className="border-b-2 border-slate-900 pb-3 mb-3.5">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold tracking-widest text-[#B5934C] uppercase font-mono">
-                      Contingency Copilot™
+                  <div className="flex items-center gap-2 mb-1">
+                    <img
+                      src="/brand/eigen-estate-full.png"
+                      alt="EigenEstate"
+                      className="h-5 w-auto object-contain"
+                    />
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium font-mono">
+                      eigenestate.com
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-                      Real Estate Closing Suite
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 font-medium border border-emerald-200">
+                      Closing Suite
                     </span>
                   </div>
                   <h1 className="text-xl font-bold tracking-tight text-slate-900 mt-0.5">
@@ -418,7 +423,7 @@ export function DealReportModal({ isOpen, onClose, deal, notifSettings: initialS
               </div>
 
               <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[8px] text-slate-400 font-mono">
-                <span>Contingency Copilot &bull; Verified Audit ID: {deal.id}</span>
+                <span>Eigen Estate (eigenestate.com) &bull; Verified Audit ID: {deal.id}</span>
                 <span>Confidential Transaction Record &bull; Page 1 of 1</span>
               </div>
             </div>
