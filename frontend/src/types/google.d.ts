@@ -10,6 +10,9 @@ interface GoogleAccountsId {
     client_id: string;
     callback: (response: GoogleCredentialResponse) => void;
     auto_select?: boolean;
+    error_callback?: (error: { type?: string; message?: string }) => void;
+    cancel_on_tap_outside?: boolean;
+    use_fedcm_for_prompt?: boolean;
   }): void;
   renderButton(
     parent: HTMLElement,

@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     setToken(null);
     setUser(null);
-    window.google?.accounts.id.disableAutoSelect();
+    window.google?.accounts?.id?.disableAutoSelect?.();
   }, []);
 
   const value = useMemo(

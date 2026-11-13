@@ -76,6 +76,13 @@ export function LoginPage() {
               setSigningIn(false);
             }
           },
+          error_callback: (err: { type?: string; message?: string }) => {
+            console.warn('Google Sign-In notification:', err);
+            if (err?.type === 'popup_closed_by_user') return;
+            if (err?.type === 'origin_mismatch') {
+              setError('Google OAuth Notice: This domain is not listed in Authorized JavaScript Origins in Google Cloud Console. Please use Instant Demo Access or Email/Password below.');
+            }
+          },
         });
         setReady(true);
       })

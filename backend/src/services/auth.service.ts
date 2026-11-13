@@ -179,17 +179,26 @@ export async function completeSignIn(
   const email = identity.email.trim().toLowerCase();
   const profile = { email, name: identity.name, pictureUrl: identity.pictureUrl, lastLoginAt: new Date() };
 
-  // Never let a sign-in rebind an email that already belongs to a different Google identity.
+  // Check if an account already exists with this email address
   const byEmail = await prisma.user.findUnique({ where: { email } });
-  if (byEmail && byEmail.googleId !== identity.googleId) {
-    throw createError('This email is linked to a different account', 409);
+  if (byEmail && byEmail.googleId && byEmail.googleId !== identity.googleId) {
+    throw createError('This email is linked to a different Google account', 409);
   }
 
-  let user = await prisma.user.upsert({
-    where: { googleId: identity.googleId },
-    update: profile,
-    create: { googleId: identity.googleId, ...profile },
-  });
+  let user: User;
+  if (byEmail) {
+    // If user previously registered via email/password or invitation without a googleId, link it now
+    user = await prisma.user.update({
+      where: { id: byEmail.id },
+      data: { googleId: identity.googleId, ...profile },
+    });
+  } else {
+    user = await prisma.user.upsert({
+      where: { googleId: identity.googleId },
+      update: profile,
+      create: { googleId: identity.googleId, ...profile },
+    });
+  }
 
   if (inviteToken) {
     user = await acceptInvitation(user, inviteToken);

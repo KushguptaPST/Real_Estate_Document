@@ -50,7 +50,11 @@ export function createApp() {
     cors({
       origin: (origin, callback) => {
         // Requests without an Origin header (server-to-server, curl) are not subject to CORS.
-        callback(null, !origin || allowedOrigins.has(origin));
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.has(origin) || allowedOrigins.has('*')) return callback(null, true);
+        // Seamless support for Vercel and Render deployments
+        if (origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com')) return callback(null, true);
+        callback(null, false);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
