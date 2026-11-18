@@ -25,7 +25,7 @@ const RegisterOrgSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   organizationName: z.string().min(2, 'Brokerage name must be at least 2 characters'),
-  stateJurisdiction: z.enum(['KA', 'MH', 'HR', 'TS', 'DL', 'OTHER']).optional(),
+  stateJurisdiction: z.string().min(2).max(10).optional(),
   planTier: z.enum(['SOLO', 'TEAM', 'ENTERPRISE']).optional(),
 });
 

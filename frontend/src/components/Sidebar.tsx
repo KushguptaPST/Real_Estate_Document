@@ -10,7 +10,6 @@ import {
   LogOut,
   TrendingUp,
   PhoneCall,
-  Cpu,
   ChevronsUpDown,
   Check,
   Settings,
@@ -33,7 +32,6 @@ const MAIN_NAV = [
 
 const SECONDARY_NAV = [
   { href: '/organization', label: 'Team & Settings', shortLabel: 'Team', icon: ShieldCheck },
-  { href: '/admin', label: 'Admin Console', shortLabel: 'Admin', icon: Cpu },
   { href: '/audit', label: 'Audit Trail', shortLabel: 'Audit', icon: History },
 ];
 

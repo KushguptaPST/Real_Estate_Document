@@ -1840,7 +1840,7 @@ export function LeadDetailPage() {
               },
               NEW_MATCHING_INVENTORY: {
                 label: 'New Matching Inventory Ready',
-                badge: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                badge: 'bg-purple-50 text-purple-800 border-purple-200',
               },
               INACTIVE_LEAD_CHECKIN: {
                 label: 'Inactive Lead Periodic Check-in',
@@ -2292,7 +2292,7 @@ export function LeadDetailPage() {
                     type="button"
                     onClick={() => handleAcceptProposal(latest)}
                     disabled={!!processingProposalId}
-                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
                   >
                     <Check className="h-3 w-3" />
                     {processingProposalId === latest?.id ? 'Applying...' : 'Apply Latest'}
@@ -2679,7 +2679,7 @@ export function LeadDetailPage() {
                             </span>
                           )}
                           {t.callLogId && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
                               From Call Log
                             </span>
                           )}

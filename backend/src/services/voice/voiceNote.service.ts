@@ -72,13 +72,21 @@ export function formatSpokenVoiceMemoScript(
   // If script doesn't start with a conversational opening and advisorName is provided, prepend personal touch
   const advisor = options?.advisorName || 'Rahul';
   const lead = options?.leadName;
+  const hasAdvisorMention = script.toLowerCase().includes(`${advisor.toLowerCase()} here`);
 
-  const hasGreeting = /^(hey|hi|hello|good morning|good afternoon)\b/i.test(script);
-  if (!hasGreeting) {
-    if (lead) {
-      script = `Hey ${lead}, ${advisor} here! ${script}`;
+  if (!hasAdvisorMention) {
+    const greetingRegex = /^(hey|hi|hello|good morning|good afternoon)\s*([a-zA-Z\s]+?)?[!.,]\s*/i;
+    if (greetingRegex.test(script)) {
+      script = script.replace(greetingRegex, (_match, greet, name) => {
+        const targetName = (name && name.trim()) || lead || 'there';
+        return `${greet} ${targetName}, ${advisor} here! `;
+      });
     } else {
-      script = `Hey there, ${advisor} here! ${script}`;
+      if (lead) {
+        script = `Hey ${lead}, ${advisor} here! ${script}`;
+      } else {
+        script = `Hey there, ${advisor} here! ${script}`;
+      }
     }
   }
 

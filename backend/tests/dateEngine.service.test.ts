@@ -23,6 +23,12 @@ describe('computeContractDeadline (service wrapper)', () => {
     expect(deadline).toEqual(new Date(2026, 11, 28));
   });
 
+  test('business days — skips India holiday Republic Day (Jan 24 Sat + 1 business = Jan 27 Tue)', () => {
+    const start = new Date(2026, 0, 24); // Saturday Jan 24, 2026
+    const { deadline } = computeContractDeadline(start, 1, 'business', 'IN', 'KA');
+    expect(deadline).toEqual(new Date(2026, 0, 27)); // Sunday 25 skipped, Republic Day Mon 26 skipped -> Tue 27
+  });
+
   test('returns correct shape', () => {
     const start = new Date(2026, 0, 1);
     const result = computeContractDeadline(start, 5, 'calendar');

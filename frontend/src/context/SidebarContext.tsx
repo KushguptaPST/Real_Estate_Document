@@ -37,7 +37,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      const isToggleKey = e.key.toLowerCase() === 'b' || e.key === '\\';
+      const isToggleKey = e.key ? (e.key.toLowerCase() === 'b' || e.key === '\\') : false;
 
       if (isCmdOrCtrl && isToggleKey) {
         const target = e.target as HTMLElement | null;

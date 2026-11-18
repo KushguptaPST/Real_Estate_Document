@@ -57,6 +57,7 @@ router.get(
 router.post(
   '/',
   requireAuth,
+  requireRole('OWNER'),
   asyncHandler(async (req, res) => {
     const parsed = CreatePropertySchema.safeParse(req.body);
     if (!parsed.success) throw createError(parsed.error.message, 422);

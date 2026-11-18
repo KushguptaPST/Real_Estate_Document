@@ -14,7 +14,6 @@ import {
   ArrowRight,
   X,
   PhoneCall,
-  Cpu,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -50,14 +49,6 @@ const COMMAND_ITEMS: CommandItem[] = [
     category: 'Navigation',
     icon: PhoneCall,
     path: '/campaigns',
-  },
-  {
-    id: 'admin',
-    title: 'Super-Admin Mission Control',
-    subtitle: 'Global multi-tenant telemetry, P&L margins, and 1-click model failover',
-    category: 'Navigation',
-    icon: Cpu,
-    path: '/admin',
   },
   {
     id: 'properties',

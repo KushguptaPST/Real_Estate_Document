@@ -1,40 +1,30 @@
 {
-  "name": "real_estate_contigency",
+  "name": "eigen-estate-monorepo",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/server.js",
+  "description": "Eigen Estate (eigenestate.com) — Autonomous Real Estate OS & Escrow Surveillance Platform",
+  "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build --prefix frontend",
-    "dev": "tsx watch src/server.ts",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "dev": "npm run dev --prefix backend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "test": "npm test --prefix backend",
+    "test:backend": "npm test --prefix backend"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/badal484/Real_Estate_Document.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/badal484/Real_Estate_Document/issues"
-  },
-  "homepage": "https://github.com/badal484/Real_Estate_Document#readme",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
-    "date-fns": "^4.4.0",
-    "date-holidays": "^3.36.1",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "multer": "^2.4.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.2.0",
-    "@types/node": "^26.5.1",
-    "jest": "^30.5.1",
-    "ts-jest": "^29.4.12",
-    "tsx": "^4.23.13",
-    "typescript": "^5.9.3"
-  }
+  "keywords": [
+    "real-estate",
+    "ai",
+    "escrow",
+    "contingency",
+    "gemini"
+  ],
+  "author": "Badal",
+  "license": "ISC"
 }
