@@ -2037,19 +2037,21 @@ export function LeadDetailPage() {
                       className={`flex flex-col ${isCustomer ? 'items-start' : 'items-end'}`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-xl p-3 ${
+                        className={`max-w-[85%] rounded-xl p-3 shadow-xs ${
                           isCustomer
-                            ? 'bg-slate-100 text-white'
+                            ? 'bg-slate-100 text-black border border-slate-200'
                             : isAi
-                            ? 'bg-slate-50 text-indigo-100 border border-indigo-500/30'
-                            : 'bg-gradient-to-r from-[#C9A961] to-[#E5C985] text-slate-900 font-semibold'
+                            ? 'bg-white text-black border border-slate-300'
+                            : 'bg-gradient-to-r from-[#C9A961] to-[#E5C985] text-slate-950 font-semibold border border-amber-300'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5 text-[10px] font-semibold">
                           <div className="flex items-center gap-1.5">
-                            <span className="opacity-80">{msg.senderType}</span>
+                            <span className={isAi ? 'text-emerald-700 font-bold' : isCustomer ? 'text-slate-800 font-bold' : 'text-slate-950 font-bold'}>
+                              {isAi ? 'AI Assistant' : isCustomer ? (lead?.fullName || 'Customer') : 'Advisor (You)'}
+                            </span>
                             {msg.channel && (
-                              <span className="text-[9px] text-slate-500 bg-white/[0.06] border border-slate-200 px-1 py-0.2 rounded font-mono">
+                              <span className="text-[9px] text-slate-600 bg-slate-100 border border-slate-200 px-1 py-0.2 rounded font-mono">
                                 {msg.channel === 'WEB_CHAT' && lead?.externalId?.startsWith('telegram:') ? 'TELEGRAM' : msg.channel}
                               </span>
                             )}
@@ -2101,11 +2103,11 @@ export function LeadDetailPage() {
                             </div>
                           )}
                         </div>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <p className="whitespace-pre-wrap text-black font-medium leading-relaxed">{msg.content}</p>
 
                         {/* ── Native WhatsApp Voice Memo Player (Section 3 & 7) ── */}
                         {msg.content?.trim() && (
-                          <div className="mt-2.5 pt-2 border-t border-slate-200/20">
+                          <div className="mt-2.5 pt-2 border-t border-slate-200">
                             {voiceNoteMessageIds[msg.id] ? (
                               <VoiceNotePlayer
                                 text={msg.content}

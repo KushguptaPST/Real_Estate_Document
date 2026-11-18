@@ -29,7 +29,7 @@ function FormattedContent({
   const paragraphs = content.split(/\n\n+/);
 
   return (
-    <div className="text-xs leading-relaxed text-slate-800 space-y-2.5">
+    <div className="text-xs leading-relaxed text-black space-y-2.5">
       {paragraphs.map((paragraph, pIdx) => {
         const lines = paragraph.split('\n');
         const isList = lines.length > 1 && lines.every((l) => /^\s*[-*•\d+.]\s+/.test(l));
@@ -42,7 +42,7 @@ function FormattedContent({
                 return (
                   <li key={lIdx} className="flex items-start gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 mt-1.5 shrink-0" />
-                    <span>
+                    <span className="text-black">
                       <InlineFormattedText
                         text={cleanedLine}
                         onFootnoteClick={onFootnoteClick}
@@ -56,7 +56,7 @@ function FormattedContent({
         }
 
         return (
-          <p key={pIdx} className="leading-relaxed">
+          <p key={pIdx} className="leading-relaxed text-black">
             <InlineFormattedText text={paragraph} onFootnoteClick={onFootnoteClick} />
           </p>
         );
@@ -99,7 +99,7 @@ function InlineFormattedText({
             {subParts.map((sub, sIdx) => {
               if (sub.startsWith('**') && sub.endsWith('**')) {
                 return (
-                  <strong key={sIdx} className="font-semibold text-white">
+                  <strong key={sIdx} className="font-bold text-black">
                     {sub.slice(2, -2)}
                   </strong>
                 );
