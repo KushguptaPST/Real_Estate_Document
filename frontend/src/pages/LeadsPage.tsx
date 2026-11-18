@@ -49,6 +49,10 @@ import {
   RefreshCw,
   Activity,
   MapPin,
+  Eye,
+  Copy,
+  ExternalLink,
+  Home,
 } from 'lucide-react';
 import { formatPrice, formatPriceFull, formatIndianPrice, formatIndianPriceFull } from '@/utils/currency';
 import { useToast } from '@/context/ToastContext';
@@ -71,6 +75,29 @@ export function LeadsPage() {
   } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
+  const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<Lead | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  function copyToClipboard(text: string, fieldName: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    toast.success(`Copied ${fieldName} to clipboard`);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  async function openLeadDetails(targetLead: Lead) {
+    setSelectedLeadForDetails(targetLead);
+    try {
+      setLoadingDetails(true);
+      const enriched = await leadsApi.get(targetLead.id);
+      setSelectedLeadForDetails(enriched);
+    } catch {
+      // fallback to targetLead
+    } finally {
+      setLoadingDetails(false);
+    }
+  }
 
   // Advisor Tasks State
   const [tasks, setTasks] = useState<LeadTask[]>([]);
@@ -392,8 +419,9 @@ export function LeadsPage() {
       setNewEmail('');
       setNewPhone('');
       setNewEnquiryText('');
-      toast.success('Lead created successfully');
-      navigate(`/leads/${lead.id}`);
+      toast.success('Lead created and requirements extracted!');
+      await fetchLeads();
+      await openLeadDetails(lead);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create lead');
     } finally {
@@ -1135,12 +1163,23 @@ export function LeadsPage() {
 
                           {/* Context-Appropriate Action Buttons */}
                           <div className="flex items-center justify-between gap-2 mt-4 pt-3.5 border-t border-slate-100">
-                            <button
-                              onClick={() => navigate(`/leads/${item.lead.id}`)}
-                              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3.5 py-1.5 cursor-pointer flex items-center gap-1 transition-colors"
-                            >
-                              Lead Cockpit &rarr;
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openLeadDetails(item.lead as any)}
+                                className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 cursor-pointer flex items-center gap-1.5 transition-colors shadow-2xs font-semibold"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-slate-500" />
+                                <span>Details</span>
+                              </button>
+                              <button
+                                onClick={() => navigate(`/leads/${item.lead.id}`)}
+                                className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs px-3 py-1.5 cursor-pointer flex items-center gap-1 transition-colors"
+                              >
+                                <span>Cockpit</span>
+                                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                              </button>
+                            </div>
 
                             <div className="flex items-center gap-2">
                               {item.leadTaskId && item.bucket !== 'completed' && (
@@ -1591,16 +1630,24 @@ export function LeadsPage() {
                   {/* Contact Chips */}
                   <div className="flex flex-col gap-1 text-[11px] text-slate-500 mb-3 px-1">
                     {lead.email && (
-                      <div className="flex items-center gap-1.5 truncate">
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1.5 truncate hover:text-slate-900 transition-colors"
+                      >
                         <Mail className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="truncate text-slate-700">{lead.email}</span>
-                      </div>
+                        <span className="truncate text-slate-700 hover:underline">{lead.email}</span>
+                      </a>
                     )}
                     {lead.phone && (
-                      <div className="flex items-center gap-1.5">
+                      <a
+                        href={`tel:${lead.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1.5 hover:text-slate-900 transition-colors"
+                      >
                         <Phone className="h-3 w-3 text-emerald-700 shrink-0" />
-                        <span className="text-slate-800 font-mono">{lead.phone}</span>
-                      </div>
+                        <span className="text-slate-800 font-mono hover:underline">{lead.phone}</span>
+                      </a>
                     )}
                   </div>
 
@@ -1609,10 +1656,16 @@ export function LeadsPage() {
                     <div className="flex items-center justify-between font-semibold text-[11px]">
                       <span className="flex items-center gap-1 text-slate-500">
                         <IndianRupee className="h-3.5 w-3.5 text-emerald-600" />
-                        Max Budget
+                        Target Budget
                       </span>
                       <span className="text-slate-900 font-bold font-mono" title={req?.maxBudget ? formatIndianPriceFull(req.maxBudget) : undefined}>
-                        {req?.maxBudget ? formatIndianPrice(req.maxBudget) : 'Flexible'}
+                        {req?.minBudget || req?.maxBudget ? (
+                          <>
+                            {req.minBudget ? formatIndianPrice(req.minBudget) : '₹0'} - {req.maxBudget ? formatIndianPrice(req.maxBudget) : 'Flexible'}
+                          </>
+                        ) : (
+                          'Flexible'
+                        )}
                       </span>
                     </div>
 
@@ -1627,10 +1680,20 @@ export function LeadsPage() {
                     </div>
 
                     {req?.preferredLocations && req.preferredLocations.length > 0 && (
-                      <p className="text-[10px] text-slate-500 truncate pt-1.5 border-t border-slate-200/60 flex items-center gap-1">
-                        <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-                        <span>{req.preferredLocations.join(', ')}</span>
+                      <p className="text-[10px] text-slate-700 truncate pt-1.5 border-t border-slate-200/60 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 shrink-0 text-emerald-600" />
+                        <span className="font-medium">{req.preferredLocations.join(', ')}</span>
                       </p>
+                    )}
+
+                    {/* What the customer asked for (Inquiry snippet) */}
+                    {req?.notes && (
+                      <div className="pt-1.5 border-t border-slate-200/60">
+                        <p className="text-[10.5px] text-slate-800 line-clamp-2 italic bg-white p-2 rounded-lg border border-slate-200/80">
+                          <span className="font-bold text-slate-900 not-italic">Asking: </span>
+                          &ldquo;{req.notes}&rdquo;
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1638,6 +1701,18 @@ export function LeadsPage() {
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                   <span className="text-[10px] font-mono">Source: {lead.source}</span>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLeadDetails(lead);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title="Inspect buyer asking details, budget, area & contacts"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Details</span>
+                    </button>
                     {isClaimable && (
                       <button
                         onClick={(e) => handleClaimLead(e, lead.id)}
@@ -1758,6 +1833,300 @@ export function LeadsPage() {
         type="leads"
         onImportSuccess={fetchLeads}
       />
+
+      {/* ── Lead Quick-Details & Inbound Inquiry Modal ── */}
+      {selectedLeadForDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                  {selectedLeadForDetails.fullName
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-bold text-slate-900 truncate">
+                      {selectedLeadForDetails.fullName}
+                    </h2>
+                    <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full border ${statusColors[selectedLeadForDetails.status] || 'bg-slate-100 text-slate-700'}`}>
+                      {selectedLeadForDetails.status}
+                    </span>
+                    <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-full border ${priorityColors[selectedLeadForDetails.priority] || 'bg-slate-100 text-slate-700'}`}>
+                      {selectedLeadForDetails.priority} Priority
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span>Source: <strong className="text-slate-700">{selectedLeadForDetails.source}</strong></span>
+                    <span>•</span>
+                    <span>Received: {new Date(selectedLeadForDetails.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedLeadForDetails(null)}
+                className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 text-xs max-h-[75vh] overflow-y-auto">
+              {/* 1. Contact Info Strip */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Phone Number
+                  </span>
+                  {selectedLeadForDetails.phone ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <a
+                        href={`tel:${selectedLeadForDetails.phone}`}
+                        className="text-xs font-mono font-bold text-emerald-700 hover:underline flex items-center gap-1.5"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        <span>{selectedLeadForDetails.phone}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(selectedLeadForDetails.phone!, 'Phone')}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                      >
+                        {copiedField === 'Phone' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 italic">No phone recorded</span>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Email Address
+                  </span>
+                  {selectedLeadForDetails.email ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <a
+                        href={`mailto:${selectedLeadForDetails.email}`}
+                        className="text-xs font-medium text-slate-800 hover:underline truncate flex items-center gap-1.5"
+                      >
+                        <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">{selectedLeadForDetails.email}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(selectedLeadForDetails.email!, 'Email')}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-600 hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
+                      >
+                        {copiedField === 'Email' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 italic">No email recorded</span>
+                  )}
+                </div>
+
+                <div className="space-y-1 pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-200 sm:pl-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Assigned Advisor
+                  </span>
+                  <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
+                    <UserCheck className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>{selectedLeadForDetails.assignedUser?.name || selectedLeadForDetails.assignedUser?.email || 'Unassigned (In Pool)'}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-2 sm:pt-0 border-t border-slate-200 sm:border-t-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Inbound Channel
+                  </span>
+                  <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
+                    <MessageSquare className="h-3.5 w-3.5 text-slate-600" />
+                    <span>{selectedLeadForDetails.externalId?.startsWith('telegram:') ? 'Telegram Bot' : selectedLeadForDetails.source}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. What the Buyer Asked For (Inbound Enquiry Message) */}
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    <MessageSquare className="h-4 w-4 text-amber-700" />
+                    What the Buyer Asked For (Inbound Enquiry Message)
+                  </span>
+                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                    Grounded Input
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-lg border border-amber-200/80 text-black leading-relaxed font-medium shadow-2xs">
+                  {selectedLeadForDetails.requirements?.notes ? (
+                    <p className="whitespace-pre-wrap italic">
+                      &ldquo;{selectedLeadForDetails.requirements.notes}&rdquo;
+                    </p>
+                  ) : (selectedLeadForDetails as any).conversations?.[0]?.messages?.find((m: any) => m.senderType === 'CUSTOMER')?.content ? (
+                    <p className="whitespace-pre-wrap italic">
+                      &ldquo;{(selectedLeadForDetails as any).conversations[0].messages.find((m: any) => m.senderType === 'CUSTOMER').content}&rdquo;
+                    </p>
+                  ) : (
+                    <p className="text-slate-400 italic">
+                      No initial raw message text was entered. Requirements were configured directly in database criteria.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Extracted Criteria Matrix (Budget, Area, Bedrooms, Timeline) */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-emerald-700" />
+                  Extracted Criteria &amp; Preferences
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Budget Card */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <IndianRupee className="h-3 w-3 text-emerald-600" /> Target Budget
+                    </span>
+                    <div className="text-sm font-extrabold text-slate-900 font-mono">
+                      {selectedLeadForDetails.requirements?.minBudget || selectedLeadForDetails.requirements?.maxBudget ? (
+                        <>
+                          {selectedLeadForDetails.requirements.minBudget ? formatIndianPrice(selectedLeadForDetails.requirements.minBudget) : '₹0'}
+                          {' - '}
+                          {selectedLeadForDetails.requirements.maxBudget ? formatIndianPrice(selectedLeadForDetails.requirements.maxBudget) : 'Flexible'}
+                        </>
+                      ) : (
+                        'Flexible / Unspecified'
+                      )}
+                    </div>
+                    {selectedLeadForDetails.requirements?.maxBudget && (
+                      <span className="text-[10px] text-slate-400 font-mono block">
+                        Full: {formatIndianPriceFull(selectedLeadForDetails.requirements.maxBudget)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Area / Locations Card */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-rose-500" /> Target Area / Localities
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {selectedLeadForDetails.requirements?.preferredLocations && selectedLeadForDetails.requirements.preferredLocations.length > 0 ? (
+                        selectedLeadForDetails.requirements.preferredLocations.map((loc, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[11px]"
+                          >
+                            <MapPin className="h-2.5 w-2.5 text-emerald-600" />
+                            {loc}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-slate-500 text-xs italic">Any location / No restriction</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Property Type & Bedrooms */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Home className="h-3 w-3 text-slate-500" /> Property Configuration
+                    </span>
+                    <div className="text-xs font-bold text-slate-900">
+                      {selectedLeadForDetails.requirements?.minBedrooms ? `${selectedLeadForDetails.requirements.minBedrooms} BHK` : 'Any BHK'}
+                      {' • '}
+                      {selectedLeadForDetails.requirements?.propertyType || 'Residential (Any)'}
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      {selectedLeadForDetails.requirements?.maxBedrooms ? `Max ${selectedLeadForDetails.requirements.maxBedrooms} bedrooms` : 'Flexible size'}
+                    </span>
+                  </div>
+
+                  {/* Possession Timeline */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-amber-500" /> Timeline &amp; Possession
+                    </span>
+                    <div className="text-xs font-bold text-slate-900">
+                      {selectedLeadForDetails.requirements?.possessionTimeline || 'Flexible / Inactive timeline'}
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      {selectedLeadForDetails.priority === 'URGENT' || selectedLeadForDetails.priority === 'HIGH' ? 'Immediate high-priority buyer' : 'Standard qualification'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Active Matches Preview (if loaded) */}
+              {(selectedLeadForDetails as any).matches && (selectedLeadForDetails as any).matches.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-emerald-700" />
+                      Matching Verified Properties ({(selectedLeadForDetails as any).matches.length})
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-bold">Live Inventory Match</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(selectedLeadForDetails as any).matches.slice(0, 3).map((m: any) => (
+                      <div key={m.id} className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-[11px]">
+                        <div>
+                          <span className="font-bold text-slate-900">{m.property?.title}</span>
+                          <span className="text-slate-500 ml-1.5 font-mono">({m.property?.city})</span>
+                        </div>
+                        <span className="font-bold font-mono text-emerald-700">{formatIndianPrice(m.property?.price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50/60">
+              <button
+                type="button"
+                onClick={() => setSelectedLeadForDetails(null)}
+                className="btn-stripe-secondary text-xs px-3.5 py-2 cursor-pointer"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-2">
+                {selectedLeadForDetails.phone && (
+                  <a
+                    href={`tel:${selectedLeadForDetails.phone}`}
+                    className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-2xs transition-all"
+                  >
+                    <Phone className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>Call Buyer</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = selectedLeadForDetails.id;
+                    setSelectedLeadForDetails(null);
+                    navigate(`/leads/${id}`);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  <span>Open Full Cockpit &amp; Chat</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
