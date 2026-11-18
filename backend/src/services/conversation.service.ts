@@ -581,7 +581,8 @@ export async function toggleAutoPilot(
     where: { id: threadId },
     data: {
       autoReplyEnabled,
-      state: thread.isHumanTakeover ? 'HUMAN_TAKEOVER' : newState,
+      isHumanTakeover: autoReplyEnabled ? false : thread.isHumanTakeover,
+      state: autoReplyEnabled ? 'AUTOPILOT' : (thread.isHumanTakeover ? 'HUMAN_TAKEOVER' : newState),
     },
   });
 

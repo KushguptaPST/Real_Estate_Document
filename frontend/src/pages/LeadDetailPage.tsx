@@ -1150,12 +1150,6 @@ export function LeadDetailPage() {
     try {
       setSendingAdvisorMessage(true);
 
-      // If takeover is not active, automatically enable human takeover so the advisor
-      // can safely handle the lead without autonomous AI interruptions.
-      if (!thread?.isHumanTakeover) {
-        await conversationsApi.toggleTakeover(id, true);
-      }
-
       await conversationsApi.sendAdvisorMessage(id, advisorMessage.trim());
       setAdvisorMessage('');
 

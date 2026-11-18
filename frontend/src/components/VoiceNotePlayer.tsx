@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Loader2, Mic, Volume2 } from 'lucide-react';
+import { authHeaders } from '@/services/session';
+
+const BASE_URL = import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001/api';
 
 interface VoiceNotePlayerProps {
   text: string;
@@ -35,18 +38,34 @@ export function VoiceNotePlayer({
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
+      if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, [audioUrl]);
+
+  const speakNativeFallback = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[*_#`~>]/g, '').trim();
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.rate = speed;
+      utterance.lang = 'en-US';
+      utterance.onstart = () => setIsPlaying(true);
+      utterance.onend = () => setIsPlaying(false);
+      utterance.onerror = () => setIsPlaying(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const fetchAudioAndPlay = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/voice/notes/preview', {
+      const response = await fetch(`${BASE_URL}/voice/notes/preview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...authHeaders(),
         },
         body: JSON.stringify({
           text,
@@ -70,13 +89,26 @@ export function VoiceNotePlayer({
         setIsPlaying(true);
       }
     } catch (err) {
-      console.error('[VoiceNotePlayer] Playback error:', err);
+      console.warn('[VoiceNotePlayer] Backend audio synthesis notice, falling back to browser speech:', err);
+      speakNativeFallback();
     } finally {
       setLoading(false);
     }
   };
 
   const handleTogglePlay = async () => {
+    // Handle active browser speech synthesis
+    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
+      if (isPlaying) {
+        window.speechSynthesis.pause();
+        setIsPlaying(false);
+      } else {
+        window.speechSynthesis.resume();
+        setIsPlaying(true);
+      }
+      return;
+    }
+
     if (!audioUrl) {
       await fetchAudioAndPlay();
       return;

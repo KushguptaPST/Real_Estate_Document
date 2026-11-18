@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import { requireAuth } from '../../middleware/auth.js';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { prisma } from '../../utils/prisma.js';
@@ -24,6 +25,12 @@ const TransferCallSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
   advisorPhone: z.string().min(8, 'Advisor phone number is required'),
   advisorName: z.string().optional(),
+});
+
+const VoicePreviewSchema = z.object({
+  text: z.string().min(1, 'Text is required'),
+  advisorName: z.string().optional(),
+  leadName: z.string().optional(),
 });
 
 function sanitizePhone(phone: string): string {
@@ -164,6 +171,72 @@ router.post(
       success: true,
       message: `Live transfer patched to ${advisorName || advisorPhone} with 5-second audio whisper.`,
     });
+  }),
+);
+
+// POST /api/voice/notes/preview — Neural speech synthesis preview for voice notes
+router.post(
+  '/notes/preview',
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = VoicePreviewSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw createError(parsed.error.errors[0]?.message || 'Invalid voice preview payload', 400);
+    }
+
+    const { text } = parsed.data;
+    const cleanText = text
+      .replace(/[*_#`~>]/g, '')
+      .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 1000);
+
+    if (!cleanText) {
+      throw createError('No speakable text provided', 400);
+    }
+
+    try {
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata('en-US-JennyNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+      const { audioStream } = tts.toStream(cleanText);
+      const chunks: Buffer[] = [];
+
+      await new Promise<void>((resolve, reject) => {
+        audioStream.on('data', (c: any) => chunks.push(Buffer.from(c)));
+        audioStream.on('end', () => resolve());
+        audioStream.on('error', (err: any) => reject(err));
+      });
+
+      if (chunks.length > 0) {
+        const audioBuffer = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', audioBuffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(audioBuffer);
+        return;
+      }
+    } catch (err: any) {
+      logger.warn(`[Voice Preview] MsEdgeTTS notice: ${err.message}. Trying Google TTS fallback.`);
+    }
+
+    // Fallback: Google TTS
+    try {
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText.slice(0, 200))}&tl=en&client=tw-ob`;
+      const ttsRes = await fetch(ttsUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
+      });
+      if (ttsRes.ok) {
+        const audioBuffer = Buffer.from(await ttsRes.arrayBuffer());
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', audioBuffer.length);
+        res.send(audioBuffer);
+        return;
+      }
+    } catch (e: any) {
+      logger.warn(`[Voice Preview] Google TTS fallback failed: ${e.message}`);
+    }
+
+    throw createError('Speech synthesis service unavailable', 503);
   }),
 );
 

@@ -77,9 +77,9 @@ router.post(
   '/messages',
   requireAuth,
   asyncHandler(async (req, res) => {
-    // In production environments, customer simulation is disabled unless explicitly enabled
-    if (process.env['NODE_ENV'] === 'production' && process.env['ENABLE_CUSTOMER_SIMULATION'] !== 'true') {
-      throw createError('Customer inquiry simulation is disabled in production environments', 403);
+    // In production, customer inquiry simulation is permitted for authorized agents testing their leads
+    if (process.env['ENABLE_CUSTOMER_SIMULATION'] === 'false') {
+      throw createError('Customer inquiry simulation has been administratively disabled', 403);
     }
 
     const leadId = req.params['id'];

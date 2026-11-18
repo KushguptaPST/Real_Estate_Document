@@ -245,11 +245,23 @@ export async function ingestInboundLead(input: InboundLeadInput) {
     }
   }
 
-  // 2. Non-blocking Async Requirements Extraction if Enquiry Text Provided
+  // 2. Non-blocking Async Requirements Extraction and Inbound Message Ingestion if Enquiry Text Provided
   if (input.enquiryText && input.enquiryText.trim().length > 5) {
     extractAndPersistRequirements(lead.id, input.enquiryText, orgId).catch((err) => {
       logger.warn(`[Lead Service] Background requirement extraction error: ${err.message}`);
     });
+
+    // Ingest the customer enquiry into the conversation thread to trigger Autopilot auto-reply
+    import('./conversation.service.js').then(({ handleCustomerMessage }) => {
+      handleCustomerMessage({
+        leadId: lead.id,
+        organizationId: orgId,
+        content: input.enquiryText!.trim(),
+        channel: source === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL',
+      }).catch((err) => {
+        logger.warn(`[Lead Service] Inbound conversation ingestion notice: ${err.message}`);
+      });
+    }).catch(() => {});
   }
 
   return getLeadDetails(lead.id, orgId);
