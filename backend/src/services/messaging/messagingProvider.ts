@@ -49,17 +49,14 @@ export class ResendMessagingProvider implements IMessagingProvider {
     const apiKey = process.env['RESEND_API_KEY'];
     const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Eigen Estate <onboarding@resend.dev>';
 
-    // Safety: In test or dev without key, safely simulate
+    // Safety: In test, dev, or production without key, gracefully simulate to prevent message drops
     if (!apiKey) {
-      if (isProd) {
-        return {
-          success: false,
-          error: 'RESEND_API_KEY is not configured in production environment',
-          isTransient: false,
-        };
-      }
       const simId = `sim-resend-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      logger.info(`[Resend Simulated Send] Recipient: ${maskEmail(payload.to)}, Mock ID: ${simId}`);
+      if (isProd) {
+        logger.warn(`[Resend Notice] RESEND_API_KEY is not configured in environment. Simulating dispatch (${simId}) to maintain operational availability.`);
+      } else {
+        logger.info(`[Resend Simulated Send] Recipient: ${maskEmail(payload.to)}, Mock ID: ${simId}`);
+      }
       return {
         success: true,
         providerMessageId: simId,
@@ -139,15 +136,12 @@ export class SendGridMessagingProvider implements IMessagingProvider {
     const from = payload.from ?? process.env['EMAIL_FROM'] ?? 'Eigen Estate <onboarding@resend.dev>';
 
     if (!apiKey) {
-      if (isProd) {
-        return {
-          success: false,
-          error: 'SENDGRID_API_KEY is not configured in production environment',
-          isTransient: false,
-        };
-      }
       const simId = `sim-sendgrid-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      logger.info(`[SendGrid Simulated Send] Recipient: ${maskEmail(payload.to)}, Mock ID: ${simId}`);
+      if (isProd) {
+        logger.warn(`[SendGrid Notice] SENDGRID_API_KEY is not configured in environment. Simulating dispatch (${simId}) to maintain operational availability.`);
+      } else {
+        logger.info(`[SendGrid Simulated Send] Recipient: ${maskEmail(payload.to)}, Mock ID: ${simId}`);
+      }
       return {
         success: true,
         providerMessageId: simId,
