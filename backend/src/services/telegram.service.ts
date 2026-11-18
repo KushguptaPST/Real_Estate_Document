@@ -506,7 +506,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
     const resumeMsg =
       `⚡ <b>AI Sales Copilot resumed!</b>\n\n` +
-      `I am ready to help you again. What kind of property are you looking for? (e.g. "Looking for 2 bedrooms in Miami under $800k")`;
+      `I am ready to help you again. What kind of property are you looking for? (e.g. "Looking for 2 bedrooms in Whitefield under ₹80 L")`;
 
     await sendTelegramMessage(chatId, resumeMsg, {
       parseMode: 'HTML',
@@ -536,8 +536,8 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
       `• 📅 <b>Book Tours:</b> Schedule an on-site property walkthrough.\n` +
       `• 📋 <b>Answer Questions:</b> Inquire about HOA fees, schools, price points, and features.\n\n` +
       `<i>Try asking:</i>\n` +
-      `👉 "Show me 2-bedroom properties under $800,000"\n` +
-      `👉 "What homes are available in Miami or Dallas?"\n` +
+      `👉 "Show me 2-bedroom properties under ₹80 L"\n` +
+      `👉 "What homes are available in Whitefield or Bengaluru?"\n` +
       `👉 "/properties" to list verified inventory now!`;
 
     await sendTelegramMessage(chatId, welcome, {
@@ -555,7 +555,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
       `• /properties — View verified live inventory\n` +
       `• /ai or /resume — Switch back to AI mode from human takeover\n` +
       `• /help — Show this help message\n\n` +
-      `You can also just talk naturally! E.g.: <i>"Looking for a 3-bed house with a backyard under $750k"</i>`;
+      `You can also just talk naturally! E.g.: <i>"Looking for a 3-bed house with a backyard under ₹1.5 Cr"</i>`;
     await sendTelegramMessage(chatId, helpText, { parseMode: 'HTML' });
     return;
   }
@@ -572,21 +572,12 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
     let listingsText = `🏡 <b>Verified Available Inventory:</b>\n\n`;
     for (const p of properties) {
-      const isIndia = Boolean(
-        p.city &&
-          (p.city.toLowerCase().includes('bengaluru') ||
-            p.city.toLowerCase().includes('whitefield') ||
-            p.city.toLowerCase().includes('bangalore'))
-      );
-      const priceFormatted = isIndia
-        ? p.price >= 10000000
-          ? `₹${(p.price / 10000000).toFixed(2)} Cr`
-          : `₹${(p.price / 100000).toFixed(2)} Lakhs`
-        : new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: 0,
-          }).format(p.price);
+      const priceFormatted =
+        p.price >= 10000000
+          ? `₹${(p.price / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')} Cr`
+          : p.price >= 100000
+          ? `₹${(p.price / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')} L`
+          : `₹${p.price.toLocaleString('en-IN')}`;
 
       listingsText += `• <b>${p.title}</b>\n  📍 ${p.address}, ${p.city}\n  💵 <b>${priceFormatted}</b> | 🛏 ${p.bedrooms} Beds | 🛁 ${p.bathrooms} Baths\n  ✨ Status: ${p.status}\n\n`;
     }

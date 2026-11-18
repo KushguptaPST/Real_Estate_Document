@@ -1731,7 +1731,7 @@ export function LeadDetailPage() {
                             <span className="font-bold text-slate-700">Confirmed Requirements: </span>
                             <span className="text-slate-500">
                               {activeBrief.confirmedRequirements
-                                ? `${activeBrief.confirmedRequirements.minBudget != null || activeBrief.confirmedRequirements.maxBudget != null ? `Budget: ${activeBrief.confirmedRequirements.minBudget ? formatIndianPrice(activeBrief.confirmedRequirements.minBudget) : '$0'} - ${activeBrief.confirmedRequirements.maxBudget ? formatIndianPrice(activeBrief.confirmedRequirements.maxBudget) : 'No max'}` : 'Budget: Flexible'} | Locations: ${activeBrief.confirmedRequirements.preferredLocations?.join(', ') || 'Any'} | Beds: ${activeBrief.confirmedRequirements.minBedrooms ?? 'Any'}`
+                                ? `${activeBrief.confirmedRequirements.minBudget != null || activeBrief.confirmedRequirements.maxBudget != null ? `Budget: ${activeBrief.confirmedRequirements.minBudget ? formatIndianPrice(activeBrief.confirmedRequirements.minBudget) : '₹0'} - ${activeBrief.confirmedRequirements.maxBudget ? formatIndianPrice(activeBrief.confirmedRequirements.maxBudget) : 'No max'}` : 'Budget: Flexible'} | Locations: ${activeBrief.confirmedRequirements.preferredLocations?.join(', ') || 'Any'} | Beds: ${activeBrief.confirmedRequirements.minBedrooms ?? 'Any'}`
                                 : 'None confirmed yet in database'}
                             </span>
                           </div>
@@ -2302,10 +2302,10 @@ export function LeadDetailPage() {
             <form noValidate onSubmit={handleSaveRequirements} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Min Budget ($ USD)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Min Budget (₹ INR)</label>
                   <input
                     type="number"
-                    placeholder="e.g. 750000 ($750K)"
+                    placeholder="e.g. 7500000 (₹75 L)"
                     value={minBudget}
                     onChange={(e) => setMinBudget(e.target.value ? Number(e.target.value) : '')}
                     className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
@@ -2315,10 +2315,10 @@ export function LeadDetailPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Max Budget ($ USD)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Max Budget (₹ INR)</label>
                   <input
                     type="number"
-                    placeholder="e.g. 1500000 ($1.5M)"
+                    placeholder="e.g. 15000000 (₹1.5 Cr)"
                     value={maxBudget}
                     onChange={(e) => setMaxBudget(e.target.value ? Number(e.target.value) : '')}
                     className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
@@ -4026,7 +4026,7 @@ export function LeadDetailPage() {
                   <PhoneCall className="h-3.5 w-3.5 text-emerald-600" /> Conversational Scenarios to Test:
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5 text-slate-600">
-                  <li>"I'm looking for a 3-bedroom home in Austin under $1.2M."</li>
+                  <li>"I'm looking for a 3-bedroom home in Whitefield under ₹1.5 Cr."</li>
                   <li>"Can you clarify the earnest money deposit and inspection contingency deadlines?"</li>
                   <li>"Let's book a property tour for this Saturday at 11 AM."</li>
                   <li>Interrupt mid-sentence to test live speech barge-in.</li>

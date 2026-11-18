@@ -1722,7 +1722,7 @@ export function LeadsPage() {
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="e.g. Looking for a 3 bedroom condo in Downtown under $650k..."
+                  placeholder="e.g. Looking for a 3 BHK apartment in Whitefield under ₹1.5 Cr..."
                   value={newEnquiryText}
                   onChange={(e) => setNewEnquiryText(e.target.value)}
                   className="input-base resize-none"

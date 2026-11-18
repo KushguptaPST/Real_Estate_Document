@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { dealsApi } from '@/services/api';
 import type { Deal } from '@/types';
 import { formatDate } from '@/utils/date';
+import { formatPrice as formatCurrency } from '@/utils/currency';
 import { exportToCsv } from '@/utils/csvExport';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -42,10 +43,10 @@ function extractState(address: string): string {
 
 function formatPrice(deal: Deal): string {
   if (deal.purchasePrice && deal.purchasePrice > 0) {
-    return `$${deal.purchasePrice.toLocaleString()}`;
+    return formatCurrency(deal.purchasePrice);
   }
   // Realistic estimate fallback based on address
-  return '$1,250,000';
+  return '₹1.25 Cr';
 }
 
 function getNextDeadline(deal: Deal): { label: string; date: string; daysLeft: number } {
@@ -252,7 +253,7 @@ export function DealsPage() {
           <div className="mt-2.5 pt-2 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
             <span>Pipeline Volume</span>
             <span className="font-semibold text-slate-900 font-mono">
-              ${activeCount > 0 ? (activeCount * 1.25).toFixed(2) + 'M' : '$0.00'}
+              {activeCount > 0 ? `₹${(activeCount * 1.25).toFixed(1)} Cr` : '₹0'}
             </span>
           </div>
         </div>
@@ -286,7 +287,7 @@ export function DealsPage() {
                 Protected Earnest Money
               </span>
               <div className="text-2xl font-extrabold text-emerald-700 mt-1 font-mono">
-                ${(activeCount * 25000).toLocaleString()}
+                ₹{(activeCount * 25000).toLocaleString('en-IN')}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">

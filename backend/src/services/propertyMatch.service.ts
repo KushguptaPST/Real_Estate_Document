@@ -24,20 +24,20 @@ export interface MatchCalculationResult {
  * 3. Returns and persists top matches with explicit reasons scoped strictly to organizationId.
  */
 function formatPrice(amount: number | null | undefined): string {
-  if (amount == null || isNaN(amount) || amount === 0) return '$0';
-  if (amount >= 1_000_000) {
-    const m = (amount / 1_000_000).toFixed(2).replace(/\.00$/, '');
-    return `$${m}M`;
+  if (amount == null || isNaN(amount) || amount === 0) return '₹0';
+  if (amount >= 10_000_000) {
+    const cr = (amount / 10_000_000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1');
+    return `₹${cr} Cr`;
   }
   if (amount >= 100_000) {
-    const k = Math.round(amount / 1_000);
-    return `$${k}K`;
+    const lakh = (amount / 100_000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1');
+    return `₹${lakh} L`;
   }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount);
+  if (amount >= 1_000) {
+    const k = (amount / 1_000).toFixed(1).replace(/\.0$/, '');
+    return `₹${k} K`;
+  }
+  return `₹${amount.toLocaleString('en-IN')}`;
 }
 
 const formatIndianPrice = formatPrice;

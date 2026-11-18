@@ -523,11 +523,11 @@ export function PropertiesPage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Asking Price *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Asking Price (₹) *</label>
                     <input
                       type="number"
                       required
-                      placeholder="e.g. 15000000 or 1250000"
+                      placeholder="e.g. 11000000 (₹1.1 Cr)"
                       value={price}
                       onChange={(e) => {
                         setPrice(e.target.value ? Number(e.target.value) : '');
