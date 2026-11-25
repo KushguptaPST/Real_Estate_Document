@@ -38,15 +38,21 @@ if (!testUrl.searchParams.has('connection_limit')) testUrl.searchParams.set('con
 process.env.DATABASE_URL = testUrl.toString();
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-only-jwt-secret-0123456789abcdef0123456789abcdef';
+process.env.PLATFORM_ADMIN_EMAILS = 'platform.admin@eigenestate.test';
 process.env.ENABLE_DEMO_LOGIN = 'false';
 process.env.GEMINI_API_KEY = '';
 process.env.RESEND_API_KEY = '';
 process.env.EMAIL_DRIVER = 'resend';
-// Never touch live providers from tests (dev .env may configure ImageKit, Twilio, Stripe...).
+// Never touch live providers from tests (dev .env may configure ImageKit, Meta WhatsApp, Plivo, SMTP, Twilio, Stripe...).
 process.env.STORAGE_DRIVER = 'local';
+process.env.EMAIL_DRIVER = 'resend';
 for (const name of [
   'IMAGEKIT_PRIVATE_KEY', 'IMAGEKIT_PUBLIC_KEY', 'SENDGRID_API_KEY', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
-  'STRIPE_SECRET_KEY', 'ANTHROPIC_API_KEY', 'WEBHOOK_SECRET', 'EMAIL_WEBHOOK_SECRET', 'INBOUND_WEBHOOK_SECRET',
+  'STRIPE_SECRET_KEY', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET',
+  'ANTHROPIC_API_KEY', 'WEBHOOK_SECRET', 'EMAIL_WEBHOOK_SECRET', 'INBOUND_WEBHOOK_SECRET',
+  'META_WHATSAPP_TOKEN', 'META_PHONE_NUMBER_ID', 'META_WABA_ID', 'META_APP_ID', 'META_APP_SECRET',
+  'PLIVO_AUTH_ID', 'PLIVO_AUTH_TOKEN', 'ELEVENLABS_API_KEY', 'CARTESIA_API_KEY', 'DEEPGRAM_API_KEY',
+  'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS',
 ]) {
   process.env[name] = '';
 }

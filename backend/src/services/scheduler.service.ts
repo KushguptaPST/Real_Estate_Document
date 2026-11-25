@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { prisma } from '../utils/prisma.js';
 import { checkAndDispatchAlerts } from './alert.service.js';
 import { processOutboxJobs } from './messaging/outboxDispatcher.js';
+import { processCampaignDialerBatch } from './campaignWorker.service.js';
 import { logger } from '../utils/logger.js';
 
 let cronTask: cron.ScheduledTask | null = null;
@@ -27,7 +28,7 @@ export function startScheduler(): void {
     }
   });
 
-  // GAP-10: Periodic outbox worker loop (every 60s) for retrying and autonomous queue draining
+  // GAP-10: Periodic outbox & outbound Plivo campaign dialer worker loop (every 60s)
   if (!outboxInterval) {
     outboxInterval = setInterval(async () => {
       try {
@@ -35,8 +36,12 @@ export function startScheduler(): void {
         if (result.processed > 0) {
           logger.info(`[Scheduler] Outbox tick processed: ${result.processed} (succeeded: ${result.succeeded}, retried: ${result.retried})`);
         }
+        const dialResult = await processCampaignDialerBatch({ maxPerCampaign: 5 });
+        if (dialResult.dialed > 0 || dialResult.skipped > 0) {
+          logger.info(`[Scheduler] Campaign dialer tick: dialed=${dialResult.dialed}, skipped=${dialResult.skipped}`);
+        }
       } catch (err) {
-        logger.error('[Scheduler] Error during outbox worker tick:', err);
+        logger.error('[Scheduler] Error during outbox/campaign worker tick:', err);
       }
     }, 60_000);
   }

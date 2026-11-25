@@ -14,6 +14,7 @@ import {
   ArrowRight,
   X,
   PhoneCall,
+  CreditCard,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -81,6 +82,14 @@ const COMMAND_ITEMS: CommandItem[] = [
     category: 'Navigation',
     icon: ShieldCheck,
     path: '/organization',
+  },
+  {
+    id: 'billing',
+    title: 'Plan & Billing',
+    subtitle: 'Upgrade subscription, manage quotas, and top up wallet',
+    category: 'Navigation',
+    icon: CreditCard,
+    path: '/billing',
   },
   {
     id: 'audit',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2,
@@ -6,22 +6,15 @@ import {
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
-  Lock,
-  User,
-  Mail,
-  KeyRound,
-  Compass,
-  Zap,
   Check,
   Loader2,
   AlertCircle,
-  Volume2,
-  Calendar,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { billingApi, authApi } from '@/services/api';
-import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
+import { billingApi, organizationApi } from '@/services/api';
+import { openRazorpayCheckout } from '@/utils/razorpay';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 const JURISDICTIONS = [
   {
@@ -55,50 +48,56 @@ const PLANS = [
     id: 'SOLO' as const,
     name: 'Solo Channel Partner',
     badge: 'Starter',
-    monthlyPrice: 4999,
-    annualPrice: 3999,
-    tagline: 'For independent brokers & CPs closing active buyer inquiries',
+    monthlyPrice: 7499,
+    annualPrice: 5999,
+    includedCreditsInr: 6000,
+    tagline: 'Daily AI cold calling (~40–50 dials/day) + WhatsApp',
     features: [
-      'Sub-15s WhatsApp Speed-to-Lead Auto-Reply',
-      'Up to 15 active buyer deals & client memory',
-      'Digital Brochure PDF & Floor Plan Dispatch',
-      'Site Visit Walk-in Scheduler & Google Maps Pin',
-      'Indian Rupee (₹ Lakhs & Crores) Tracking',
+      '500 AI Calling Mins (~1,000–1,250 cold dials/mo)',
+      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      'ElevenLabs Studio Voice + 1 Plivo India DID',
+      'Unlimited Website Chat Widget & Telegram Bot',
+      'WhatsApp Speed-to-Lead + PDF Brochure & Location Pin',
+      'Site Visit Scheduling & Deal Document Copilot (Up to 50 deals)',
     ],
   },
   {
     id: 'TEAM' as const,
     name: 'Brokerage Team',
     badge: 'Most Popular',
-    monthlyPrice: 14999,
-    annualPrice: 11999,
-    tagline: 'For high-producing teams, mandate agencies & brokerages',
+    monthlyPrice: 21999,
+    annualPrice: 17599,
+    includedCreditsInr: 19200,
+    tagline: 'AI Sales Team (~120–150 dials/day + up to 10 seats)',
     popular: true,
     features: [
-      'Omnichannel WhatsApp Business & Voice Notes',
-      'Meta (FB/IG) Lead Ads & 99acres Sync',
-      'Plivo Speed-to-Lead Outbound Calling',
-      'Up to 10 Agent & Telecaller workspace seats',
-      'Unlimited Active Deals & Model Flat Walkthroughs',
-      '45-Day Lead Protection & Claim Lock for Agents',
-      '18% GST Input Tax Credit (ITC) Invoices',
+      '1,600 AI Calling Mins (~3,200–4,000 cold dials/mo)',
+      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      'ElevenLabs Studio Voice + Plivo Batch Campaign Dialer',
+      'Unlimited Website Chat Widget & Telegram Bot',
+      'WhatsApp Coexistence (Auto-pause when advisor replies)',
+      'Up to 10 Team Seats + Live Warm Call Transfer',
+      'CSV Bulk Lead Import & Unlimited Active Deals',
+      'Unified Razorpay INR Wallet & Ledger Tracking',
     ],
   },
   {
     id: 'ENTERPRISE' as const,
-    name: 'Developer / Builder Enterprise',
-    badge: 'Builder Scale',
-    monthlyPrice: 39999,
-    annualPrice: 31999,
-    tagline: 'For multi-project developers and high-volume mandate firms',
+    name: 'Builder / Mandate Center',
+    badge: 'High Volume',
+    monthlyPrice: 54999,
+    annualPrice: 43999,
+    includedCreditsInr: 48000,
+    tagline: 'High-scale mandate center (~300+ cold dials/day)',
     popular: false,
     features: [
-      'Unlimited Calling Seats & In-House Telecallers',
-      'Multi-Project Inventory & Master Stacking',
-      'Custom Agent Hinglish Voice Cloning Digital Twin',
-      'High-Scale Batch Campaign Dialing Center',
-      'Dedicated Real-Time Webhook Pipeline & CRM API',
-      'Priority 24/7 Account Manager & Dedicated Onboarding',
+      '4,000 AI Calling Mins (~8,000–10,000 cold dials/mo)',
+      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      'Up to 100 Team Seats + Isolated Plivo Subaccount',
+      'Multi-Project RERA Inventory & Hybrid Knowledge Search',
+      'Tenant API Keys & HMAC-Signed Inbound Lead Webhooks',
+      'Unlimited Website Chat Widget, Telegram & Audit Trail',
+      'Guided Plivo India KYC & Channel Onboarding',
     ],
   },
 ];
@@ -106,78 +105,57 @@ const PLANS = [
 export function SignupPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { registerOrg } = useAuth();
+  const { user, signInWithGoogle, refreshUser, signOut } = useAuth();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(() =>
+    user?.subscriptionStatus === 'PENDING_PAYMENT' ? 2 : 1,
+  );
   const [selectedPlan, setSelectedPlan] = useState<'SOLO' | 'TEAM' | 'ENTERPRISE'>(
     (searchParams.get('plan') as 'SOLO' | 'TEAM' | 'ENTERPRISE') || 'TEAM',
   );
-  const [isAnnual, setIsAnnual] = useState(true);
-  const [selectedJurisdiction, setSelectedJurisdiction] = useState('KA');
+  const [isAnnual, setIsAnnual] = useState(searchParams.get('annual') === 'true');
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState(user?.stateJurisdiction || 'KA');
+  const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [checkingEmail, setCheckingEmail] = useState(false);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    ownerName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    organizationName: '',
-  });
-
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validateStep1 = () => {
-    const errs: Record<string, string> = {};
-    if (!formData.ownerName.trim()) errs.ownerName = 'Managing broker name is required.';
-    if (!formData.email.trim()) {
-      errs.email = 'Valid work email is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errs.email = 'Please provide a valid email format.';
+  const activePlan = PLANS.find((p) => p.id === selectedPlan) || PLANS[1];
+  const dueTodayInr = isAnnual ? activePlan.annualPrice * 12 : activePlan.monthlyPrice;
+
+  useEffect(() => {
+    if (user?.subscriptionStatus === 'PENDING_PAYMENT') {
+      setStep((prev) => (prev === 1 ? 2 : prev));
+      if (user.stateJurisdiction) setSelectedJurisdiction(user.stateJurisdiction);
+      if (user.organizationName && !organizationName && !user.organizationName.endsWith("'s Brokerage")) {
+        setOrganizationName(user.organizationName);
+      }
     }
-    if (!formData.password) {
-      errs.password = 'Password is required.';
-    } else if (formData.password.length < 6) {
-      errs.password = 'Password must be at least 6 characters.';
+  }, [user, organizationName]);
+
+  const handleGoogleStep = async (credential: string) => {
+    setErrors({});
+    const res = await signInWithGoogle(credential);
+    if (!res.isNewWorkspace && res.user.subscriptionStatus !== 'PENDING_PAYMENT') {
+      toast.success('Welcome back to your active brokerage workspace.');
+      navigate('/deals', { replace: true });
+      return;
     }
-    if (formData.password !== formData.confirmPassword) {
-      errs.confirmPassword = 'Passwords do not match.';
-    }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    toast.success(`Verified ${res.user.email} via Google`);
+    setStep(2);
   };
 
   const validateStep2 = () => {
     const errs: Record<string, string> = {};
-    if (!formData.organizationName.trim()) {
-      errs.organizationName = 'Brokerage or team name is required.';
+    if (!organizationName.trim() || organizationName.trim().length < 2) {
+      errs.organizationName = 'Brokerage or team name is required (min 2 characters).';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleNext = async () => {
-    if (step === 1 && validateStep1()) {
-      try {
-        setCheckingEmail(true);
-        const res = await authApi.checkEmail(formData.email.trim());
-        if (res.exists) {
-          setErrors({
-            email: 'An account with this email address already exists. Please log in.',
-          });
-          toast.warning(
-            'This email is already registered. Please sign in to your existing account.',
-            'Account Exists',
-          );
-          return;
-        }
-      } catch (err) {
-        // network fallback
-      } finally {
-        setCheckingEmail(false);
-      }
+  const handleNext = () => {
+    if (step === 1 && user) {
       setStep(2);
     } else if (step === 2 && validateStep2()) {
       setStep(3);
@@ -190,48 +168,53 @@ export function SignupPage() {
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      setStep(1);
+      setErrors({ form: 'Please verify your Google account first.' });
+      return;
+    }
+    if (!validateStep2()) {
+      setStep(2);
+      return;
+    }
+
     setLoading(true);
     setErrors({});
 
     try {
-      // 1. Atomically register Organization and Owner user
-      await registerOrg({
-        ownerName: formData.ownerName.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-        organizationName: formData.organizationName.trim(),
+      // 1. Save Brokerage Name, Market & Selected Plan on the Google-verified workspace
+      await organizationApi.updateWorkspaceProfile({
+        organizationName: organizationName.trim(),
         stateJurisdiction: selectedJurisdiction,
         planTier: selectedPlan,
       });
 
+      // 2. Single unified Razorpay Checkout (activates plan + auto-credits included AI & Calling credits)
+      const order = await billingApi.createRazorpayOrder({
+        type: 'SUBSCRIPTION_PLAN',
+        plan: selectedPlan,
+        isAnnual,
+      });
+      const rzpResponse = await openRazorpayCheckout(order);
+      const verified = await billingApi.verifyRazorpayPayment({
+        ...rzpResponse,
+        type: 'SUBSCRIPTION_PLAN',
+        plan: selectedPlan,
+        isAnnual,
+      });
+
+      await refreshUser();
+
       toast.success(
-        `Welcome ${formData.ownerName}. Your brokerage workspace is activated on the ${selectedPlan} plan.`,
-        'Workspace Created!',
+        `Plan activated with ₹${(verified.includedCreditsInr ?? verified.newBalance ?? 0).toLocaleString('en-IN')} AI & Calling credits included.`,
+        `${selectedPlan} Workspace Live!`,
       );
 
-      // 2. Try creating checkout session or direct to dashboard
-      try {
-        const checkout = await billingApi.createCheckoutSession({
-          plan: selectedPlan,
-          isAnnual,
-          successUrl: `${window.location.origin}/deals?checkout=success&plan=${selectedPlan}`,
-          cancelUrl: `${window.location.origin}/pricing?checkout=cancelled`,
-        });
-
-        if (checkout.url && !checkout.mock) {
-          window.location.href = checkout.url;
-          return;
-        }
-      } catch (billingErr) {
-        console.warn('Billing checkout redirect fallback:', billingErr);
-      }
-
-      // Default redirect to Deals pipeline
-      navigate('/deals', { replace: true });
+      navigate('/onboarding', { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Registration failed. Please check your inputs.';
+      const msg = err instanceof Error ? err.message : 'Payment did not complete. Click Pay via Razorpay & Activate to retry.';
       setErrors({ form: msg });
-      toast.error(msg, 'Registration Failed');
+      toast.error(msg, 'Complete Razorpay Payment');
     } finally {
       setLoading(false);
     }
@@ -285,7 +268,7 @@ export function SignupPage() {
                 {step > 1 ? <Check className="h-4 w-4" /> : '1'}
               </div>
               <span className={`text-[11px] mt-1.5 font-medium ${step >= 1 ? 'text-[#0A0A0A] font-bold' : 'text-zinc-400'}`}>
-                Owner Profile
+                Google Account
               </span>
             </div>
 
@@ -332,135 +315,63 @@ export function SignupPage() {
             </div>
           )}
 
-          {/* STEP 1: Owner Profile */}
+          {/* STEP 1: Verified Google Sign-In (Zero Passwords) */}
           {step === 1 && (
-            <div className="space-y-6 max-w-xl mx-auto">
+            <div className="space-y-6 max-w-md mx-auto">
               <div className="text-center space-y-1.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-xs font-semibold border border-zinc-200">
                   Step 1 of 3
                 </span>
                 <h2 className="text-2xl font-bold tracking-tight text-[#0A0A0A]">
-                  Create your Broker Owner Profile
+                  Verify Your Google Account
                 </h2>
                 <p className="text-xs text-[#52525B]">
-                  You will have primary administrator privileges over your brokerage pipeline and escrow vault.
+                  Sign in with your verified Gmail or Google Workspace email—no unverified emails or passwords required.
                 </p>
               </div>
 
-              <div className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                    Managing Broker / Agent Full Name
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                    <input
-                      type="text"
-                      value={formData.ownerName}
-                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
-                      placeholder="e.g. Sarah Jenkins, Broker"
-                      className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
-                        errors.ownerName ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
-                      }`}
-                    />
-                  </div>
-                  {errors.ownerName && <p className="text-[11px] text-red-600 mt-1">{errors.ownerName}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                    Direct Work Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="broker@yourbrokerage.com"
-                      className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
-                        errors.email ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
-                      }`}
-                    />
-                  </div>
-                  {errors.email && (
-                    <div className="mt-1.5 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
-                      <span className="text-[11px] font-medium">{errors.email}</span>
-                      {errors.email.toLowerCase().includes('already exists') && (
-                        <Link
-                          to={`/login?email=${encodeURIComponent(formData.email.trim())}`}
-                          className="inline-flex items-center gap-1 font-bold text-slate-900 hover:underline px-2.5 py-1 rounded-lg bg-amber-200/80 text-[11px] shrink-0"
-                        >
-                          Sign In &rarr;
-                        </Link>
-                      )}
+              {user ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-700 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-emerald-950 truncate">
+                        Verified as {user.name || user.email}
+                      </p>
+                      <p className="text-[11px] text-emerald-800 truncate">{user.email}</p>
                     </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                      Account Password
-                    </label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                      <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        placeholder="At least 6 characters"
-                        className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
-                          errors.password ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
-                        }`}
-                      />
-                    </div>
-                    {errors.password && <p className="text-[11px] text-red-600 mt-1">{errors.password}</p>}
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                      <input
-                        type="password"
-                        value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        placeholder="Re-enter password"
-                        className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
-                          errors.confirmPassword ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
-                        }`}
-                      />
-                    </div>
-                    {errors.confirmPassword && (
-                      <p className="text-[11px] text-red-600 mt-1">{errors.confirmPassword}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={checkingEmail}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 bg-[#0A0A0A] hover:bg-zinc-800 text-white font-semibold text-xs shadow-xs transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
-                >
-                  {checkingEmail ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Checking email...</span>
-                    </>
-                  ) : (
-                    <>
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 bg-[#0A0A0A] hover:bg-zinc-800 text-white font-semibold text-xs cursor-pointer"
+                    >
                       <span>Continue to Brokerage Profile</span>
                       <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={signOut}
+                      className="px-4 py-2.5 rounded-full border border-emerald-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                    >
+                      Switch Account
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  <GoogleSignInButton
+                    onCredential={handleGoogleStep}
+                    onError={(msg) => setErrors({ form: msg })}
+                    text="continue_with"
+                  />
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-zinc-50 border border-zinc-200/70 px-3 py-2.5 text-[11px] text-zinc-600">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>If your brokerage already exists, you&apos;ll be signed straight in.</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -475,7 +386,7 @@ export function SignupPage() {
                   Brokerage Firm &amp; State Jurisdiction
                 </h2>
                 <p className="text-xs text-[#52525B]">
-                  Select your primary state licensing body to configure deterministic business-day and deadline calculation rules.
+                  {user ? `Signed in with Google (${user.email}). ` : ''}Select your primary market hub to configure AI lead qualification rules.
                 </p>
               </div>
 
@@ -488,8 +399,8 @@ export function SignupPage() {
                     <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                     <input
                       type="text"
-                      value={formData.organizationName}
-                      onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                      value={organizationName}
+                      onChange={(e) => setOrganizationName(e.target.value)}
                       placeholder="e.g. Eigen Estate, Prestige Realty, or Apex Advisory"
                       className={`w-full rounded-xl border bg-zinc-50/50 pl-10 pr-4 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 ${
                         errors.organizationName ? 'border-red-400 ring-2 ring-red-200' : 'border-zinc-200'
@@ -567,30 +478,33 @@ export function SignupPage() {
                   Every plan includes speed-to-lead AI sales capabilities, 50-state statutory date surveillance, and verifiable contract citations.
                 </p>
 
-                {/* Billing Toggle */}
-                <div className="mt-4 flex items-center justify-center gap-3">
-                  <span className={`text-xs font-medium ${!isAnnual ? 'text-zinc-900 font-bold' : 'text-zinc-400'}`}>
-                    Monthly Billing
-                  </span>
+                {/* Billing Cycle Selector */}
+                <div className="mt-4 inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 p-1">
                   <button
                     type="button"
-                    onClick={() => setIsAnnual(!isAnnual)}
-                    className="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border border-zinc-200 bg-white transition-colors duration-200 ease-in-out"
+                    onClick={() => setIsAnnual(false)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      !isAnnual
+                        ? 'bg-[#0A0A0A] text-white shadow-xs'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[#0A0A0A] mt-1 ml-1 shadow transition duration-200 ease-in-out ${
-                        isAnnual ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
+                    Monthly Billing
                   </button>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-xs font-medium ${isAnnual ? 'text-zinc-900 font-bold' : 'text-zinc-400'}`}>
-                      Annual Billing
-                    </span>
-                    <span className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setIsAnnual(true)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      isAnnual
+                        ? 'bg-[#0A0A0A] text-white shadow-xs'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                  >
+                    <span>Annual Billing</span>
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
                       Save 20%
                     </span>
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -656,7 +570,7 @@ export function SignupPage() {
                               : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                           }`}
                         >
-                          {isSelected ? 'Selected Platform Tier' : 'Select Plan'}
+                          {isSelected ? 'Selected' : 'Select Plan'}
                         </button>
                       </div>
                     </div>
@@ -664,27 +578,11 @@ export function SignupPage() {
                 })}
               </div>
 
-              {/* Inline Error & Sign In Action Banner */}
+              {/* Inline Error Banner */}
               {errors.form && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-900 space-y-2.5">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                    <span>{errors.form}</span>
-                  </div>
-                  {errors.form.toLowerCase().includes('already exists') && (
-                    <div className="pt-2 border-t border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <span className="text-[11px] text-rose-700">
-                        An account is already registered with <strong>{formData.email}</strong>.
-                      </span>
-                      <Link
-                        to={`/login?email=${encodeURIComponent(formData.email)}`}
-                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#0A0A0A] hover:bg-black text-white font-bold text-xs shadow-xs transition-all shrink-0 cursor-pointer"
-                      >
-                        <span>Sign In to Existing Account</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  )}
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-xs text-rose-900 flex items-center gap-2 font-semibold">
+                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  <span>{errors.form}</span>
                 </div>
               )}
 
@@ -702,10 +600,13 @@ export function SignupPage() {
                 <div className="flex items-center gap-4 w-full sm:w-auto">
                   <div className="text-right hidden sm:block">
                     <span className="text-xs font-bold text-zinc-900 block">
-                      Ready to launch {formData.organizationName || 'your brokerage'}
+                      Total due today: ₹{dueTodayInr.toLocaleString('en-IN')}{' '}
+                      <span className="font-normal text-zinc-500">
+                        ({isAnnual ? '12 months annual' : 'monthly'})
+                      </span>
                     </span>
                     <span className="text-[11px] text-zinc-500 block font-mono">
-                      Market: {selectedJurisdiction} &bull; Tier: {selectedPlan}
+                      {organizationName || 'Your Brokerage'} &bull; {selectedJurisdiction} &bull; Includes ₹{activePlan.includedCreditsInr.toLocaleString('en-IN')} AI credits
                     </span>
                   </div>
 
@@ -722,7 +623,7 @@ export function SignupPage() {
                       </>
                     ) : (
                       <>
-                        <span>Complete Setup &amp; Activate</span>
+                        <span>Pay ₹{dueTodayInr.toLocaleString('en-IN')} via Razorpay</span>
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}
@@ -736,7 +637,7 @@ export function SignupPage() {
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-6 text-center text-xs text-zinc-400 border-t border-[#E5E7EB]">
-        <span>&copy; {new Date().getFullYear()} Eigen Estate Inc. &bull; eigenestate.com &bull; AES-256 Vault &bull; SOC2 Type II Certified</span>
+        <span>&copy; {new Date().getFullYear()} Eigen Estate Inc. &bull; eigenestate.com &bull; Google-Verified Auth &bull; Tenant-Isolated Audit Trail</span>
       </footer>
     </div>
   );

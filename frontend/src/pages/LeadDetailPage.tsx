@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { leadsApi, conversationsApi, propertiesApi, organizationApi, siteVisitsApi, voiceApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+import { WorkspacePageSkeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
 import type {
   Lead,
   LeadAssignmentHistory,
@@ -1261,11 +1262,7 @@ export function LeadDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
-      </div>
-    );
+    return <WorkspacePageSkeleton />;
   }
 
   if (error || !lead) {
@@ -2875,10 +2872,7 @@ export function LeadDetailPage() {
             </button>
           </div>
         ) : loadingTimeline && timelineEvents.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 space-y-2">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto text-emerald-700" />
-            <p className="text-xs">Loading activity timeline...</p>
-          </div>
+          <TableRowsSkeleton rows={3} compact />
         ) : timelineEvents.length === 0 ? (
           <div className="p-10 rounded-xl border border-dashed border-slate-200 text-center space-y-2">
             <Clock className="h-8 w-8 text-slate-400 mx-auto" />

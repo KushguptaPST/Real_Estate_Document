@@ -44,19 +44,18 @@ export function PublicHeader() {
           : 'bg-white/80 backdrop-blur-md border-b border-zinc-200/70'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo & Wordmark */}
-        <Link to="/" className="flex items-center group py-1">
+        <Link to="/" className="flex items-center group py-1 shrink-0">
           <img
             src="/brand/eigen-estate-full.png"
             alt="EigenEstate"
-            style={{ height: '32px', width: 'auto' }}
-            className="h-8 w-auto object-contain hover:opacity-90 transition-opacity"
+            className="h-7 sm:h-8 w-auto object-contain hover:opacity-90 transition-opacity"
           />
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-8 text-[13px] text-zinc-600 font-medium">
+        <nav className="hidden xl:flex items-center gap-6 text-[13px] text-zinc-600 font-medium whitespace-nowrap">
           {navLinks.map((link) => {
             const active = isCurrentActive(link.href);
             if (link.isRoute) {
@@ -64,7 +63,7 @@ export function PublicHeader() {
                 <Link
                   key={link.label}
                   to={link.href}
-                  className={`transition-colors ${
+                  className={`whitespace-nowrap transition-colors ${
                     active ? 'text-zinc-950 font-semibold' : 'hover:text-zinc-950'
                   }`}
                 >
@@ -76,7 +75,7 @@ export function PublicHeader() {
               <a
                 key={link.label}
                 href={link.href}
-                className={`transition-colors ${
+                className={`whitespace-nowrap transition-colors ${
                   active ? 'text-zinc-950 font-semibold' : 'hover:text-zinc-950'
                 }`}
               >
@@ -87,38 +86,38 @@ export function PublicHeader() {
         </nav>
 
         {/* Right Action CTAs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           {user ? (
             <Link
               to="/deals"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full bg-[#0A0A0A] text-white hover:bg-zinc-800 transition-all hover:-translate-y-0.5 shadow-2xs"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 sm:px-4 py-2 rounded-full bg-[#0A0A0A] text-white hover:bg-zinc-800 transition-all hover:-translate-y-0.5 shadow-2xs whitespace-nowrap"
             >
               <span>Brokerage Pipeline</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
             </Link>
           ) : (
             <>
               <Link
                 to="/login"
-                className="inline-flex text-[13px] font-semibold text-zinc-700 hover:text-zinc-950 px-3.5 py-1.5 rounded-full hover:bg-zinc-100 transition-all"
+                className="inline-flex text-[13px] font-semibold text-zinc-700 hover:text-zinc-950 px-3 sm:px-3.5 py-1.5 rounded-full hover:bg-zinc-100 transition-all whitespace-nowrap"
               >
                 Sign In
               </Link>
               <Link
                 to="/signup"
-                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full bg-[#0A0A0A] text-white hover:bg-zinc-800 transition-all hover:-translate-y-0.5 shadow-2xs"
+                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full bg-[#0A0A0A] text-white hover:bg-zinc-800 transition-all hover:-translate-y-0.5 shadow-2xs whitespace-nowrap"
               >
                 <span>Start Free Trial</span>
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
               </Link>
             </>
           )}
 
-          {/* Mobile Hamburger Toggle Button */}
+          {/* Mobile / Tablet Hamburger Toggle Button */}
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 rounded-lg text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100 transition-colors"
+            className="xl:hidden p-1.5 rounded-lg text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100 transition-colors cursor-pointer"
             aria-label="Toggle Navigation Menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -126,7 +125,7 @@ export function PublicHeader() {
         </div>
       </div>
 
-      {/* Mobile Dropdown Navigation Drawer */}
+      {/* Mobile / Tablet Dropdown Navigation Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -134,7 +133,7 @@ export function PublicHeader() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="lg:hidden border-b border-[#E5E7EB] bg-white/95 backdrop-blur-2xl px-6 py-6 space-y-4 shadow-xl"
+            className="xl:hidden border-b border-[#E5E7EB] bg-white/95 backdrop-blur-2xl px-6 py-6 space-y-4 shadow-xl"
           >
             <nav className="flex flex-col space-y-1 text-sm font-medium text-zinc-700">
               {navLinks.map((link) => {

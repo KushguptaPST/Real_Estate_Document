@@ -3,6 +3,7 @@
  * Implements Resend, SendGrid, and safe mock/simulation drivers.
  */
 
+import nodemailer from 'nodemailer';
 import { logger } from '../../utils/logger.js';
 import { maskEmail } from '../../utils/audit.js';
 import { whatsAppService } from './whatsapp.service.js';
@@ -205,6 +206,55 @@ export class WhatsAppMessagingProvider implements IMessagingProvider {
 }
 
 /**
+ * SMTP Email Messaging Provider (Nodemailer)
+ */
+export class SmtpMessagingProvider implements IMessagingProvider {
+  readonly name = 'smtp';
+
+  async send(payload: OutboundMessagePayload): Promise<OutboundDispatchResult> {
+    const isTest = process.env['NODE_ENV'] === 'test';
+    if (isTest) {
+      return { success: true, providerMessageId: `test-smtp-${Date.now()}` };
+    }
+
+    const host = process.env['SMTP_HOST'];
+    const user = process.env['SMTP_USER'];
+    const pass = process.env['SMTP_PASS'];
+    const from = payload.from ?? process.env['EMAIL_FROM'] ?? user ?? 'Eigen Estate <no-reply@example.com>';
+
+    if (!host || !user || !pass) {
+      const simId = `sim-smtp-${Date.now()}`;
+      logger.warn(`[SMTP Notice] SMTP credentials missing. Simulating dispatch (${simId}).`);
+      return { success: true, providerMessageId: simId };
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port: Number(process.env['SMTP_PORT'] ?? 587),
+        secure: process.env['SMTP_SECURE'] === 'true',
+        auth: { user, pass },
+      });
+
+      const info = await transporter.sendMail({
+        from,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html || `<p>${payload.text}</p>`,
+        text: payload.text,
+      });
+
+      logger.info(`[SMTP Dispatched] ID: ${info.messageId} to ${maskEmail(payload.to)}`);
+      return { success: true, providerMessageId: info.messageId };
+    } catch (err: any) {
+      const msg = err.message || 'Unknown SMTP error';
+      logger.error(`[SMTP Dispatch Error] ${msg}`);
+      return { success: false, error: msg, isTransient: false };
+    }
+  }
+}
+
+/**
  * Provider factory returning the configured messaging driver.
  */
 let customProviderOverride: IMessagingProvider | null = null;
@@ -224,6 +274,8 @@ export function getMessagingProvider(channel?: string): IMessagingProvider {
 
   const driver = (process.env['EMAIL_DRIVER'] || 'resend').toLowerCase();
   switch (driver) {
+    case 'smtp':
+      return new SmtpMessagingProvider();
     case 'sendgrid':
       return new SendGridMessagingProvider();
     case 'resend':

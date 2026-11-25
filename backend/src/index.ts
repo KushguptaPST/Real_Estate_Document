@@ -5,6 +5,7 @@ import { logger } from './utils/logger.js';
 import { initAlertCron, stopAlertCron } from './services/alert.service.js';
 import { initTelegramBot, stopTelegramBot } from './services/telegram.service.js';
 import { assertSecurityConfig } from './services/auth.service.js';
+import { attachPlivoStreamGateway } from './services/telephony/plivoStreamGateway.js';
 import { prisma } from './utils/prisma.js';
 
 // Refuse to start with an insecure configuration (missing/weak JWT_SECRET, demo login in production).
@@ -105,6 +106,12 @@ if (process.env.NODE_ENV !== 'test') {
 
     // Initialize automated contingency deadline alerts
     initAlertCron();
+
+    // Attach Plivo bidirectional <Stream> WebSocket gateway (/ws/plivo/:sessionId)
+    if (server) {
+      attachPlivoStreamGateway(server);
+      logger.info('📞 [Plivo Stream] Bidirectional WebSocket voice gateway attached at /ws/plivo/:sessionId');
+    }
 
     // Initialize Telegram Bot agentic AI listener
     initTelegramBot().catch((err) => {

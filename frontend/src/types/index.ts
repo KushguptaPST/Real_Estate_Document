@@ -164,8 +164,10 @@ export interface User {
   organizationId?: string;
   organizationName?: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
   stateJurisdiction?: string;
   role?: 'OWNER' | 'AGENT';
+  isPlatformAdmin?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
 }

@@ -110,27 +110,25 @@ html.lenis, html.lenis body {
 }
 
 @layer components {
-  /* ── Smooth Page & Tab Transition ── */
+  /* ── Opacity-Only Fade (No Vertical Shift / Layout Jitter) ── */
   @keyframes smoothFadeIn {
     from {
-      opacity: 0.8;
-      transform: translateY(2px);
+      opacity: 0.9;
     }
     to {
       opacity: 1;
-      transform: none;
     }
   }
 
   .smooth-transition {
-    animation: smoothFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: smoothFadeIn 0.14s ease-out;
   }
 
   /* ── Razorpay / Wispr Flow Design Tokens ── */
   .stripe-nav {
-    background-color: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    background-color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.85);
   }
 
   .stripe-card {
@@ -138,7 +136,7 @@ html.lenis, html.lenis body {
     border: 1px solid rgba(226, 232, 240, 0.8);
     border-radius: 0.875rem;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out;
   }
 
   .stripe-card:hover {
@@ -148,28 +146,28 @@ html.lenis, html.lenis body {
 
   /* ── Crisp Action Buttons ── */
   .btn-stripe-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#0A0A0A] hover:bg-zinc-800 active:bg-black text-white px-4 py-2 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#0A0A0A] hover:bg-zinc-800 active:bg-black text-white px-4 py-2 text-xs font-semibold shadow-xs transition-[background-color,box-shadow,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
   }
 
   .btn-stripe-navy {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-xs font-semibold shadow-xs transition-[background-color,box-shadow,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
   }
 
   .btn-stripe-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300 px-4 py-2 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300 px-4 py-2 text-xs font-semibold shadow-xs transition-[background-color,border-color,box-shadow,transform] duration-150 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99];
   }
 
   .btn-stripe-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all cursor-pointer;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors duration-150 cursor-pointer;
   }
 
   .card {
-    @apply rounded-xl border border-zinc-200/80 bg-white text-zinc-900 transition-all;
+    @apply rounded-xl border border-zinc-200/80 bg-white text-zinc-900 transition-[border-color,box-shadow] duration-150;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
   }
 
   .card-hover {
-    @apply rounded-xl border border-zinc-200/80 bg-white text-zinc-900 transition-all hover:border-zinc-300;
+    @apply rounded-xl border border-zinc-200/80 bg-white text-zinc-900 transition-[border-color,box-shadow] duration-150 hover:border-zinc-300;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
   }
 
@@ -178,7 +176,7 @@ html.lenis, html.lenis body {
   }
 
   .input-base {
-    @apply w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none transition-all shadow-2xs;
+    @apply w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 focus:outline-none transition-[border-color,box-shadow] duration-150 shadow-2xs;
   }
 
   .label-base {
@@ -306,4 +304,19 @@ html.lenis, html.lenis body {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 45%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
 }

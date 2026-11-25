@@ -39,6 +39,7 @@ import type {
   ActionQueueBucket,
 } from '@/types';
 import { authHeaders, notifyUnauthorized } from './session';
+import { swrCache } from '@/utils/swrCache';
 
 const BASE_URL = import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001/api';
 
@@ -65,7 +66,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
-  return res.json() as Promise<T>;
+  if (res.status === 204) {
+    return undefined as T;
+  }
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -95,7 +103,7 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
   signInWithGoogle: (credential: string, inviteToken?: string) =>
-    request<{ token: string; user: User }>('/auth/google', {
+    request<{ token: string; user: User; isNewWorkspace?: boolean }>('/auth/google', {
       method: 'POST',
       body: JSON.stringify({ credential, ...(inviteToken ? { inviteToken } : {}) }),
     }),
@@ -109,24 +117,22 @@ export const authApi = {
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
 
-let _dealsCache: Deal[] | null = null;
+const DEALS_CACHE_KEY = 'deals:list';
 
 export const dealsApi = {
-  list: async () => {
-    const data = await request<Deal[]>('/deals');
-    _dealsCache = data;
-    return data;
-  },
-  getCached: () => _dealsCache,
+  list: () => swrCache.fetch(DEALS_CACHE_KEY, () => request<Deal[]>('/deals')),
+  getCached: () => swrCache.get<Deal[]>(DEALS_CACHE_KEY) ?? null,
+  prefetch: () => swrCache.prefetch(DEALS_CACHE_KEY, () => request<Deal[]>('/deals')),
   get: (id: string) => request<Deal>(`/deals/${id}`),
   create: async (data: CreateDealInput) => {
     const deal = await request<Deal>('/deals', { method: 'POST', body: JSON.stringify(data) });
-    _dealsCache = null;
+    swrCache.invalidate('deals:');
+    swrCache.invalidate('billing:');
     return deal;
   },
   update: async (id: string, data: Partial<CreateDealInput>) => {
     const deal = await request<Deal>(`/deals/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
-    _dealsCache = null;
+    swrCache.invalidate('deals:');
     return deal;
   },
 };
@@ -221,37 +227,73 @@ export const assistantApi = {
 
 // ── Feature 1: AI Leads API ───────────────────────────────────────────────────
 
+export interface LeadsListParams {
+  search?: string;
+  status?: string;
+  priority?: string;
+  assignedUserId?: string | null;
+  unassigned?: boolean;
+  unassignedOnly?: boolean;
+}
+
+function buildLeadsListKey(params?: LeadsListParams) {
+  const cleanParams: Record<string, string> = {};
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'undefined') {
+        cleanParams[k] = String(v);
+      }
+    });
+  }
+  const query = new URLSearchParams(cleanParams).toString();
+  return { key: `leads:list:${query}`, query };
+}
+
 export const leadsApi = {
-  list: (params?: {
-    search?: string;
-    status?: string;
-    priority?: string;
-    assignedUserId?: string | null;
-    unassigned?: boolean;
-    unassignedOnly?: boolean;
-  }) => {
-    const cleanParams: Record<string, string> = {};
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '' && v !== 'undefined') {
-          cleanParams[k] = String(v);
-        }
-      });
-    }
-    const query = new URLSearchParams(cleanParams).toString();
-    return request<Lead[]>(`/leads${query ? `?${query}` : ''}`);
+  list: (params?: LeadsListParams) => {
+    const { key, query } = buildLeadsListKey(params);
+    return swrCache.fetch(key, () => request<Lead[]>(`/leads${query ? `?${query}` : ''}`));
+  },
+  getCached: (params?: LeadsListParams) =>
+    swrCache.get<Lead[]>(buildLeadsListKey(params).key) ?? null,
+  prefetch: () => {
+    const { key, query } = buildLeadsListKey();
+    swrCache.prefetch(key, () => request<Lead[]>(`/leads${query ? `?${query}` : ''}`));
   },
   get: (id: string) => request<Lead>(`/leads/${id}`),
-  create: (data: { fullName: string; email?: string; phone?: string; enquiryText?: string; source?: string }) =>
-    request<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) =>
-    request<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  claim: (id: string, reason?: string) =>
-    request<Lead>(`/leads/${id}/claim`, { method: 'POST', body: JSON.stringify({ reason }) }),
-  release: (id: string, reason?: string) =>
-    request<Lead>(`/leads/${id}/release`, { method: 'POST', body: JSON.stringify({ reason }) }),
-  reassign: (id: string, targetUserId: string | null, reason?: string) =>
-    request<Lead>(`/leads/${id}/reassign`, { method: 'POST', body: JSON.stringify({ targetUserId, reason }) }),
+  create: async (data: { fullName: string; email?: string; phone?: string; enquiryText?: string; source?: string }) => {
+    const lead = await request<Lead>('/leads', { method: 'POST', body: JSON.stringify(data) });
+    swrCache.invalidate('leads:');
+    return lead;
+  },
+  importCsv: async (rows: Array<Record<string, unknown>>) => {
+    const res = await request<{ importedCount: number; skippedCount: number; errors: Array<{ row: number; reason: string }> }>(
+      '/leads/import',
+      { method: 'POST', body: JSON.stringify({ rows }) },
+    );
+    swrCache.invalidate('leads:');
+    return res;
+  },
+  update: async (id: string, data: any) => {
+    const lead = await request<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    swrCache.invalidate('leads:');
+    return lead;
+  },
+  claim: async (id: string, reason?: string) => {
+    const lead = await request<Lead>(`/leads/${id}/claim`, { method: 'POST', body: JSON.stringify({ reason }) });
+    swrCache.invalidate('leads:');
+    return lead;
+  },
+  release: async (id: string, reason?: string) => {
+    const lead = await request<Lead>(`/leads/${id}/release`, { method: 'POST', body: JSON.stringify({ reason }) });
+    swrCache.invalidate('leads:');
+    return lead;
+  },
+  reassign: async (id: string, targetUserId: string | null, reason?: string) => {
+    const lead = await request<Lead>(`/leads/${id}/reassign`, { method: 'POST', body: JSON.stringify({ targetUserId, reason }) });
+    swrCache.invalidate('leads:');
+    return lead;
+  },
   getAssignments: (id: string) =>
     request<LeadAssignmentHistory[]>(`/leads/${id}/assignments`),
   logCall: (id: string, data: CreateCallLogInput) =>
@@ -385,20 +427,56 @@ export const conversationsApi = {
 
 // ── Feature 3: Property Inventory & Matcher API ──────────────────────────────
 
+function buildPropertiesListKey(params?: { search?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string; status?: string }) {
+  const cleanParams: Record<string, string> = {};
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'undefined') {
+        cleanParams[k] = String(v);
+      }
+    });
+  }
+  const query = new URLSearchParams(cleanParams).toString();
+  return { key: `properties:list:${query}`, query };
+}
+
 export const propertiesApi = {
   list: (params?: { search?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string; status?: string }) => {
-    const cleanParams: Record<string, string> = {};
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '' && v !== 'undefined') {
-          cleanParams[k] = String(v);
-        }
-      });
-    }
-    const query = new URLSearchParams(cleanParams).toString();
-    return request<any[]>(`/properties${query ? `?${query}` : ''}`);
+    const { key, query } = buildPropertiesListKey(params);
+    return swrCache.fetch(key, () => request<any[]>(`/properties${query ? `?${query}` : ''}`));
   },
-  create: (data: any) => request<any>('/properties', { method: 'POST', body: JSON.stringify(data) }),
+  getCached: (params?: { search?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; city?: string; status?: string }) =>
+    swrCache.get<any[]>(buildPropertiesListKey(params).key) ?? null,
+  prefetch: () => {
+    const { key, query } = buildPropertiesListKey();
+    swrCache.prefetch(key, () => request<any[]>(`/properties${query ? `?${query}` : ''}`));
+  },
+  create: async (data: any) => {
+    const prop = await request<any>('/properties', { method: 'POST', body: JSON.stringify(data) });
+    swrCache.invalidate('properties:');
+    swrCache.invalidate('org:onboarding');
+    return prop;
+  },
+  update: async (id: string, data: any) => {
+    const prop = await request<any>(`/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    swrCache.invalidate('properties:');
+    return prop;
+  },
+  importCsv: async (rows: Array<Record<string, unknown>>) => {
+    const res = await request<{ importedCount: number; skippedCount: number; errors: Array<{ row: number; reason: string }> }>(
+      '/properties/import',
+      { method: 'POST', body: JSON.stringify({ rows }) },
+    );
+    swrCache.invalidate('properties:');
+    swrCache.invalidate('org:onboarding');
+    return res;
+  },
+  uploadBrochure: async (file: File): Promise<{ url: string; filename: string; sizeBytes: number }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await send('/properties/brochure', { method: 'POST', body: form });
+    return res.json();
+  },
   getLeadMatches: (leadId: string) => request<any[]>(`/leads/${leadId}/matches`),
   refreshLeadMatches: (leadId: string) =>
     request<any>(`/leads/${leadId}/matches/refresh`, { method: 'POST' }),
@@ -434,9 +512,23 @@ export const knowledgeApi = {
 // ── Feature 6: Organization & Team API ────────────────────────────────────────
 
 export const organizationApi = {
-  listMembers: () => request<User[]>('/org/members'),
+  listMembers: () => swrCache.fetch('org:members', () => request<User[]>('/org/members')),
+  getCachedMembers: () => swrCache.get<User[]>('org:members') ?? null,
   listInvitations: () =>
-    request<
+    swrCache.fetch('org:invitations', () =>
+      request<
+        Array<{
+          id: string;
+          email: string;
+          role: 'OWNER' | 'AGENT';
+          status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+          expiresAt: string;
+          createdAt: string;
+        }>
+      >('/org/invitations'),
+    ),
+  getCachedInvitations: () =>
+    swrCache.get<
       Array<{
         id: string;
         email: string;
@@ -445,9 +537,9 @@ export const organizationApi = {
         expiresAt: string;
         createdAt: string;
       }>
-    >('/org/invitations'),
-  sendInvitation: (data: { email: string; role: 'OWNER' | 'AGENT' }) =>
-    request<{
+    >('org:invitations') ?? null,
+  sendInvitation: async (data: { email: string; role: 'OWNER' | 'AGENT' }) => {
+    const res = await request<{
       invitation: {
         id: string;
         email: string;
@@ -462,16 +554,189 @@ export const organizationApi = {
     }>('/org/invitations', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
-  removeMember: (userId: string) =>
-    request<void>(`/org/members/${userId}`, { method: 'DELETE' }),
-  changeMemberRole: (userId: string, role: 'OWNER' | 'AGENT') =>
-    request<User>(`/org/members/${userId}/role`, {
+    });
+    swrCache.invalidate('org:');
+    return res;
+  },
+  removeMember: async (userId: string) => {
+    await request<void>(`/org/members/${userId}`, { method: 'DELETE' });
+    swrCache.invalidate('org:');
+    swrCache.invalidate('billing:');
+  },
+  changeMemberRole: async (userId: string, role: 'OWNER' | 'AGENT') => {
+    const user = await request<User>(`/org/members/${userId}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
+    });
+    swrCache.invalidate('org:');
+    return user;
+  },
+  revokeInvitation: async (invitationId: string) => {
+    await request<void>(`/org/invitations/${invitationId}`, { method: 'DELETE' });
+    swrCache.invalidate('org:');
+  },
+  getChannels: () =>
+    swrCache.fetch('org:channels', () =>
+      request<{
+        id: string;
+        organizationId: string;
+        whatsappPhoneNumberId: string | null;
+        whatsappWabaId: string | null;
+        hasWhatsappToken: boolean;
+        whatsappVerifyToken: string | null;
+        telegramBotUsername: string | null;
+        hasTelegramToken: boolean;
+        telegramWebhookSecret: string | null;
+        widgetPublicKey: string;
+        widgetAllowedOrigins: string[];
+        widgetTitle: string;
+        widgetGreeting: string;
+        widgetThemeColor: string;
+        defaultCurrency: string;
+        defaultTimezone: string;
+        callingWindowStart: string;
+        callingWindowEnd: string;
+      }>('/org/channels'),
+    ),
+  getCachedChannels: () => swrCache.get<any>('org:channels') ?? null,
+  prefetchTeam: () => {
+    swrCache.prefetch('org:members', () => request<User[]>('/org/members'));
+    swrCache.prefetch('org:invitations', () => request<any[]>('/org/invitations'));
+    swrCache.prefetch('org:channels', () => request<any>('/org/channels'));
+  },
+  updateChannels: (data: Record<string, unknown>) =>
+    request<{ updated: boolean; widgetPublicKey: string; widgetAllowedOrigins: string[] }>('/org/channels', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
-  revokeInvitation: (invitationId: string) =>
-    request<void>(`/org/invitations/${invitationId}`, { method: 'DELETE' }),
+  getOnboarding: () =>
+    swrCache.fetch('org:onboarding', () =>
+      request<{
+        organizationId: string;
+        organizationName: string;
+        planTier: string;
+        subscriptionStatus: string;
+        walletBalance: number;
+        onboardingCompleted: boolean;
+        onboardingStep: number;
+        checklist: {
+          paymentActive: boolean;
+          walletFunded: boolean;
+          whatsappConnected: boolean;
+          plivoSubaccountReady: boolean;
+          plivoDidAssigned: boolean;
+          plivoComplianceStatus: string;
+          telegramConnected: boolean;
+          widgetConfigured: boolean;
+          hasInventory: boolean;
+          hasAdvisorPhone: boolean;
+        };
+        details: {
+          whatsappPhoneNumberId: string | null;
+          whatsappProvider: string | null;
+          plivoSubaccountId: string | null;
+          plivoComplianceAppId: string | null;
+          plivoNumbers: Array<{ id: string; phoneNumber: string; city: string | null; isPrimary: boolean }>;
+          telegramBotUsername: string | null;
+          telegramWebhookSecret: string | null;
+          widgetPublicKey: string;
+          widgetAllowedOrigins: string[];
+          widgetTitle: string;
+          widgetGreeting: string;
+          widgetThemeColor: string;
+          propertyCount: number;
+          advisorWithPhoneCount: number;
+          totalAdvisors: number;
+          metaAppId: string | null;
+          metaConfigId: string | null;
+        };
+      }>('/org/onboarding'),
+    ),
+  getCachedOnboarding: () => swrCache.get<any>('org:onboarding') ?? null,
+  prefetchOnboarding: () => {
+    swrCache.prefetch('org:onboarding', () => request<any>('/org/onboarding'));
+  },
+  completeOnboarding: async () => {
+    const res = await request<{ onboardingCompleted: boolean }>('/org/onboarding/complete', { method: 'POST' });
+    swrCache.invalidate('org:');
+    return res;
+  },
+  updateWorkspaceProfile: (data: {
+    organizationName: string;
+    stateJurisdiction?: string;
+    planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+  }) =>
+    request<{
+      organization: {
+        id: string;
+        name: string;
+        stateJurisdiction: string;
+        subscriptionTier: string;
+        subscriptionStatus: string;
+      };
+    }>('/org/workspace-profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  updateBranding: (data: {
+    organizationName?: string;
+    widgetTitle?: string;
+    widgetGreeting?: string;
+    widgetThemeColor?: string;
+    defaultCurrency?: 'INR' | 'USD' | 'AED' | 'GBP';
+    defaultTimezone?: string;
+  }) =>
+    request<{ organizationName: string }>('/org/branding', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  updateMemberPhone: (userId: string, phone: string) =>
+    request<{ id: string; phone: string }>(`/org/members/${userId}/phone`, {
+      method: 'PATCH',
+      body: JSON.stringify({ phone }),
+    }),
+  connectWhatsApp: (data: {
+    code?: string;
+    phoneNumberId: string;
+    wabaId: string;
+    whatsappProvider?: 'COEXISTENCE' | 'DEDICATED' | 'BSP_MANAGED';
+  }) =>
+    request<{ connected: boolean; whatsappPhoneNumberId: string; whatsappProvider: string }>(
+      '/org/whatsapp/embedded-signup',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  assignPlatformWhatsApp: () =>
+    request<{ connected: boolean; whatsappPhoneNumberId: string; whatsappProvider: string; isSimulated: boolean }>(
+      '/org/whatsapp/assign-platform-number',
+      { method: 'POST' },
+    ),
+  connectTelegram: async (botToken: string) => {
+    const res = await request<{ connected: boolean; telegramBotUsername: string; webhookRegistered: boolean }>(
+      '/org/telegram/connect',
+      { method: 'POST', body: JSON.stringify({ botToken }) },
+    );
+    swrCache.invalidate('org:');
+    return res;
+  },
+  submitPlivoKyc: (data: {
+    legalEntityName: string;
+    documentType: 'GST_CERTIFICATE' | 'COI' | 'UDYAM';
+    registrationNumber: string;
+    authorizedSignatoryName: string;
+    businessAddress: string;
+    city: string;
+  }) =>
+    request<{ complianceApplicationId: string; status: string; subaccountId: string }>(
+      '/org/plivo/compliance',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  provisionPlivoNumber: (data: { phoneNumber?: string; city: string; alias?: string }) =>
+    request<{
+      number: { id: string; phoneNumber: string; city: string };
+      subaccountId: string;
+      callForwardingCode: string;
+      isSimulated: boolean;
+    }>('/org/plivo/provision-number', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Feature 7: Advisor Tasks API ──────────────────────────────────────────────
@@ -606,7 +871,11 @@ export interface SubscriptionStatusResponse {
 }
 
 export const billingApi = {
-  getSubscription: () => request<SubscriptionStatusResponse>('/billing/subscription'),
+  getSubscription: () => swrCache.fetch('billing:subscription', () => request<SubscriptionStatusResponse>('/billing/subscription')),
+  getCachedSubscription: () => swrCache.get<SubscriptionStatusResponse>('billing:subscription') ?? null,
+  prefetchSubscription: () => {
+    swrCache.prefetch('billing:subscription', () => request<SubscriptionStatusResponse>('/billing/subscription'));
+  },
   getPlans: () => request<{ plans: any[] }>('/billing/plans'),
   createCheckoutSession: (params: {
     plan: 'SOLO' | 'TEAM' | 'ENTERPRISE';
@@ -628,6 +897,52 @@ export const billingApi = {
       method: 'POST',
       body: JSON.stringify({ plan }),
     }),
+  getRazorpayConfig: () =>
+    request<{ configured: boolean; keyId: string | null; currency: 'INR' }>('/billing/razorpay/config'),
+  createRazorpayOrder: (
+    data:
+      | { type: 'WALLET_TOPUP'; amountInr: number }
+      | { type: 'SUBSCRIPTION_PLAN'; plan: 'SOLO' | 'TEAM' | 'ENTERPRISE'; isAnnual?: boolean },
+  ) =>
+    request<{
+      orderId: string;
+      amountPaise: number;
+      amountInr: number;
+      currency: 'INR';
+      keyId: string;
+      isSimulated: boolean;
+      description: string;
+      organizationName: string;
+      prefill: { name?: string; email?: string };
+    }>('/billing/razorpay/create-order', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  verifyRazorpayPayment: async (data: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    type: 'WALLET_TOPUP' | 'SUBSCRIPTION_PLAN';
+    amountInr?: number;
+    plan?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
+    isAnnual?: boolean;
+  }) => {
+    const res = await request<{
+      verified: boolean;
+      type: 'WALLET_TOPUP' | 'SUBSCRIPTION_PLAN';
+      newBalance?: number;
+      includedCreditsInr?: number;
+      subscriptionTier?: string;
+      subscriptionStatus?: string;
+    }>('/billing/razorpay/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    swrCache.invalidate('billing:');
+    swrCache.invalidate('wallet:');
+    swrCache.invalidate('org:');
+    return res;
+  },
 };
 
 // ── Feature 12: Pre-Paid Metered Telephony & Messaging Wallet API ──────────
@@ -646,7 +961,7 @@ export interface WalletTransaction {
 export interface WalletStateResponse {
   organizationId: string;
   balance: number;
-  currency: 'USD';
+  currency: 'INR' | 'USD';
   autoRecharge: {
     enabled: boolean;
     threshold: number;
@@ -667,17 +982,27 @@ export interface WalletStateResponse {
 }
 
 export const walletApi = {
-  getWallet: () => request<WalletStateResponse>('/billing/wallet'),
-  depositCredits: (amount: number, options?: { successUrl?: string; cancelUrl?: string }) =>
-    request<{ success: boolean; newBalance: number; transaction: WalletTransaction; checkoutUrl?: string; isSimulated: boolean }>('/billing/wallet/deposit', {
+  getWallet: () => swrCache.fetch('wallet:state', () => request<WalletStateResponse>('/billing/wallet')),
+  getCached: () => swrCache.get<WalletStateResponse>('wallet:state') ?? null,
+  prefetch: () => {
+    swrCache.prefetch('wallet:state', () => request<WalletStateResponse>('/billing/wallet'));
+  },
+  depositCredits: async (amount: number, options?: { successUrl?: string; cancelUrl?: string }) => {
+    const res = await request<{ success: boolean; newBalance: number; transaction: WalletTransaction; checkoutUrl?: string; isSimulated: boolean }>('/billing/wallet/deposit', {
       method: 'POST',
       body: JSON.stringify({ amount, ...options }),
-    }),
-  updateAutoRecharge: (data: { enabled?: boolean; threshold?: number; rechargeAmount?: number }) =>
-    request<{ success: boolean; autoRecharge: any }>('/billing/wallet/auto-recharge', {
+    });
+    swrCache.invalidate('wallet:');
+    return res;
+  },
+  updateAutoRecharge: async (data: { enabled?: boolean; threshold?: number; rechargeAmount?: number }) => {
+    const res = await request<{ success: boolean; autoRecharge: any }>('/billing/wallet/auto-recharge', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    });
+    swrCache.invalidate('wallet:');
+    return res;
+  },
   simulateDeduction: (data: { type: 'VOICE_CALL' | 'WHATSAPP_QUALIFICATION'; durationSeconds?: number; leadName?: string }) =>
     request<{ success: boolean; transaction: WalletTransaction; currentBalance: number }>('/billing/wallet/simulate-deduction', {
       method: 'POST',
@@ -779,78 +1104,153 @@ export const campaignsApi = {
     }),
 };
 
-// ── Feature 13: Super-Admin Mission Control API ─────────────────────────────
+// ── Super-Admin Mission Control API (Real PostgreSQL Telemetry & Ops) ─────────
 
-export interface AdminMetricsResponse {
-  kpis: {
-    totalTenants: number;
-    activeDids: number;
-    totalMonthlyMinutes: number;
-    monthlyRevenue: number;
-    infrastructureCost: number;
-    netGrossMarginPct: number;
-    concurrentActiveCalls: number;
-    bargeInAvgReactionMs: number;
-  };
-  latencyWaterfall: {
-    sttDeepgramMs: number;
-    llmGeminiTtftMs: number;
-    ttsCartesiaMs: number;
-    networkRoundTripMs: number;
-    totalDuplexMs: number;
-  };
-  switchboard: {
-    activeLlm: 'gemini-2.5-flash' | 'groq-llama-3.3-70b' | 'claude-3.5-sonnet' | 'gpt-4o-mini';
-    activeStt: 'deepgram-nova-2' | 'whisper-large-v3' | 'assemblyai-conformer-2';
-    activeTts: 'cartesia-sonic' | 'elevenlabs-turbo-v2.5' | 'azure-neural-hd';
-    activeCarrier: 'plivo-high-throughput' | 'twilio-sip-trunking';
-    bargeInThresholdMs: number;
-    lastFailoverAt?: string;
-    failoverReason?: string;
-  };
-  tenants: Array<{
-    id: string;
-    name: string;
-    tier: string;
-    status: string;
-    stateJurisdiction: string;
-    activeDids: number;
-    monthlyMinutes: number;
-    walletBalance: number;
-    monthlyRevenue: number;
-    latencyMs: number;
-    lastActive: string;
-  }>;
-}
-
-export interface VisualPathwayNode {
+export interface PlatformConfigData {
   id: string;
-  stepNumber: number;
-  name: string;
-  goal: string;
-  type: 'HOOK' | 'DISCOVERY' | 'FINANCIAL_BRIDGE' | 'SITE_VISIT_LOCK' | 'WARM_TRANSFER';
-  targetDurationSeconds: number;
-  promptSnippet: string;
-  active: boolean;
+  primaryTtsEngine: 'eleven_flash_v2_5' | 'cartesia_sonic' | 'edge_neural';
+  primaryLlmModel: string;
+  outboundDialerPaused: boolean;
+  maxPlatformConcurrency: number;
+  autoFailoverEnabled: boolean;
+  consecutiveTtsFailures: number;
+  lastFailoverAt?: string | null;
+  failoverReason?: string | null;
+  updatedBy?: string | null;
+  updatedAt: string;
 }
 
-export interface PathwaySettings {
-  maxDiscountFlexibilityPct: number;
-  budgetStretchCeilingPct: number;
-  fieldAdvisorsOnDuty: number;
-  fairHousingEnforced: boolean;
+export interface AdminAuditLogRow {
+  id: string;
+  adminEmail: string;
+  organizationId?: string | null;
+  action: string;
+  note?: string | null;
+  createdAt: string;
+  organization?: { name: string } | null;
+}
+
+export interface AdminOverviewResponse {
+  kpis: {
+    totalOrgs: number;
+    activePaidOrgs: number;
+    suspendedOrgs: number;
+    totalUsers: number;
+    activeDids: number;
+    activeCallsNow: number;
+    pendingKycCount: number;
+    totalWalletLiabilityInr: number;
+    monthlySubscriptionMrrInr: number;
+    extraTopups30dInr: number;
+    grossRevenue30dInr: number;
+    totalCogs30dInr: number;
+    netProfit30dInr: number;
+    grossMarginPct: number;
+    totalCallMinutes30d: number;
+    totalCalls30d: number;
+    totalAgentRuns30d: number;
+    aiLatencyP50Ms: number;
+    aiLatencyP95Ms: number;
+  };
+  providerBreakdown: Array<{
+    provider: string;
+    costInr: number;
+    eventsCount: number;
+    totalUnits: number;
+  }>;
+  config: PlatformConfigData;
+  auditLogs: AdminAuditLogRow[];
+}
+
+export interface AdminTenantSummary {
+  id: string;
+  name: string;
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  isSuspended: boolean;
+  suspendedReason?: string | null;
+  stateJurisdiction?: string | null;
+  createdAt: string;
+  planExpiresAt?: string | null;
+  owner: { name: string | null; email: string; phone: string | null } | null;
+  seatsUsed: number;
+  maxSeats: number;
+  dealsCount: number;
+  leadsCount: number;
+  activeDids: number;
+  plivoSubaccountId: string | null;
+  plivoComplianceStatus: string;
+  whatsappConnected: boolean;
+  walletBalance: number;
+  totalSpent: number;
+  monthlyRevenueInr: number;
+  cogs30dInr: number;
+  profit30dInr: number;
+  callMinutes30d: number;
+  runningCampaigns: number;
+}
+
+export interface AdminTenantDetail {
+  organization: any;
+  costByProvider30d: Array<{ provider: string; costInr: number; eventsCount: number }>;
+  recentCalls: Array<{
+    id: string;
+    callUuid: string;
+    direction: string;
+    toNumber: string;
+    status: string;
+    outcome?: string | null;
+    durationSeconds: number;
+    createdAt: string;
+  }>;
+  recentTraces: Array<{
+    id: string;
+    channel: string;
+    specialist: string;
+    intent: string;
+    latencyMs: number;
+    modelUsed: string;
+    guardrailFlags: string[];
+    createdAt: string;
+  }>;
+  auditLogs: AdminAuditLogRow[];
 }
 
 export const adminApi = {
-  getMetrics: () => request<AdminMetricsResponse>('/admin/metrics'),
-  updateSwitchboard: (data: Partial<AdminMetricsResponse['switchboard']>) =>
-    request<{ success: boolean; message: string; switchboard: any }>('/admin/switchboard', {
+  getOverview: () => request<AdminOverviewResponse>('/admin/overview'),
+  getTenants: (search?: string) =>
+    request<{ tenants: AdminTenantSummary[] }>(
+      `/admin/tenants${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    ),
+  getTenantDetail: (orgId: string) => request<AdminTenantDetail>(`/admin/tenants/${orgId}`),
+  updateKyc: (orgId: string, data: { status: 'PENDING' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED'; note?: string }) =>
+    request<{ success: boolean; channel: any }>(`/admin/tenants/${orgId}/kyc`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  adjustWallet: (orgId: string, data: { amountInr: number; reason: string }) =>
+    request<{ success: boolean; newBalance: number }>(`/admin/tenants/${orgId}/wallet`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  getPathways: () => request<{ nodes: VisualPathwayNode[]; settings: PathwaySettings }>('/admin/pathways'),
-  updatePathways: (data: { nodes?: VisualPathwayNode[]; settings?: Partial<PathwaySettings> }) =>
-    request<{ success: boolean; nodes: VisualPathwayNode[]; settings: PathwaySettings }>('/admin/pathways', {
+  updateOrgStatus: (orgId: string, data: { isSuspended: boolean; reason?: string }) =>
+    request<{ success: boolean; organization: any }>(`/admin/tenants/${orgId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  pauseTenantCampaigns: (orgId: string) =>
+    request<{ success: boolean; pausedCount: number }>(`/admin/tenants/${orgId}/pause-campaigns`, {
+      method: 'POST',
+    }),
+  updateConfig: (data: {
+    primaryTtsEngine?: 'eleven_flash_v2_5' | 'cartesia_sonic' | 'edge_neural';
+    primaryLlmModel?: string;
+    outboundDialerPaused?: boolean;
+    maxPlatformConcurrency?: number;
+    autoFailoverEnabled?: boolean;
+    note?: string;
+  }) =>
+    request<{ success: boolean; config: PlatformConfigData }>('/admin/config', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

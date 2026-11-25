@@ -113,8 +113,41 @@ export async function synthesizeRawSpeechAudio(
   const cartesiaKey = process.env['CARTESIA_API_KEY'];
   const cartesiaVoice = options?.voiceId || process.env['CARTESIA_VOICE_ID'];
 
-  // 1. Cartesia Sonic if configured
-  if (cartesiaKey && cartesiaVoice && options?.provider !== 'elevenlabs') {
+  // 1. ElevenLabs Studio Voice (Primary for highest natural Hinglish/Indian realism)
+  if (elevenLabsKey && options?.provider !== 'cartesia') {
+    try {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elevenLabsVoice}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': elevenLabsKey,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_flash_v2_5',
+          voice_settings: {
+            stability: options?.stability ?? 0.42,
+            similarity_boost: options?.similarityBoost ?? 0.82,
+            style: 0.25,
+            use_speaker_boost: true,
+          },
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (response.ok) {
+        const arrayBuf = await response.arrayBuffer();
+        return Buffer.from(arrayBuf);
+      }
+      logger.warn(`[VoiceNote] ElevenLabs returned status ${response.status}: ${await response.text()}`);
+    } catch (err: any) {
+      logger.warn(`[VoiceNote] ElevenLabs request failed: ${err.message}. Trying next engine.`);
+    }
+  }
+
+  // 2. Cartesia Sonic if configured
+  if (cartesiaKey && cartesiaVoice) {
     try {
       const response = await fetch('https://api.cartesia.ai/tts/bytes', {
         method: 'POST',
@@ -138,40 +171,7 @@ export async function synthesizeRawSpeechAudio(
       }
       logger.warn(`[VoiceNote] Cartesia returned status ${response.status}: ${await response.text()}`);
     } catch (err: any) {
-      logger.warn(`[VoiceNote] Cartesia request failed: ${err.message}. Trying next engine.`);
-    }
-  }
-
-  // 2. ElevenLabs Turbo / Multilingual v2
-  if (elevenLabsKey) {
-    try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elevenLabsVoice}`, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': elevenLabsKey,
-          'Content-Type': 'application/json',
-          Accept: 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2_5',
-          voice_settings: {
-            stability: options?.stability ?? 0.42,
-            similarity_boost: options?.similarityBoost ?? 0.82,
-            style: 0.25,
-            use_speaker_boost: true,
-          },
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (response.ok) {
-        const arrayBuf = await response.arrayBuffer();
-        return Buffer.from(arrayBuf);
-      }
-      logger.warn(`[VoiceNote] ElevenLabs returned status ${response.status}: ${await response.text()}`);
-    } catch (err: any) {
-      logger.warn(`[VoiceNote] ElevenLabs request failed: ${err.message}. Trying fallback.`);
+      logger.warn(`[VoiceNote] Cartesia request failed: ${err.message}. Trying fallback.`);
     }
   }
 

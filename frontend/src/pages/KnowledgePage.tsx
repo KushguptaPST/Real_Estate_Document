@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { AssistantAnswer } from '@/types';
 import { useToast } from '@/context/ToastContext';
+import { CardGridSkeleton } from '@/components/ui/skeleton';
 
 export function KnowledgePage() {
   const { toast } = useToast();
@@ -171,10 +172,7 @@ export function KnowledgePage() {
         </div>
 
         {loadingDocs ? (
-          <div className="flex items-center justify-center py-8 text-xs text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin text-slate-900 mr-2" />
-            Loading knowledge index...
-          </div>
+          <CardGridSkeleton count={3} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {[

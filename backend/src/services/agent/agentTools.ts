@@ -7,7 +7,9 @@ import { type UserRole } from '@prisma/client';
 import { prisma } from '../../utils/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { requireOrgId } from '../../utils/tenant.js';
-import { getProperties, computeMatchesForLead } from '../propertyMatch.service.js';
+import { getProperties, computeMatchesForLead, searchPropertiesHybrid } from '../propertyMatch.service.js';
+import { whatsAppService } from '../messaging/whatsapp.service.js';
+import { sendTelegramDocument, sendTelegramLocation, sendTelegramMessage } from '../telegram.service.js';
 import { getLeadDetails, updateLeadStatus } from '../lead.service.js';
 import { checkAdvisorAvailability, scheduleSiteVisit } from '../siteVisit.service.js';
 import {
@@ -586,6 +588,26 @@ export const PlanLeadFollowUpArgsSchema = z.object({
 
 export type PlanLeadFollowUpArgs = z.infer<typeof PlanLeadFollowUpArgsSchema>;
 
+// ── 12. Send Property Collateral (Brochure / Floor Plan / Pin) ───────────────
+
+export const SendPropertyCollateralArgsSchema = z.object({
+  leadId: z.string().trim().min(1).max(64),
+  propertyId: z.string().trim().min(1).max(64),
+  includeBrochure: z.boolean().default(true),
+  includeLocationPin: z.boolean().default(true),
+});
+
+export type SendPropertyCollateralArgs = z.infer<typeof SendPropertyCollateralArgsSchema>;
+
+// ── 13. Query Project & Legal Knowledge Base ─────────────────────────────────
+
+export const QueryProjectKnowledgeArgsSchema = z.object({
+  query: z.string().trim().min(2).max(500),
+  propertyId: z.string().trim().max(64).optional(),
+});
+
+export type QueryProjectKnowledgeArgs = z.infer<typeof QueryProjectKnowledgeArgsSchema>;
+
 // ── Function Declarations for Gemini SDK ─────────────────────────────────────
 
 export const AGENT_FUNCTION_DECLARATIONS = [
@@ -832,6 +854,34 @@ export const AGENT_FUNCTION_DECLARATIONS = [
       required: ['leadId', 'recommendedAction', 'suggestedDueDate', 'rationale'],
     },
   },
+  {
+    name: 'send_property_collateral',
+    description:
+      'Dispatch verified project collateral (PDF brochure, floor plan link, and Google Maps / WhatsApp location pin) for a specific property to the buyer via WhatsApp or return the links for chat.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        leadId: { type: 'STRING', description: 'The unique ID of the authorized lead' },
+        propertyId: { type: 'STRING', description: 'The verified property ID from search_properties' },
+        includeBrochure: { type: 'BOOLEAN', description: 'Whether to send the PDF brochure / floor plan (default true)' },
+        includeLocationPin: { type: 'BOOLEAN', description: 'Whether to send the site location pin (default true)' },
+      },
+      required: ['leadId', 'propertyId'],
+    },
+  },
+  {
+    name: 'query_project_knowledge',
+    description:
+      'Query verified project knowledge, RERA registration, possession status, amenities, and uploaded organization documents for factual answers.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: 'Specific question or keywords (e.g., RERA, possession, amenities, payment plan)' },
+        propertyId: { type: 'STRING', description: 'Optional property ID to narrow down project details' },
+      },
+      required: ['query'],
+    },
+  },
 ] as const;
 
 export const ALLOWED_TOOL_NAMES = new Set(AGENT_FUNCTION_DECLARATIONS.map((d) => d.name));
@@ -883,10 +933,10 @@ export async function executeAgentTool(
         }
 
         logger.info(
-          `[search_properties] Querying inventory for org ${context.organizationId}: city="${args.city ?? ''}", search="${args.searchQuery ?? ''}", maxPrice=${normalizedMaxPrice ?? 'none'}, bedrooms=${args.bedrooms ?? 'any'}`,
+          `[search_properties] Hybrid query for org ${context.organizationId}: city="${args.city ?? ''}", search="${args.searchQuery ?? ''}", maxPrice=${normalizedMaxPrice ?? 'none'}, bedrooms=${args.bedrooms ?? 'any'}`,
         );
 
-        const properties = await getProperties({
+        const { exactMatches, stretchMatches } = await searchPropertiesHybrid({
           search: args.searchQuery,
           minPrice: normalizedMinPrice,
           maxPrice: normalizedMaxPrice,
@@ -895,30 +945,43 @@ export async function executeAgentTool(
           organizationId: context.organizationId,
         });
 
-        // Bounded structured response (max 5 items, verified fields only)
-        const bounded = properties.slice(0, 5).map((p) => ({
+        const serializeProp = (p: any, stretchReason?: string) => ({
           id: p.id,
           title: p.title,
           address: p.address,
           city: p.city,
+          microMarket: p.microMarket ?? null,
+          builderName: p.builderName ?? null,
+          reraNumber: p.reraNumber ?? null,
+          possessionStatus: p.possessionStatus ?? null,
           price: p.price,
           bedrooms: p.bedrooms,
           bathrooms: p.bathrooms,
           propertyType: p.propertyType,
           status: p.status,
           features: p.features,
-        }));
+          hasBrochure: Boolean(p.brochureUrl || p.floorPlanUrl),
+          brochureUrl: p.brochureUrl ?? null,
+          mapsUrl: p.mapsUrl ?? null,
+          ...(stretchReason ? { stretchReason } : {}),
+        });
+
+        const exactBounded = exactMatches.slice(0, 5).map((p) => serializeProp(p));
+        const stretchBounded = stretchMatches.slice(0, 3).map((s) => serializeProp(s.property, s.stretchReason));
 
         return {
           toolName,
           status: 'SUCCESS',
           data: {
-            totalFound: properties.length,
-            returnedCount: bounded.length,
-            properties: bounded,
+            totalFound: exactBounded.length + stretchBounded.length,
+            returnedCount: exactBounded.length,
+            properties: exactBounded,
+            nearbyOrStretchOptions: stretchBounded,
             message:
-              bounded.length === 0
-                ? 'No verified properties found matching the requested criteria in current inventory.'
+              exactBounded.length === 0 && stretchBounded.length === 0
+                ? 'No verified properties found in current organization inventory.'
+                : exactBounded.length === 0
+                ? 'No exact match found; returning closest adjacent micro-market or budget-stretch options.'
                 : undefined,
           },
           durationMs: Date.now() - startTime,
@@ -2106,6 +2169,221 @@ export async function executeAgentTool(
             requiresAdvisorReview: true,
             followUpProposal: proposal,
             ...proposal,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      case 'send_property_collateral': {
+        const parsed = SendPropertyCollateralArgsSchema.safeParse(rawArgs ?? {});
+        if (!parsed.success) {
+          return {
+            toolName,
+            status: 'ERROR',
+            error: `Invalid send_property_collateral arguments: ${parsed.error.message}`,
+            durationMs: Date.now() - startTime,
+          };
+        }
+
+        const orgId = requireOrgId(context.organizationId);
+        const [lead, orgChannel] = await Promise.all([
+          prisma.lead.findFirst({ where: { id: context.leadId, organizationId: orgId } }),
+          prisma.organizationChannel.findUnique({ where: { organizationId: orgId } }),
+        ]);
+
+        let property = await prisma.property.findFirst({
+          where: { id: parsed.data.propertyId, organizationId: orgId },
+        });
+        // Fallback: LLM sometimes passes property title/name when CUID isn't in chat history
+        if (!property) {
+          property = await prisma.property.findFirst({
+            where: {
+              organizationId: orgId,
+              title: { contains: parsed.data.propertyId, mode: 'insensitive' },
+            },
+          });
+        }
+
+        if (!lead) {
+          return { toolName, status: 'ERROR', error: 'Lead not found in organization', durationMs: Date.now() - startTime };
+        }
+        if (!property) {
+          return { toolName, status: 'ERROR', error: 'Property not found in organization', durationMs: Date.now() - startTime };
+        }
+
+        const waCreds =
+          orgChannel?.whatsappAccessToken && orgChannel?.whatsappPhoneNumberId
+            ? { token: orgChannel.whatsappAccessToken, phoneNumberId: orgChannel.whatsappPhoneNumberId }
+            : undefined;
+
+        const dispatchedItems: string[] = [];
+        const collateralLinks: Record<string, string | null> = {
+          brochureUrl: property.brochureUrl ?? null,
+          floorPlanUrl: property.floorPlanUrl ?? null,
+          mapsUrl: property.mapsUrl ?? null,
+        };
+
+        const tgChatId = lead.externalId?.startsWith('telegram:')
+          ? lead.externalId.replace('telegram:', '')
+          : null;
+        const tgBotToken = orgChannel?.telegramBotToken ?? undefined;
+
+        if (tgChatId) {
+          if (parsed.data.includeBrochure && (property.brochureUrl || property.floorPlanUrl)) {
+            const docUrl = property.brochureUrl || property.floorPlanUrl!;
+            const docSent = await sendTelegramDocument(tgChatId, docUrl, {
+              filename: `${property.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Brochure.pdf`,
+              caption: `📄 ${property.title} — ${property.bedrooms}BHK in ${property.microMarket || property.city}`,
+              botToken: tgBotToken,
+            });
+            if (docSent) dispatchedItems.push('telegram_brochure_pdf');
+          }
+
+          if (parsed.data.includeLocationPin && property.latitude != null && property.longitude != null) {
+            const locSent = await sendTelegramLocation(tgChatId, property.latitude, property.longitude, tgBotToken);
+            if (locSent) dispatchedItems.push('telegram_location_pin');
+          } else if (parsed.data.includeLocationPin && property.mapsUrl) {
+            const linkSent = await sendTelegramMessage(
+              tgChatId,
+              `📍 ${property.title} location pin: ${property.mapsUrl}`,
+              { botToken: tgBotToken },
+            );
+            if (linkSent) dispatchedItems.push('telegram_maps_link');
+          }
+        } else if (lead.phone) {
+          if (parsed.data.includeBrochure && (property.brochureUrl || property.floorPlanUrl)) {
+            const docUrl = property.brochureUrl || property.floorPlanUrl!;
+            const docRes = await whatsAppService.sendDocument(lead.phone, docUrl, {
+              filename: `${property.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_Brochure.pdf`,
+              caption: `${property.title} — ${property.bedrooms}BHK in ${property.microMarket || property.city}`,
+              credentials: waCreds,
+            });
+            if (docRes.success) dispatchedItems.push('brochure_pdf');
+          }
+
+          if (parsed.data.includeLocationPin && property.latitude != null && property.longitude != null) {
+            const locRes = await whatsAppService.sendLocation(
+              lead.phone,
+              {
+                latitude: property.latitude,
+                longitude: property.longitude,
+                name: property.title,
+                address: `${property.address}, ${property.city}`,
+              },
+              { credentials: waCreds },
+            );
+            if (locRes.success) dispatchedItems.push('whatsapp_location_pin');
+          } else if (parsed.data.includeLocationPin && property.mapsUrl) {
+            const linkRes = await whatsAppService.sendTextMessage(
+              lead.phone,
+              `📍 ${property.title} location pin: ${property.mapsUrl}`,
+              { previewUrl: true, credentials: waCreds },
+            );
+            if (linkRes.success) dispatchedItems.push('maps_link');
+          }
+        }
+
+        await prisma.auditLog.create({
+          data: {
+            organizationId: orgId,
+            action: 'COLLATERAL_SENT',
+            entityType: 'Property',
+            entityId: property.id,
+            actor: context.callerEmail ?? 'ai_sales_agent',
+            note: `Dispatched collateral (${dispatchedItems.join(', ') || 'links_prepared'}) for ${property.title} to lead ${lead.id}`,
+            newValue: { leadId: lead.id, propertyId: property.id, dispatchedItems, collateralLinks },
+          },
+        }).catch(() => {});
+
+        const hasAnyCollateralUrl = Boolean(property.brochureUrl || property.floorPlanUrl || property.mapsUrl);
+        return {
+          toolName,
+          status: 'SUCCESS',
+          data: {
+            sent: dispatchedItems.length > 0,
+            dispatchedItems,
+            propertyId: property.id,
+            propertyTitle: property.title,
+            ...collateralLinks,
+            message:
+              dispatchedItems.length > 0
+                ? `Dispatched ${dispatchedItems.join(' & ')} for ${property.title} directly to the buyer on ${tgChatId ? 'Telegram' : 'WhatsApp'}.`
+                : hasAnyCollateralUrl
+                ? `Prepared collateral links for ${property.title}. Share the brochureUrl directly in your reply.`
+                : `Prepared verified project summary for ${property.title}. (No PDF brochure URL attached yet on this listing.)`,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      case 'query_project_knowledge': {
+        const parsed = QueryProjectKnowledgeArgsSchema.safeParse(rawArgs ?? {});
+        if (!parsed.success) {
+          return {
+            toolName,
+            status: 'ERROR',
+            error: `Invalid query_project_knowledge arguments: ${parsed.error.message}`,
+            durationMs: Date.now() - startTime,
+          };
+        }
+
+        const orgId = requireOrgId(context.organizationId);
+        const terms = parsed.data.query
+          .split(/\s+/)
+          .map((t) => t.replace(/[^a-zA-Z0-9]/g, ''))
+          .filter((t) => t.length >= 3)
+          .slice(0, 5);
+
+        const [properties, docChunks] = await Promise.all([
+          prisma.property.findMany({
+            where: {
+              organizationId: orgId,
+              ...(parsed.data.propertyId ? { id: parsed.data.propertyId } : {}),
+            },
+            select: {
+              id: true,
+              title: true,
+              builderName: true,
+              reraNumber: true,
+              possessionStatus: true,
+              possessionDate: true,
+              microMarket: true,
+              city: true,
+              features: true,
+              description: true,
+              negotiationMarginNote: true,
+            },
+            take: 5,
+          }),
+          terms.length > 0
+            ? prisma.documentChunk.findMany({
+                where: {
+                  organizationId: orgId,
+                  OR: terms.map((term) => ({ content: { contains: term, mode: 'insensitive' as const } })),
+                },
+                select: {
+                  pageNumber: true,
+                  sectionTitle: true,
+                  content: true,
+                  document: { select: { filename: true, docType: true } },
+                },
+                take: 4,
+              })
+            : Promise.resolve([]),
+        ]);
+
+        return {
+          toolName,
+          status: 'SUCCESS',
+          data: {
+            propertiesKnowledge: properties,
+            documentExcerpts: docChunks.map((c) => ({
+              document: c.document.filename,
+              docType: c.document.docType,
+              page: c.pageNumber,
+              section: c.sectionTitle,
+              excerpt: c.content.slice(0, 500),
+            })),
           },
           durationMs: Date.now() - startTime,
         };

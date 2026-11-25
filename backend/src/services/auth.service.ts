@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { type User, type UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
 import { createError } from '../middleware/errorHandler.js';
+import { provisionSubaccountForOrg } from './telephony/plivoProvisioning.service.js';
 
 
 const SESSION_TTL = '7d';
@@ -17,6 +18,17 @@ const KNOWN_WEAK_SECRETS = new Set(['development-fallback-secret-2026', 'changem
 const DEMO_GOOGLE_ID = 'demo-google-agent-sub-1001';
 const DEMO_ORG_ID = 'demo-sandbox-org';
 
+export function isPlatformAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const raw = process.env['PLATFORM_ADMIN_EMAILS'] || '';
+  if (!raw.trim()) return false;
+  const allowlist = raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(email.trim().toLowerCase());
+}
+
 export interface SessionUser {
   id: string;
   email: string;
@@ -25,8 +37,10 @@ export interface SessionUser {
   organizationId: string;
   organizationName?: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
   stateJurisdiction?: string | null;
   role: UserRole;
+  isPlatformAdmin: boolean;
 }
 
 interface SessionClaims {
@@ -78,9 +92,23 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function toSessionUser(user: User & { organization?: { name: string; subscriptionTier?: string; stateJurisdiction?: string | null } | null }): SessionUser {
+function toSessionUser(
+  user: User & {
+    organization?: {
+      name: string;
+      subscriptionTier?: string;
+      subscriptionStatus?: string;
+      stateJurisdiction?: string | null;
+      isSuspended?: boolean;
+    } | null;
+  },
+): SessionUser {
   if (!user.organizationId) {
     throw createError('Your account is not a member of any organization. Ask an organization owner for an invitation.', 403);
+  }
+  const platformAdmin = isPlatformAdminEmail(user.email);
+  if (user.organization?.isSuspended && !platformAdmin) {
+    throw createError('Your brokerage workspace has been suspended. Please contact support.', 403);
   }
   return {
     id: user.id,
@@ -90,13 +118,25 @@ function toSessionUser(user: User & { organization?: { name: string; subscriptio
     organizationId: user.organizationId,
     organizationName: user.organization?.name,
     subscriptionTier: user.organization?.subscriptionTier,
+    subscriptionStatus: user.organization?.subscriptionStatus,
     stateJurisdiction: user.organization?.stateJurisdiction,
     role: user.role,
+    isPlatformAdmin: platformAdmin,
   };
 }
 
 /** Issues a session JWT for a user that belongs to an organization. */
-export function signSessionToken(user: User & { organization?: { name: string; subscriptionTier?: string; stateJurisdiction?: string | null } | null }): { token: string; user: SessionUser } {
+export function signSessionToken(
+  user: User & {
+    organization?: {
+      name: string;
+      subscriptionTier?: string;
+      subscriptionStatus?: string;
+      stateJurisdiction?: string | null;
+      isSuspended?: boolean;
+    } | null;
+  },
+): { token: string; user: SessionUser } {
   const sessionUser = toSessionUser(user);
   const claims: SessionClaims = {
     sub: user.id,
@@ -157,7 +197,7 @@ async function acceptInvitation(user: User, inviteToken: string): Promise<User> 
 export async function signInWithGoogle(
   credential: string,
   inviteToken?: string,
-): Promise<{ token: string; user: SessionUser }> {
+): Promise<{ token: string; user: SessionUser; isNewWorkspace?: boolean }> {
   const ticket = await getGoogleClient()
     .verifyIdToken({ idToken: credential, audience: requireEnv('GOOGLE_CLIENT_ID') })
     .catch(() => {
@@ -179,7 +219,7 @@ export async function signInWithGoogle(
 export async function completeSignIn(
   identity: { googleId: string; email: string; name: string | null; pictureUrl: string | null },
   inviteToken?: string,
-): Promise<{ token: string; user: SessionUser }> {
+): Promise<{ token: string; user: SessionUser; isNewWorkspace?: boolean }> {
   const email = identity.email.trim().toLowerCase();
   const profile = { email, name: identity.name, pictureUrl: identity.pictureUrl, lastLoginAt: new Date() };
 
@@ -204,20 +244,59 @@ export async function completeSignIn(
     });
   }
 
+  let isNewWorkspace = false;
   if (inviteToken) {
     user = await acceptInvitation(user, inviteToken);
   } else if (!user.organizationId) {
-    const orgName = identity.name ? `${identity.name}'s Brokerage` : 'Agent Workspace';
-    const org = await prisma.organization.create({
-      data: { name: orgName },
+    const orgName = identity.name ? `${identity.name}'s Brokerage` : 'My Brokerage';
+    const provisioned = await prisma.$transaction(async (tx) => {
+      const org = await tx.organization.create({
+        data: {
+          name: orgName,
+          subscriptionTier: 'SOLO',
+          subscriptionStatus: 'PENDING_PAYMENT',
+          stateJurisdiction: 'KA',
+        },
+      });
+      await tx.organizationChannel.create({
+        data: {
+          organizationId: org.id,
+          telegramWebhookSecret: crypto.randomBytes(18).toString('hex'),
+          widgetAllowedOrigins: ['http://localhost:3000', 'http://localhost:5173'],
+        },
+      });
+      await tx.organizationWallet.create({
+        data: {
+          organizationId: org.id,
+          balance: 0.0,
+          totalDeposited: 0.0,
+          autoRechargeEnabled: false,
+        },
+      });
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: { organizationId: org.id, role: 'OWNER' },
+      });
+      return { org, updatedUser };
     });
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: { organizationId: org.id, role: 'OWNER' },
-    });
+
+    user = provisioned.updatedUser;
+    isNewWorkspace = true;
+    if (process.env['NODE_ENV'] !== 'test') {
+      provisionSubaccountForOrg(provisioned.org.id, provisioned.org.name).catch(() => {});
+    }
   }
 
-  return signSessionToken(user);
+  const hydratedUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    include: {
+      organization: {
+        select: { name: true, subscriptionTier: true, subscriptionStatus: true, stateJurisdiction: true, isSuspended: true },
+      },
+    },
+  });
+
+  return { ...signSessionToken(hydratedUser), isNewWorkspace };
 }
 
 /** Demo login — only when ENABLE_DEMO_LOGIN=true outside production; isolated sandbox org. */
@@ -281,7 +360,11 @@ export async function verifySessionToken(token: string): Promise<SessionUser> {
 
   const user = await prisma.user.findUnique({
     where: { id: claims.sub },
-    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
+    include: {
+      organization: {
+        select: { name: true, subscriptionTier: true, subscriptionStatus: true, stateJurisdiction: true, isSuspended: true },
+      },
+    },
   });
   if (!user || !user.organizationId || user.organizationId !== claims.org || user.sessionVersion !== claims.sv) {
     throw createError('Session expired or invalid — please sign in again', 401);
@@ -312,6 +395,7 @@ export interface RegisterOrganizationInput {
   ownerName: string;
   email: string;
   password?: string;
+  ownerPhone?: string;
   organizationName: string;
   stateJurisdiction?: string;
   planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
@@ -336,14 +420,18 @@ export async function registerOrganization(input: RegisterOrganizationInput): Pr
 
   const jurisdiction = input.stateJurisdiction || 'KA';
   const tier = input.planTier || 'SOLO';
+  const initialSubscriptionStatus =
+    process.env['NODE_ENV'] === 'production' && Boolean(process.env['STRIPE_SECRET_KEY'])
+      ? 'PENDING_PAYMENT'
+      : 'ACTIVE';
 
-  return prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({
       data: {
         name: input.organizationName.trim(),
         stateJurisdiction: jurisdiction,
         subscriptionTier: tier,
-        subscriptionStatus: 'ACTIVE',
+        subscriptionStatus: initialSubscriptionStatus,
         planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
@@ -352,10 +440,28 @@ export async function registerOrganization(input: RegisterOrganizationInput): Pr
       data: {
         email,
         name: input.ownerName.trim(),
+        phone: input.ownerPhone?.trim() || null,
         passwordHash: input.password ? hashPassword(input.password) : null,
         organizationId: org.id,
         role: 'OWNER',
         lastLoginAt: new Date(),
+      },
+    });
+
+    await tx.organizationChannel.create({
+      data: {
+        organizationId: org.id,
+        telegramWebhookSecret: crypto.randomBytes(18).toString('hex'),
+        widgetAllowedOrigins: ['http://localhost:3000', 'http://localhost:5173'],
+      },
+    });
+
+    await tx.organizationWallet.create({
+      data: {
+        organizationId: org.id,
+        balance: 0.0,
+        totalDeposited: 0.0,
+        autoRechargeEnabled: false,
       },
     });
 
@@ -379,13 +485,18 @@ export async function registerOrganization(input: RegisterOrganizationInput): Pr
       },
     };
   });
+
+  // Provision Plivo Subaccount asynchronously (non-blocking)
+  provisionSubaccountForOrg(created.organization.id, created.organization.name).catch(() => {});
+
+  return created;
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<{ token: string; user: SessionUser }> {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
+    include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true, isSuspended: true } } },
   });
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
     throw createError('Invalid email or password', 401);

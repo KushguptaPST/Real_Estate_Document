@@ -6,6 +6,7 @@ import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { prisma } from '../../utils/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { walletService } from '../../services/billing/wallet.service.js';
+import { plivoService, sanitizeE164Phone } from '../../services/telephony/plivo.service.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -33,14 +34,15 @@ const VoicePreviewSchema = z.object({
   leadName: z.string().optional(),
 });
 
-function sanitizePhone(phone: string): string {
-  const digits = phone.replace(/[^\d+]/g, '');
-  if (digits.startsWith('+')) return digits;
-  if (digits.length === 10) return `+91${digits}`;
-  return digits.startsWith('+') ? digits : `+${digits}`;
+function getPublicBase(req: Request): string {
+  const configured = process.env['APP_PUBLIC_URL'] || process.env['API_PUBLIC_URL'];
+  if (configured) return configured.replace(/\/$/, '');
+  const proto = req.header('x-forwarded-proto') || req.protocol || 'http';
+  const host = req.header('x-forwarded-host') || req.get('host') || 'localhost:3001';
+  return `${proto}://${host}`;
 }
 
-// POST /api/voice/plivo/test-call — sandbox test dialer
+// POST /api/voice/plivo/test-call — live or simulated Plivo test dialer
 router.post(
   '/plivo/test-call',
   asyncHandler(async (req: Request, res: Response) => {
@@ -49,39 +51,60 @@ router.post(
       throw createError(parsed.error.errors[0]?.message || 'Invalid phone number', 400);
     }
 
-    const cleanPhone = sanitizePhone(parsed.data.phone);
+    const cleanPhone = sanitizeE164Phone(parsed.data.phone);
     const orgId = req.user!.organizationId;
-    const callUuid = `call-test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const plivoNum = await prisma.plivoNumber.findFirst({
+      where: { organizationId: orgId, isActive: true },
+      orderBy: { isPrimary: 'desc' },
+    });
+    const fromNumber = plivoNum?.phoneNumber || process.env['PLIVO_FROM_NUMBER'] || '+918000000000';
 
-    logger.info(`[Voice API] Initiating test call to ${cleanPhone} for org ${orgId} (UUID: ${callUuid})`);
+    const session = await prisma.voiceCallSession.create({
+      data: {
+        organizationId: orgId,
+        callUuid: `plivo-test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        direction: 'OUTBOUND',
+        fromNumber,
+        toNumber: cleanPhone,
+        status: 'INITIATED',
+      },
+    });
 
-    // In local sandbox / testing without live Plivo carrier credentials
-    const plivoAuthId = process.env['PLIVO_AUTH_ID'];
-    const plivoAuthToken = process.env['PLIVO_AUTH_TOKEN'];
+    const baseUrl = getPublicBase(req);
+    const plivoRes = await plivoService.originateCall({
+      from: fromNumber,
+      to: cleanPhone,
+      answerUrl: `${baseUrl}/api/webhooks/plivo/answer/${session.id}`,
+      hangupUrl: `${baseUrl}/api/webhooks/plivo/hangup/${session.id}`,
+      machineDetectionUrl: `${baseUrl}/api/webhooks/plivo/answer/${session.id}`,
+    });
 
-    if (plivoAuthId && plivoAuthToken) {
-      try {
-        // Live Plivo API dispatch if credentials present
-        logger.info(`[Voice API] Dispatching live Plivo call to ${cleanPhone}`);
-      } catch (err: any) {
-        logger.warn(`[Voice API] Live Plivo dispatch failed: ${err.message}. Falling back to simulation.`);
-      }
+    if (!plivoRes.success) {
+      await prisma.voiceCallSession.update({
+        where: { id: session.id },
+        data: { status: 'FAILED', summary: plivoRes.error },
+      });
+      throw createError(plivoRes.error || 'Plivo call origination failed', 502);
     }
 
-    // Record wallet deduction simulation for test call
-    try {
-      await walletService.deductVoiceCall(orgId, 60, {
-        leadName: 'Sandbox Test Dialer',
-      });
-    } catch {
-      // Wallet deduction non-blocking for demo testing
+    const callUuid = plivoRes.callUuid || session.callUuid;
+    await prisma.voiceCallSession.update({
+      where: { id: session.id },
+      data: { callUuid, status: plivoRes.isSimulated ? 'COMPLETED' : 'RINGING' },
+    });
+
+    if (plivoRes.isSimulated) {
+      await walletService.deductVoiceCall(orgId, 60, { leadName: 'Sandbox Test Dialer' }).catch(() => {});
     }
 
     res.json({
       success: true,
+      sessionId: session.id,
       callUuid,
-      isSimulated: !Boolean(plivoAuthId && plivoAuthToken),
-      message: `Call initiated! Your phone (${cleanPhone}) will ring in ~4 seconds with AI Speed-to-Lead voice assistant.`,
+      isSimulated: Boolean(plivoRes.isSimulated),
+      message: plivoRes.isSimulated
+        ? `Simulated Plivo call created (${cleanPhone}). Configure PLIVO_AUTH_ID & PLIVO_AUTH_TOKEN to ring real phones.`
+        : `Live Plivo call initiated! ${cleanPhone} will ring shortly.`,
     });
   }),
 );
@@ -95,8 +118,8 @@ router.post(
       throw createError(parsed.error.errors[0]?.message || 'Invalid call parameters', 400);
     }
 
-    const { leadId, phone, fromNumber } = parsed.data;
-    const cleanPhone = sanitizePhone(phone);
+    const { leadId, phone, fromNumber: requestedFrom } = parsed.data;
+    const cleanPhone = sanitizeE164Phone(phone);
     const orgId = req.user!.organizationId;
 
     const lead = await prisma.lead.findFirst({
@@ -105,11 +128,60 @@ router.post(
     if (!lead) {
       throw createError('Lead not found', 404);
     }
+    if (lead.doNotCall) {
+      throw createError('Lead is marked Do Not Call (DND)', 409);
+    }
 
-    const callUuid = `call-outbound-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    logger.info(`[Voice API] Outbound speed-to-lead call for lead ${lead.fullName} (${cleanPhone})`);
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { isSuspended: true },
+    });
+    if (org?.isSuspended) {
+      throw createError('Workspace is suspended; outbound calls are disabled', 403);
+    }
+    await walletService.ensureSufficientBalance(orgId, 12);
 
-    // Log call in CRM CallLog
+    const plivoNum = await prisma.plivoNumber.findFirst({
+      where: { organizationId: orgId, isActive: true },
+      orderBy: { isPrimary: 'desc' },
+    });
+    const fromNumber = requestedFrom || plivoNum?.phoneNumber || process.env['PLIVO_FROM_NUMBER'] || '+918000000000';
+
+    const session = await prisma.voiceCallSession.create({
+      data: {
+        organizationId: orgId,
+        leadId: lead.id,
+        callUuid: `plivo-out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        direction: 'OUTBOUND',
+        fromNumber,
+        toNumber: cleanPhone,
+        status: 'INITIATED',
+      },
+    });
+
+    const baseUrl = getPublicBase(req);
+    const plivoRes = await plivoService.originateCall({
+      from: fromNumber,
+      to: cleanPhone,
+      answerUrl: `${baseUrl}/api/webhooks/plivo/answer/${session.id}`,
+      hangupUrl: `${baseUrl}/api/webhooks/plivo/hangup/${session.id}`,
+      machineDetectionUrl: `${baseUrl}/api/webhooks/plivo/answer/${session.id}`,
+    });
+
+    if (!plivoRes.success) {
+      await prisma.voiceCallSession.update({
+        where: { id: session.id },
+        data: { status: 'FAILED', summary: plivoRes.error },
+      });
+      throw createError(plivoRes.error || 'Plivo outbound call failed', 502);
+    }
+
+    const callUuid = plivoRes.callUuid || session.callUuid;
+    await prisma.voiceCallSession.update({
+      where: { id: session.id },
+      data: { callUuid, status: plivoRes.isSimulated ? 'COMPLETED' : 'RINGING' },
+    });
+
     await prisma.leadCallLog.create({
       data: {
         leadId: lead.id,
@@ -117,25 +189,17 @@ router.post(
         userId: req.user!.id,
         direction: 'OUTBOUND',
         outcome: 'CONNECTED',
-        durationSeconds: 120,
-        notes: `Autonomous AI Speed-to-Lead call dispatched via Plivo trunk. Lead qualified for model walkthrough.`,
+        durationSeconds: plivoRes.isSimulated ? 60 : 0,
+        notes: `Plivo AI Speed-to-Lead call (${callUuid}) ${plivoRes.isSimulated ? '[simulated]' : '[live]'}.`,
       },
     });
 
-    // Deduct minutes from metered wallet
-    try {
-      await walletService.deductVoiceCall(orgId, 120, {
-        leadName: lead.fullName,
-      });
-    } catch (e: any) {
-      logger.warn(`[Voice API] Wallet deduction error: ${e.message}`);
-    }
-
     res.json({
       success: true,
+      sessionId: session.id,
       callUuid,
-      isSimulated: true,
-      message: `AI voice agent successfully dispatched call to ${lead.fullName} (${cleanPhone})`,
+      isSimulated: Boolean(plivoRes.isSimulated),
+      message: `Plivo AI call initiated to ${lead.fullName} (${cleanPhone})`,
     });
   }),
 );
@@ -152,9 +216,32 @@ router.post(
     const { callUuid, leadId, advisorPhone, advisorName } = parsed.data;
     const orgId = req.user!.organizationId;
 
-    logger.info(`[Voice API] Live transfer for call ${callUuid} to advisor ${advisorName || advisorPhone}`);
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, organizationId: orgId },
+      include: { requirements: true },
+    });
+    if (!lead) throw createError('Lead not found', 404);
 
-    // Update call log note
+    const session = await prisma.voiceCallSession.findFirst({
+      where: { callUuid, organizationId: orgId },
+    });
+
+    const baseUrl = getPublicBase(req);
+    const whisperText = `Warm transfer for ${lead.fullName}. Preferred areas: ${lead.requirements?.preferredLocations?.join(', ') || 'TBD'}.`;
+    const transferXmlUrl = `${baseUrl}/api/webhooks/plivo/transfer/${session?.id || 'live'}?advisorPhone=${encodeURIComponent(advisorPhone)}&whisper=${encodeURIComponent(whisperText)}`;
+
+    const transferRes = await plivoService.transferActiveCall(callUuid, transferXmlUrl);
+    if (!transferRes.success) {
+      throw createError(transferRes.error || 'Plivo call transfer failed', 502);
+    }
+
+    if (session) {
+      await prisma.voiceCallSession.update({
+        where: { id: session.id },
+        data: { status: 'TRANSFERRED', outcome: 'WARM_TRANSFER' },
+      });
+    }
+
     await prisma.leadCallLog.create({
       data: {
         leadId,
@@ -163,14 +250,29 @@ router.post(
         direction: 'OUTBOUND',
         outcome: 'CONNECTED',
         durationSeconds: 180,
-        notes: `Live warm transfer executed to advisor ${advisorName || advisorPhone} with 5-second buyer context whisper.`,
+        notes: `Plivo live warm transfer to advisor ${advisorName || advisorPhone} (${callUuid}).`,
       },
     });
 
     res.json({
       success: true,
-      message: `Live transfer patched to ${advisorName || advisorPhone} with 5-second audio whisper.`,
+      isSimulated: Boolean(transferRes.isSimulated),
+      message: `Warm transfer initiated to ${advisorName || advisorPhone}.`,
     });
+  }),
+);
+
+// GET /api/voice/sessions — list recent Plivo call sessions for organization
+router.get(
+  '/sessions',
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessions = await prisma.voiceCallSession.findMany({
+      where: { organizationId: req.user!.organizationId },
+      include: { lead: { select: { id: true, fullName: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    res.json(sessions);
   }),
 );
 
@@ -197,7 +299,7 @@ router.post(
 
     try {
       const tts = new MsEdgeTTS();
-      await tts.setMetadata('en-US-JennyNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+      await tts.setMetadata('en-IN-NeerjaExpressiveNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
       const { audioStream } = tts.toStream(cleanText);
       const chunks: Buffer[] = [];
 
@@ -219,7 +321,6 @@ router.post(
       logger.warn(`[Voice Preview] MsEdgeTTS notice: ${err.message}. Trying Google TTS fallback.`);
     }
 
-    // Fallback: Google TTS
     try {
       const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText.slice(0, 200))}&tl=en&client=tw-ob`;
       const ttsRes = await fetch(ttsUrl, {
@@ -241,4 +342,3 @@ router.post(
 );
 
 export default router;
-

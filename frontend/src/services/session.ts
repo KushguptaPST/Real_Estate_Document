@@ -3,6 +3,8 @@
  * kept in localStorage and sent as a Bearer token on every API request.
  */
 
+import { swrCache } from '@/utils/swrCache';
+
 const TOKEN_KEY = 'copilot.session';
 const UNAUTHORIZED_EVENT = 'copilot:unauthorized';
 
@@ -16,10 +18,16 @@ export function getToken(): string | null {
 
 export function setToken(token: string | null): void {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    const previous = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      if (previous && previous !== token) swrCache.clear();
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+      swrCache.clear();
+    }
   } catch {
-    // storage unavailable — session lasts for this page load only
+    swrCache.clear();
   }
 }
 

@@ -13,7 +13,6 @@ import {
   Calendar,
   User,
   ShieldCheck,
-  Zap,
   Check,
   Loader2,
   Info,
@@ -52,14 +51,6 @@ export function UploadPage() {
   const [buyerName, setBuyerName] = useState('');
   const [sellerName, setSellerName] = useState('');
   const [acceptanceDate, setAcceptanceDate] = useState('');
-
-  const fillSampleDeal = () => {
-    setPropertyAddress('1420 Evergreen Vista Way, Bellevue, WA 98004');
-    setBuyerName('Alexander & Elena Vance');
-    setSellerName('Highland Properties Trust');
-    const today = new Date().toISOString().split('T')[0];
-    setAcceptanceDate(today);
-  };
 
   async function handleDirectUpload(file: File, overrideAddress?: string) {
     if (file.type !== 'application/pdf') {
@@ -104,25 +95,6 @@ export function UploadPage() {
       setError((err as Error).message);
       setDirectUploading(false);
       setSubmitting(false);
-    }
-  }
-
-  async function handleLoadSampleContract() {
-    setDirectUploading(true);
-    setError(null);
-    setDirectStage('Loading sample WA Form 21 contract agreement...');
-    try {
-      const res = await fetch('/sample-contract.pdf');
-      const blob = await res.blob();
-      const file = new File(
-        [blob],
-        'NWMLS_Form21_Purchase_Agreement_1420_Evergreen.pdf',
-        { type: 'application/pdf' }
-      );
-      await handleDirectUpload(file, '1420 Evergreen Vista Way, Bellevue, WA 98004');
-    } catch (err) {
-      setError('Failed to load sample contract: ' + (err as Error).message);
-      setDirectUploading(false);
     }
   }
 
@@ -270,9 +242,9 @@ export function UploadPage() {
                 const file = e.dataTransfer.files?.[0];
                 if (file) void handleDirectUpload(file);
               }}
-              className={`relative overflow-hidden rounded-2xl border-2 border-dashed p-8 transition-all text-center ${
+              className={`relative overflow-hidden rounded-2xl border-2 border-dashed p-8 transition-colors text-center ${
                 directDragging
-                  ? 'border-emerald-500 bg-emerald-50/80 scale-[1.01] shadow-lg'
+                  ? 'border-emerald-500 bg-emerald-50/80 shadow-lg'
                   : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50/40 shadow-sm'
               }`}
             >
@@ -323,25 +295,15 @@ export function UploadPage() {
                     </p>
                   </div>
 
-                  {/* Primary Action Buttons */}
+                  {/* Primary Action Button */}
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                     <Button
                       type="button"
                       onClick={() => directInputRef.current?.click()}
-                      className="gap-2 h-11 px-6 rounded-xl bg-[#0A0A0A] hover:bg-black text-white font-bold text-xs shadow-md cursor-pointer transition-all hover:-translate-y-0.5"
+                      className="gap-2 h-11 px-6 rounded-xl bg-[#0A0A0A] hover:bg-black text-white font-bold text-xs shadow-md cursor-pointer transition-colors"
                     >
                       <UploadCloud className="h-4 w-4 text-emerald-400" />
                       <span>Browse Contract PDF</span>
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleLoadSampleContract()}
-                      className="gap-2 h-11 px-5 rounded-xl border-emerald-300 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 font-bold text-xs cursor-pointer transition-all hover:-translate-y-0.5"
-                    >
-                      <Zap className="h-4 w-4 text-emerald-600" />
-                      <span>1-Click Test (WA Form 21 Sample)</span>
                     </Button>
                   </div>
 
@@ -381,17 +343,6 @@ export function UploadPage() {
                       You can enter property and counterparty names now or let the document parser extract them from the PDF.
                     </CardDescription>
                   </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={fillSampleDeal}
-                    className="gap-1.5 text-[11px] h-8 px-3 border-slate-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-slate-400 self-start sm:self-auto cursor-pointer transition-all"
-                  >
-                    <Zap className="h-3 w-3 text-emerald-700" />
-                    <span>Auto-Fill Sample (WA Form 21)</span>
-                  </Button>
                 </div>
               </CardHeader>
 

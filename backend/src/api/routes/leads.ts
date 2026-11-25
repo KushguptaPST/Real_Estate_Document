@@ -230,6 +230,8 @@ router.get(
       assignedUserId,
       unassignedOnly,
       organizationId: orgId,
+      callerId: req.user!.id,
+      callerRole: req.user!.role,
     });
     res.json(leads);
   }),
@@ -253,13 +255,85 @@ router.post(
   }),
 );
 
+const BulkImportLeadsSchema = z.object({
+  rows: z.array(z.record(z.unknown())).min(1, 'At least 1 row is required').max(500, 'Maximum 500 rows per batch'),
+});
+
+// ── POST /api/leads/import (Batch CSV Lead Import with Validation) ────────────
+router.post(
+  '/import',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const orgId = req.user!.organizationId;
+    const parsed = BulkImportLeadsSchema.safeParse(req.body);
+    if (!parsed.success) throw createError(parsed.error.errors[0]?.message || 'Invalid import payload', 422);
+
+    let importedCount = 0;
+    let skippedCount = 0;
+    const errors: Array<{ row: number; reason: string }> = [];
+
+    for (let i = 0; i < parsed.data.rows.length; i++) {
+      const raw = parsed.data.rows[i] as Record<string, unknown>;
+      const rowParsed = InboundLeadSchema.safeParse({
+        fullName: typeof raw.fullName === 'string' ? raw.fullName.trim() : '',
+        email: typeof raw.email === 'string' && raw.email.trim() ? raw.email.trim() : null,
+        phone: typeof raw.phone === 'string' && raw.phone.trim() ? raw.phone.trim() : null,
+        enquiryText: typeof raw.enquiryText === 'string' && raw.enquiryText.trim() ? raw.enquiryText.trim() : null,
+        source: 'PORTAL_INQUIRY',
+      });
+
+      if (!rowParsed.success) {
+        skippedCount++;
+        errors.push({
+          row: i + 1,
+          reason: rowParsed.error.errors[0]?.message || 'Invalid lead row',
+        });
+        continue;
+      }
+
+      if (!rowParsed.data.email && !rowParsed.data.phone) {
+        skippedCount++;
+        errors.push({ row: i + 1, reason: 'At least an email or phone number is required' });
+        continue;
+      }
+
+      try {
+        await ingestInboundLead({
+          ...rowParsed.data,
+          organizationId: orgId,
+        });
+        importedCount++;
+      } catch (err: any) {
+        skippedCount++;
+        errors.push({ row: i + 1, reason: err?.message || 'Could not import row' });
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        action: 'LEAD_CREATED',
+        entityType: 'Lead',
+        actor: req.user?.email ?? 'system',
+        note: `CSV import finished: imported=${importedCount}, skipped=${skippedCount}`,
+        newValue: { importedCount, skippedCount },
+      },
+    });
+
+    res.status(201).json({ importedCount, skippedCount, errors });
+  }),
+);
+
 // ── GET /api/leads/:id ────────────────────────────────────────────────────────
 router.get(
   '/:id',
   requireAuth,
   asyncHandler(async (req, res) => {
     const orgId = req.user!.organizationId;
-    const lead = await getLeadDetails(req.params['id'], orgId);
+    const lead = await getLeadDetails(req.params['id'], orgId, {
+      id: req.user!.id,
+      role: req.user!.role,
+    });
     res.json(lead);
   }),
 );

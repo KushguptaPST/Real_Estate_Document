@@ -4,6 +4,7 @@
 
 import { prisma } from '../utils/prisma.js';
 import cron from 'node-cron';
+import { differenceInCalendarDays, startOfDay } from 'date-fns';
 import { logger } from '../utils/logger.js';
 import { maskEmail } from '../utils/audit.js';
 import { sendEmail, generateTemplate } from './email.service.js';
@@ -48,8 +49,7 @@ export async function checkAndDispatchAlerts(): Promise<{ processed: number; sen
 
       for (const deadline of deal.deadlines) {
         const targetDate = deadline.confirmedDate ?? deadline.computedDate;
-        const diffMs = targetDate.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const diffDays = differenceInCalendarDays(startOfDay(targetDate), startOfDay(now));
 
         let templateToSend: '3d' | '1d' | 'dayOf' | 'missed' | null = null;
 

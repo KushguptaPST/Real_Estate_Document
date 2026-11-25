@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { campaignsApi, type CampaignStateResponse, type CampaignLogItem } from '@/services/api';
 import { useToast } from '@/context/ToastContext';
+import { WorkspacePageSkeleton } from '@/components/ui/skeleton';
 
 export function CampaignsPage() {
   const { toast } = useToast();
@@ -129,11 +130,7 @@ export function CampaignsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
-      </div>
-    );
+    return <WorkspacePageSkeleton />;
   }
 
   const campaign = data?.campaign;

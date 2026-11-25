@@ -23,8 +23,8 @@ describe('Phase 0 — invite-only membership and OWNER/AGENT authorization', () 
   const createdOrgIds: string[] = [];
 
   beforeAll(async () => {
-    orgA = await prisma.organization.create({ data: { name: 'P0 Membership Org A' } });
-    orgB = await prisma.organization.create({ data: { name: 'P0 Membership Org B' } });
+    orgA = await prisma.organization.create({ data: { name: 'P0 Membership Org A', subscriptionTier: 'ENTERPRISE' } });
+    orgB = await prisma.organization.create({ data: { name: 'P0 Membership Org B', subscriptionTier: 'ENTERPRISE' } });
     createdOrgIds.push(orgA.id, orgB.id);
     ownerA = await createMemberSession(orgA.id, { role: 'OWNER' });
     agentA = await createMemberSession(orgA.id, { role: 'AGENT' });

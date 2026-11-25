@@ -19,6 +19,7 @@ export interface PlanDetails {
   name: string;
   monthlyPrice: number;
   annualPrice: number;
+  includedCreditsInr: number;
   maxAgents: number;
   maxDeals: number | null; // null = unlimited
   features: string[];
@@ -28,47 +29,52 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanDetails> = {
   SOLO: {
     id: 'SOLO',
     name: 'Solo Channel Partner',
-    monthlyPrice: 4999,
-    annualPrice: 49999,
+    monthlyPrice: 7499,
+    annualPrice: 71988,
+    includedCreditsInr: 6000,
     maxAgents: 1,
-    maxDeals: 15,
+    maxDeals: 50,
     features: [
-      'Up to 15 Active Buyer Deals',
-      'Sub-15s WhatsApp Speed-to-Lead Auto-Reply',
-      'Digital Brochure PDF & Floor Plan Dispatch',
-      'Site Visit Walk-in Scheduler & Google Maps Pin',
-      'Indian Rupee (₹ Lakhs & Crores) Tracking',
+      '500 AI Calling Minutes (~1,000–1,250 cold dials/mo, ₹0 unanswered)',
+      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹12/min)',
+      'Unlimited Embeddable Website Chat Widget & Telegram Bot',
+      '1 Indian Plivo DID Number & WhatsApp Speed-to-Lead (₹3/lead)',
+      'Property Brochure PDF & Google Maps Location Pin Dispatch',
+      'Automated Site Visit Scheduling & Deal Document Copilot',
     ],
   },
   TEAM: {
     id: 'TEAM',
     name: 'Brokerage Team',
-    monthlyPrice: 14999,
-    annualPrice: 149999,
+    monthlyPrice: 21999,
+    annualPrice: 211188,
+    includedCreditsInr: 19200,
     maxAgents: 10,
     maxDeals: null,
     features: [
-      'Unlimited Active Deals & Walkthroughs',
-      'Up to 10 Licensed Agent / Telecaller seats',
-      'Omnichannel WhatsApp Business & Voice Notes',
-      'Meta (FB/IG) Lead Ads & 99acres Sync',
-      'Plivo Speed-to-Lead Outbound AI Calling',
-      '45-Day Lead Protection & Claim Lock for Agents',
+      '1,600 AI Calling Minutes (~3,200–4,000 cold dials/mo)',
+      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹12/min)',
+      'Unlimited Embeddable Website Chat Widget & Telegram Bot',
+      'WhatsApp Coexistence Mode (Auto-pause on advisor mobile reply)',
+      'Up to 10 Workspace Seats (Google Verified Auth + Invitations)',
+      'CSV Bulk Lead Import, Plivo Batch Campaigns & Warm Transfer',
     ],
   },
   ENTERPRISE: {
     id: 'ENTERPRISE',
-    name: 'Developer / Builder Enterprise',
-    monthlyPrice: 39999,
-    annualPrice: 399999,
+    name: 'Builder / Mandate Center',
+    monthlyPrice: 54999,
+    annualPrice: 527988,
+    includedCreditsInr: 48000,
     maxAgents: 100,
     maxDeals: null,
     features: [
-      'Unlimited Calling Seats & In-House Telecallers',
-      'Multi-Project Inventory & Master Stacking',
-      'Custom Agent Hinglish Voice Cloning Digital Twin',
-      'High-Scale Batch Campaign Dialing Center',
-      'Dedicated Account Manager & 24/7 Setup Support',
+      '4,000 AI Calling Minutes (~8,000–10,000 cold dials/mo)',
+      'Up to 100 Workspace Seats + Plivo Subaccount Isolation',
+      'Unlimited Website Chat Widget & Telegram AI Bot',
+      'Multi-Property RERA Inventory & Hybrid PGVector Knowledge Search',
+      'Tenant API Keys & HMAC-Signed Inbound Lead Webhooks',
+      'Full Deal & Contingency Document Intelligence + Audit Log',
     ],
   },
 };
@@ -92,8 +98,8 @@ export async function createCheckoutSession(params: CreateCheckoutParams): Promi
     throw createError('Organization not found', 404);
   }
 
-  const defaultSuccess = successUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-  const defaultCancel = cancelUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/pricing?checkout=cancelled`;
+  const defaultSuccess = successUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+  const defaultCancel = cancelUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/billing?checkout=cancelled`;
 
   // If Stripe is not configured or in local sandbox development, simulate instantaneous checkout
   if (!stripe) {
@@ -157,7 +163,7 @@ export async function createCustomerPortalSession(organizationId: string, return
     throw createError('Organization not found', 404);
   }
 
-  const defaultReturn = returnUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/pricing`;
+  const defaultReturn = returnUrl || `${process.env['FRONTEND_URL'] || 'http://localhost:3000'}/billing`;
 
   if (!stripe || !org.stripeCustomerId) {
     logger.info(`[Billing] Customer portal fallback for org ${organizationId}`);
