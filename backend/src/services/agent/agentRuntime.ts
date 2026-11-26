@@ -127,50 +127,81 @@ async function generateConsultativeFallback(params: {
   customerMessage: string;
   leadId: string;
   organizationId: string;
+  organizationName?: string;
   executedTools: ExecutedToolRecord[];
   reason: string;
   customerName?: string;
   currency?: string;
 }): Promise<SalesAgentResult> {
-  const { customerMessage, organizationId, executedTools, reason, customerName, currency = 'INR' } = params;
+  const { customerMessage, organizationId, organizationName, executedTools, reason, customerName, currency = 'INR' } = params;
   const lower = customerMessage.toLowerCase();
   const firstName = customerName ? customerName.split(' ')[0] : '';
   const greeting = firstName ? `Hey ${firstName},` : 'Hey!';
+  const orgLabel = organizationName || 'our brokerage';
 
   const bedroomsMatch = customerMessage.match(/(\d+)\s*(?:bhk|bed|bedroom)/i);
   const requestedBedrooms = bedroomsMatch ? parseInt(bedroomsMatch[1]!, 10) : undefined;
 
-  const matchedProps = await prisma.property.findMany({
+  const crMatch = customerMessage.match(/(?:under|below|max|upto|up to|budget)?\s*(\d+(?:\.\d+)?)\s*(?:cr|crore)/i);
+  const lMatch = customerMessage.match(/(?:under|below|max|upto|up to|budget)?\s*(\d+(?:\.\d+)?)\s*(?:l|lac|lakh|lakhs)/i);
+  const maxPrice = crMatch
+    ? Math.round(parseFloat(crMatch[1]!) * 10_000_000)
+    : lMatch
+    ? Math.round(parseFloat(lMatch[1]!) * 100_000)
+    : undefined;
+
+  const allOrgProps = await prisma.property.findMany({
     where: {
       organizationId,
       status: 'AVAILABLE',
-      ...(requestedBedrooms ? { bedrooms: { gte: requestedBedrooms } } : {}),
     },
-    take: 2,
+    take: 25,
     orderBy: { createdAt: 'desc' },
   });
+
+  const filteredProps = allOrgProps.filter((p) => {
+    if (requestedBedrooms && p.bedrooms < requestedBedrooms) return false;
+    if (maxPrice && p.price > maxPrice) return false;
+    return true;
+  });
+
+  const matchedProps = (filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
+  const asksOrg = /\b(org|organisation|organization|company|brokerage|agency|who are you)\b/i.test(lower);
 
   let response = '';
   const suggestedFollowUps: string[] = [];
 
-  if (matchedProps.length > 0) {
+  if (asksOrg) {
+    const invSummary =
+      allOrgProps.length > 0
+        ? ` We currently have ${allOrgProps.length} active listing${allOrgProps.length === 1 ? '' : 's'}, including ${allOrgProps
+            .slice(0, 2)
+            .map((p) => `${p.title} (${formatCurrencyShort(p.price, currency)})`)
+            .join(' and ')}.`
+        : '';
+    response = `${greeting} I'm the AI Property Advisor for ${orgLabel}.${invSummary} How can I help you today?`;
+    suggestedFollowUps.push('Show available properties', 'Schedule a site visit');
+  } else if (matchedProps.length > 0) {
     const summaryList = matchedProps
       .map((p) => `${p.title} in ${p.microMarket || p.city} at ${formatCurrencyShort(p.price, currency)}`)
-      .join(' and ');
+      .join(', ');
     const wantsBrochure = /\b(brochure|pdf|floor\s*plan|details)\b/i.test(lower);
 
-    response = wantsBrochure
-      ? `${greeting} we have ${summaryList} available right now. Could you confirm your target budget and preferred move-in timeline so I can share the right floor plan and schedule a visit?`
-      : `${greeting} thanks for reaching out! From our active inventory we currently have ${summaryList}. Which micro-market and budget range are you targeting so I can narrow this down for you?`;
+    if (filteredProps.length === 0 && (requestedBedrooms || maxPrice)) {
+      response = `${greeting} we don't have an exact match for that filter at ${orgLabel} right now, but our active inventory includes ${summaryList}. Would you like details or a brochure for any of these?`;
+    } else if (wantsBrochure) {
+      response = `${greeting} at ${orgLabel} we have ${summaryList} available right now. Which one would you like the brochure or a site visit for?`;
+    } else {
+      response = `${greeting} at ${orgLabel} we currently have ${summaryList}. Which one catches your eye, or would you like to schedule a site visit?`;
+    }
 
     for (const p of matchedProps) {
       suggestedFollowUps.push(`Send brochure for ${p.title}`);
     }
     suggestedFollowUps.push('Schedule a site visit');
   } else {
-    response = `${greeting} thanks for reaching out! Could you share your preferred location, approximate budget, and configuration (like 2BHK or 3BHK) so our advisor can match the best options for you?`;
-    suggestedFollowUps.push('Share budget & configuration');
-    suggestedFollowUps.push('Request advisor callback');
+    response = `${greeting} thanks for reaching out to ${orgLabel}! We don't have active listings matching that right now—would you like me to connect you with one of our property advisors?`;
+    suggestedFollowUps.push('Connect with an advisor');
   }
 
   return {
@@ -209,8 +240,8 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     threadId,
   };
 
-  // 1. Mandatory Thread & Lead Verification
-  const [thread, leadRecord, orgChannel] = await Promise.all([
+  // 1. Mandatory Thread, Lead & Full Organization Context Verification
+  const [thread, leadRecord, orgChannel, organization, orgProperties, orgAdvisors] = await Promise.all([
     prisma.conversationThread.findFirst({
       where: { id: threadId, organizationId: orgId },
     }),
@@ -220,7 +251,35 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     }),
     prisma.organizationChannel.findUnique({
       where: { organizationId: orgId },
-      select: { defaultCurrency: true },
+      select: { defaultCurrency: true, defaultTimezone: true },
+    }),
+    prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, stateJurisdiction: true },
+    }),
+    prisma.property.findMany({
+      where: { organizationId: orgId, status: 'AVAILABLE' },
+      select: {
+        id: true,
+        title: true,
+        address: true,
+        city: true,
+        microMarket: true,
+        price: true,
+        bedrooms: true,
+        bathrooms: true,
+        propertyType: true,
+        builderName: true,
+        reraNumber: true,
+        possessionStatus: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 25,
+    }),
+    prisma.user.findMany({
+      where: { organizationId: orgId },
+      select: { name: true, role: true },
+      take: 10,
     }),
   ]);
 
@@ -364,12 +423,25 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   const clientFullName = params.customerName || leadRecord.fullName || '';
   const clientFirstName = clientFullName.split(' ')[0] || '';
 
+  const orgName = organization?.name || 'Eigen Estate Brokerage';
+  const orgInventorySummary =
+    orgProperties.length > 0
+      ? orgProperties
+          .map(
+            (p) =>
+              `  * [${p.id}] ${p.title} — ${p.bedrooms}BHK ${p.propertyType} in ${p.microMarket || p.city} (${p.address}) | ${formatCurrencyShort(p.price, currency)}${p.builderName ? ` | Builder: ${p.builderName}` : ''}${p.reraNumber ? ` | RERA: ${p.reraNumber}` : ''}${p.possessionStatus ? ` | ${p.possessionStatus}` : ''}`,
+          )
+          .join('\n')
+      : '  * No active available listings currently in this organization.';
+  const advisorNames = orgAdvisors.map((a) => `${a.name || 'Advisor'} (${a.role})`).join(', ') || 'Advisory Team';
+
   if (!ai) {
     logger.warn('[Agent Runtime] GEMINI_API_KEY not set. Using DB-grounded consultative fallback.');
     const fallback = await generateConsultativeFallback({
       customerMessage,
       leadId,
       organizationId: orgId,
+      organizationName: orgName,
       executedTools: [],
       reason: 'API key missing from environment',
       customerName: clientFullName,
@@ -466,10 +538,8 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       };
     }
 
-    const effectivePrimary =
-      configuredModel === 'gemini-2.5-flash' ? 'gemini-3-flash-preview' : configuredModel;
     const candidateModels = Array.from(
-      new Set([effectivePrimary, 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash-lite']),
+      new Set([configuredModel, 'gemini-2.5-flash-lite', 'gemini-2.5-flash']),
     );
 
     const forceMatcherToolOnRound1 =
@@ -500,7 +570,14 @@ ACTIVE CONVERSATION CONTEXT:
 - Current Date: "${new Date().toISOString().slice(0, 10)}"
 - Lead Lifecycle Stage: "${stageBefore}"
 - Currency: "${currency}"
-- Authorized Lead ID: "${leadId}"`,
+- Authorized Lead ID: "${leadId}"
+
+ORGANIZATION PROFILE & VERIFIED INVENTORY (STRICT TENANT SCOPE):
+- Organization / Brokerage Name: "${orgName}"
+- Region / Jurisdiction: "${organization?.stateJurisdiction || 'India'}"
+- Team Advisors: ${advisorNames}
+- Active Available Listings (${orgProperties.length}):
+${orgInventorySummary}`,
                 tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
                 ...(forceMatcherToolOnRound1
                   ? {
@@ -555,6 +632,7 @@ ACTIVE CONVERSATION CONTEXT:
         customerMessage,
         leadId,
         organizationId: orgId,
+        organizationName: orgName,
         executedTools,
         reason: `Model cascade error: ${errMessage.slice(0, 100)}`,
         customerName: clientFullName,
