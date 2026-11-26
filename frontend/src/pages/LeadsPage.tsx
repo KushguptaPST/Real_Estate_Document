@@ -84,7 +84,11 @@ export function LeadsPage() {
     hasInventory: boolean;
   } | null>(() => {
     const cached = organizationApi.getCachedOnboarding();
-    if (!cached || (cached.onboardingCompleted && cached.checklist?.telegramConnected)) return null;
+    if (!cached) return null;
+    const isComplete =
+      (cached.onboardingCompleted && cached.checklist?.telegramConnected) ||
+      (cached.checklist?.telegramConnected && cached.checklist?.hasInventory);
+    if (isComplete) return null;
     return {
       telegramConnected: Boolean(cached.checklist?.telegramConnected),
       hasInventory: Boolean(cached.checklist?.hasInventory),
@@ -96,7 +100,12 @@ export function LeadsPage() {
     organizationApi
       .getOnboarding()
       .then((res) => {
-        if (!res.onboardingCompleted || !res.checklist.telegramConnected) {
+        const isComplete =
+          (res.onboardingCompleted && res.checklist.telegramConnected) ||
+          (res.checklist.telegramConnected && res.checklist.hasInventory);
+        if (isComplete) {
+          setSetupIncomplete(null);
+        } else {
           setSetupIncomplete({
             telegramConnected: res.checklist.telegramConnected,
             hasInventory: res.checklist.hasInventory,

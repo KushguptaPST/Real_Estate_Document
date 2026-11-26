@@ -78,20 +78,19 @@ router.post(
       },
     });
 
-    // ── Gemini extraction pipeline (Parallelized) ────────────────────────
-    logger.info(`[Pipeline] Starting parallel clause & milestone task extraction for document ${document.id}`);
+    // ── Gemini clause extraction (critical path) ─────────────────────────
+    logger.info(`[Pipeline] Starting clause extraction for document ${document.id}`);
 
     await prisma.auditLog.create({
       data: { dealId, organizationId: orgId, action: 'EXTRACTION_STARTED', entityType: 'Document', entityId: document.id, actor: 'system' },
     });
 
-    const [extraction, _tasks] = await Promise.all([
-      extractClausesFromPdf(file.path),
-      extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
-        logger.warn(`[Pipeline] Task extraction failed: ${err.message}`);
-        return [];
-      }),
-    ]);
+    const extraction = await extractClausesFromPdf(file.path);
+
+    // Run secondary milestone task extraction in the background so upload responds immediately
+    void extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
+      logger.warn(`[Pipeline] Background task extraction failed: ${err.message}`);
+    });
 
     const clauses = await Promise.all(
       extraction.clauses.map((clause) =>
@@ -142,13 +141,21 @@ router.post(
 
         const pages = await extractPagesFromPdf(file.path);
         const sampleText = pages.map((p) => p.text).join('\n').slice(0, 10000);
-        const classification = await classifyDocument({ filename: file.originalname, sampleText });
         const chunks = chunkDocumentPages(pages);
 
-        for (const chunk of chunks) {
-          const embedding = await generateEmbedding(chunk.content);
-          await prisma.documentChunk.create({
-            data: {
+        const [classification, embeddedChunks] = await Promise.all([
+          classifyDocument({ filename: file.originalname, sampleText }),
+          Promise.all(
+            chunks.map(async (chunk) => ({
+              chunk,
+              embedding: await generateEmbedding(chunk.content),
+            })),
+          ),
+        ]);
+
+        if (embeddedChunks.length > 0) {
+          await prisma.documentChunk.createMany({
+            data: embeddedChunks.map(({ chunk, embedding }) => ({
               documentId: document.id,
               dealId,
               organizationId: orgId,
@@ -159,7 +166,7 @@ router.post(
               tokenCount: chunk.tokenCount,
               source: chunk.source,
               embedding: embedding as unknown as object,
-            },
+            })),
           });
         }
 

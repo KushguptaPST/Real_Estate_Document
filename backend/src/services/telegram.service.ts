@@ -65,6 +65,14 @@ interface OrgPollerState {
 
 const orgPollers = new Map<string, OrgPollerState>();
 
+export function stopOrgTelegramPolling(organizationId: string): void {
+  const prev = orgPollers.get(organizationId);
+  if (!prev) return;
+  prev.running = false;
+  prev.controller?.abort();
+  orgPollers.delete(organizationId);
+}
+
 export async function startOrgTelegramPolling(organizationId: string, botToken: string): Promise<void> {
   if (process.env['NODE_ENV'] === 'test' || !botToken.trim()) return;
   const cleanToken = botToken.trim();
@@ -707,16 +715,22 @@ async function handleIncomingMessage(
       },
     });
 
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    const orgDisplayName = org?.name || 'our Real Estate Advisory';
+
     const welcome =
       `👋 <b>Hello ${msg.from.first_name}!</b>\n\n` +
-      `Welcome to <b>Eigen Estate AI Copilot</b> (eigenestate.com). I am your autonomous real estate sales advisor.\n\n` +
+      `Welcome to <b>${orgDisplayName}</b>. I am your dedicated real estate sales advisor.\n\n` +
       `Here is what I can do for you:\n` +
-      `• 🔍 <b>Find Properties:</b> Tell me your budget, preferred city, or bedroom requirements.\n` +
+      `• 🔍 <b>Find Properties:</b> Tell me your budget, preferred area, or bedroom requirements.\n` +
       `• 📅 <b>Book Tours:</b> Schedule an on-site property walkthrough.\n` +
-      `• 📋 <b>Answer Questions:</b> Inquire about HOA fees, schools, price points, and features.\n\n` +
+      `• 📋 <b>Answer Questions:</b> Inquire about pricing, RERA, amenities, and property details.\n\n` +
       `<i>Try asking:</i>\n` +
-      `👉 "Show me 2-bedroom properties under ₹80 L"\n` +
-      `👉 "What homes are available in Whitefield or Bengaluru?"\n` +
+      `👉 "Show me all available properties"\n` +
+      `👉 "What are the details and price?"\n` +
       `👉 "/properties" to list verified inventory now!`;
 
     await sendTelegramMessage(chatId, welcome, {
@@ -926,26 +940,55 @@ async function pollUpdates(orgId: string): Promise<void> {
  * Initializes and starts the Telegram Bot Service.
  */
 export async function initTelegramBot(): Promise<void> {
-  // Start per-organization Telegram bot polling on localhost/dev when public HTTPS isn't active
-  const publicUrl = process.env['APP_PUBLIC_URL'] || process.env['API_PUBLIC_URL'] || '';
-  if (!publicUrl.startsWith('https://')) {
-    try {
-      const channels = await prisma.organizationChannel.findMany({
-        where: { telegramBotToken: { not: null } },
-        select: { organizationId: true, telegramBotToken: true },
-      });
-      for (const ch of channels) {
-        if (ch.telegramBotToken) {
-          await startOrgTelegramPolling(ch.organizationId, ch.telegramBotToken);
+  // Initialize per-organization Telegram bots (webhooks in HTTPS prod, long-polling in local/dev)
+  const publicUrl = (
+    process.env['API_PUBLIC_URL'] ||
+    process.env['APP_PUBLIC_URL'] ||
+    process.env['RENDER_EXTERNAL_URL'] ||
+    ''
+  ).trim();
+  const orgTokens = new Set<string>();
+
+  try {
+    const channels = await prisma.organizationChannel.findMany({
+      where: { telegramBotToken: { not: null } },
+      orderBy: { updatedAt: 'desc' },
+      select: { organizationId: true, telegramBotToken: true, telegramWebhookSecret: true },
+    });
+    for (const ch of channels) {
+      if (!ch.telegramBotToken) continue;
+      const cleanOrgToken = ch.telegramBotToken.trim();
+      if (orgTokens.has(cleanOrgToken)) continue;
+      orgTokens.add(cleanOrgToken);
+
+      if (publicUrl.startsWith('https://')) {
+        if (ch.telegramWebhookSecret) {
+          const webhookUrl = `${publicUrl.replace(/\/$/, '')}/api/webhooks/telegram/${ch.telegramWebhookSecret}`;
+          fetch(`https://api.telegram.org/bot${cleanOrgToken}/setWebhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: webhookUrl }),
+            signal: AbortSignal.timeout(8000),
+          }).catch((err: any) => {
+            logger.warn(`[Telegram] Failed to ensure webhook for org ${ch.organizationId}: ${err.message}`);
+          });
         }
+      } else {
+        await startOrgTelegramPolling(ch.organizationId, cleanOrgToken);
       }
-    } catch (err: any) {
-      logger.warn(`[Telegram] Failed loading org bot pollers: ${err.message}`);
     }
+  } catch (err: any) {
+    logger.warn(`[Telegram] Failed loading org bot pollers: ${err.message}`);
   }
 
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
+  const token = process.env['TELEGRAM_BOT_TOKEN']?.trim();
   if (!token) {
+    return;
+  }
+
+  // Avoid 409 Conflict if an organization already registered this exact token
+  if (orgTokens.has(token)) {
+    logger.info('[Telegram] Global TELEGRAM_BOT_TOKEN is already managed by an organization channel; skipping duplicate poller.');
     return;
   }
 
@@ -982,6 +1025,19 @@ export async function initTelegramBot(): Promise<void> {
     logger.info(`🚀 [Telegram] Real-Time Agentic AI listener active for @${botInfo.username}`);
   } catch (err: any) {
     logger.error(`[Telegram] Failed to initialize Telegram Bot: ${err.message}`);
+  }
+}
+
+/**
+ * Stops only the global .env TELEGRAM_BOT_TOKEN polling loop (used when an org claims that token).
+ */
+export function stopGlobalTelegramPolling(): void {
+  if (!isRunning) return;
+  logger.info('[Telegram] Stopping global fallback poller because an organization claimed the token...');
+  isRunning = false;
+  if (pollingAbortController) {
+    pollingAbortController.abort();
+    pollingAbortController = null;
   }
 }
 

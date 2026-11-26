@@ -82,9 +82,9 @@ export interface SalesAgentResult {
   suppressedReason?: string;
 }
 
-const BASE_SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner representing a brokerage channel partner.
-You speak warmly, concisely, and authentically like an experienced human property consultant.
-NEVER invent properties, prices, RERA IDs, possession dates, or amenities that were not returned by a tool.
+const BASE_SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner representing the specific brokerage/organization listed in ORGANIZATION PROFILE below.
+You speak warmly, concisely, and authentically like an experienced human property consultant for THAT organization ONLY—never refer to "Eigen Estate" or any underlying software platform as your own company.
+NEVER invent properties, prices, RERA IDs, possession dates, or amenities that were not returned by a tool or listed in ORGANIZATION PROFILE.
 
 CORE OPERATING RULES:
 1. QUALIFICATION FIRST:
@@ -127,51 +127,188 @@ async function generateConsultativeFallback(params: {
   customerMessage: string;
   leadId: string;
   organizationId: string;
+  organizationName?: string;
+  organizationJurisdiction?: string | null;
+  advisors?: Array<{ name: string | null; role: string; phone: string | null }>;
+  properties?: Array<{
+    id: string;
+    title: string;
+    address: string;
+    city: string;
+    microMarket: string | null;
+    price: number;
+    bedrooms: number;
+    bathrooms: number;
+    propertyType: string;
+    builderName: string | null;
+    reraNumber: string | null;
+    possessionStatus: string | null;
+    features?: string[];
+    description?: string | null;
+    brochureUrl?: string | null;
+    mapsUrl?: string | null;
+  }>;
   executedTools: ExecutedToolRecord[];
   reason: string;
   customerName?: string;
   currency?: string;
 }): Promise<SalesAgentResult> {
-  const { customerMessage, organizationId, executedTools, reason, customerName, currency = 'INR' } = params;
-  const lower = customerMessage.toLowerCase();
+  const {
+    customerMessage,
+    organizationId,
+    organizationName,
+    organizationJurisdiction,
+    advisors = [],
+    executedTools,
+    reason,
+    customerName,
+    currency = 'INR',
+  } = params;
+  const lower = customerMessage.toLowerCase().trim();
   const firstName = customerName ? customerName.split(' ')[0] : '';
-  const greeting = firstName ? `Hey ${firstName},` : 'Hey!';
+  const greeting = firstName ? `Hey ${firstName}` : 'Hey';
+  const orgLabel = organizationName || 'our brokerage';
 
   const bedroomsMatch = customerMessage.match(/(\d+)\s*(?:bhk|bed|bedroom)/i);
   const requestedBedrooms = bedroomsMatch ? parseInt(bedroomsMatch[1]!, 10) : undefined;
 
-  const matchedProps = await prisma.property.findMany({
-    where: {
-      organizationId,
-      status: 'AVAILABLE',
-      ...(requestedBedrooms ? { bedrooms: { gte: requestedBedrooms } } : {}),
-    },
-    take: 2,
-    orderBy: { createdAt: 'desc' },
+  const crMatch = customerMessage.match(/(?:under|below|max|upto|up to|budget)?\s*(\d+(?:\.\d+)?)\s*(?:cr|crore)/i);
+  const lMatch = customerMessage.match(/(?:under|below|max|upto|up to|budget)?\s*(\d+(?:\.\d+)?)\s*(?:l|lac|lakh|lakhs)/i);
+  const maxPrice = crMatch
+    ? Math.round(parseFloat(crMatch[1]!) * 10_000_000)
+    : lMatch
+    ? Math.round(parseFloat(lMatch[1]!) * 100_000)
+    : undefined;
+
+  const allOrgProps =
+    params.properties ??
+    (await prisma.property.findMany({
+      where: { organizationId, status: 'AVAILABLE' },
+      take: 25,
+      orderBy: { createdAt: 'desc' },
+    }));
+
+  const filteredProps = allOrgProps.filter((p) => {
+    if (requestedBedrooms && p.bedrooms < requestedBedrooms) return false;
+    if (maxPrice && p.price > maxPrice) return false;
+    return true;
   });
+
+  // Check if user mentioned a specific property title or micro-market/city
+  const mentionedProp = allOrgProps.find(
+    (p) =>
+      lower.includes(p.title.toLowerCase()) ||
+      (p.microMarket && lower.includes(p.microMarket.toLowerCase())) ||
+      lower.includes(p.city.toLowerCase()),
+  );
+  const primaryProp = mentionedProp ?? filteredProps[0] ?? allOrgProps[0];
+
+  const isGreeting = /^(hi+|hii+|hello+|hey+|good\s*(morning|afternoon|evening)|namaste)[\s!.,?]*$/i.test(lower);
+  const asksOrg = /\b(org|organisation|organization|company|brokerage|agency|who are you)\b/i.test(lower);
+  const asksCountOrAll = /\b(only\s*one|how\s*many|all\s*propert|all\s*listing|list\s*all|every\s*propert|total\s*propert|show\s*all|what\s*all|available\s*propert)\b/i.test(lower);
+  const asksLocation = /\b(where|location|address|map|direction|situated|located|area)\b/i.test(lower);
+  const asksPrice = /\b(price|cost|how\s*much|rate|amount|crore|lakh)\b/i.test(lower);
+  const asksDetails = /\b(detail|info|about|rera|builder|amenit|feature|spec|bath|bedroom|bhk|possession|ready|status|description)\b/i.test(lower);
+  const asksBrochure = /\b(brochure|pdf|floor\s*plan|document)\b/i.test(lower);
+  const asksVisit = /\b(visit|tour|schedule|book|see\s*it|walkthrough|slot|when\s*can\s*i)\b/i.test(lower);
+  const asksAdvisor = /\b(advisor|agent|human|call|phone|contact|number|speak|talk)\b/i.test(lower);
+
+  const formatPropFull = (p: (typeof allOrgProps)[number]) => {
+    const parts = [
+      `${p.title} (${p.bedrooms}BHK ${p.propertyType.toLowerCase()}, ${p.bathrooms} baths) at ${formatCurrencyShort(p.price, currency)}`,
+      `Location: ${p.address}${p.microMarket ? `, ${p.microMarket}` : ''}, ${p.city}`,
+    ];
+    if (p.builderName) parts.push(`Builder: ${p.builderName}`);
+    if (p.reraNumber) parts.push(`RERA: ${p.reraNumber}`);
+    if (p.possessionStatus) parts.push(`Possession: ${p.possessionStatus}`);
+    if (p.features && p.features.length > 0) parts.push(`Highlights: ${p.features.slice(0, 5).join(', ')}`);
+    return parts.join(' | ');
+  };
 
   let response = '';
   const suggestedFollowUps: string[] = [];
 
-  if (matchedProps.length > 0) {
-    const summaryList = matchedProps
-      .map((p) => `${p.title} in ${p.microMarket || p.city} at ${formatCurrencyShort(p.price, currency)}`)
-      .join(' and ');
-    const wantsBrochure = /\b(brochure|pdf|floor\s*plan|details)\b/i.test(lower);
-
-    response = wantsBrochure
-      ? `${greeting} we have ${summaryList} available right now. Could you confirm your target budget and preferred move-in timeline so I can share the right floor plan and schedule a visit?`
-      : `${greeting} thanks for reaching out! From our active inventory we currently have ${summaryList}. Which micro-market and budget range are you targeting so I can narrow this down for you?`;
-
-    for (const p of matchedProps) {
-      suggestedFollowUps.push(`Send brochure for ${p.title}`);
+  if (asksOrg) {
+    const advisorCount = advisors.length;
+    const regionText = organizationJurisdiction ? ` (${organizationJurisdiction})` : '';
+    const invNote =
+      allOrgProps.length > 0
+        ? ` We currently have ${allOrgProps.length} verified listing${allOrgProps.length === 1 ? '' : 's'} available, including ${allOrgProps
+            .slice(0, 2)
+            .map((p) => `${p.title} at ${formatCurrencyShort(p.price, currency)}`)
+            .join(' and ')}.`
+        : ' We are currently updating our active listings.';
+    response = `${greeting}! You're chatting with ${orgLabel}${regionText}, with ${advisorCount || 1} advisor${advisorCount === 1 ? '' : 's'} on our team.${invNote} What kind of property are you looking for?`;
+    suggestedFollowUps.push('Show all properties', 'Connect with an advisor');
+  } else if (isGreeting) {
+    if (allOrgProps.length === 1 && primaryProp) {
+      response = `${greeting}! Welcome to ${orgLabel}. Right now we have ${primaryProp.title} (${primaryProp.bedrooms}BHK in ${primaryProp.microMarket || primaryProp.city} at ${formatCurrencyShort(primaryProp.price, currency)}) available. Would you like full details, the brochure, or a site visit?`;
+    } else if (allOrgProps.length > 1) {
+      response = `${greeting}! Welcome to ${orgLabel}. We have ${allOrgProps.length} verified properties available right now. What location, configuration (2BHK/3BHK), or budget are you looking for?`;
+    } else {
+      response = `${greeting}! Welcome to ${orgLabel}. How can I help you with your property search today?`;
     }
-    suggestedFollowUps.push('Schedule a site visit');
+    suggestedFollowUps.push('Show all properties', 'Schedule a site visit');
+  } else if (asksCountOrAll) {
+    if (allOrgProps.length === 0) {
+      response = `${greeting}, we don't have any active listings added at ${orgLabel} yet. Would you like me to connect you with one of our advisors for upcoming inventory?`;
+    } else if (allOrgProps.length === 1 && primaryProp) {
+      response = `Yes, ${greeting}—right now ${orgLabel} has 1 active verified listing:\n\n• ${formatPropFull(primaryProp)}\n\nWould you like me to share the brochure or schedule a site visit for ${primaryProp.title}?`;
+    } else {
+      const list = allOrgProps
+        .slice(0, 5)
+        .map((p, idx) => `${idx + 1}. ${formatPropFull(p)}`)
+        .join('\n');
+      response = `${greeting}, ${orgLabel} currently has ${allOrgProps.length} active verified listings:\n\n${list}\n\nWhich of these would you like more details or a site visit for?`;
+    }
+    suggestedFollowUps.push('Send brochure', 'Schedule a site visit');
+  } else if (asksAdvisor) {
+    const advisorWithPhone = advisors.find((a) => a.phone);
+    if (advisorWithPhone) {
+      response = `${greeting}, you can reach our ${advisorWithPhone.role.toLowerCase()} ${advisorWithPhone.name || 'advisor'} at ${orgLabel} directly on ${advisorWithPhone.phone}. Would you also like me to note a preferred callback time for you?`;
+    } else {
+      const advisorNames = advisors.map((a) => a.name).filter(Boolean).join(', ');
+      response = `${greeting}, our advisory team${advisorNames ? ` (${advisorNames})` : ''} at ${orgLabel} would be happy to assist you directly. Share your phone number or preferred time and I'll arrange a callback!`;
+    }
+    suggestedFollowUps.push('Request callback', 'Schedule a site visit');
+  } else if (asksVisit && primaryProp) {
+    response = `${greeting}, I'd be glad to arrange a site visit for ${primaryProp.title} (${primaryProp.microMarket || primaryProp.city}). We have slots open tomorrow at 11:00 AM or 4:00 PM—which time works better for you?`;
+    suggestedFollowUps.push('Tomorrow 11:00 AM', 'Tomorrow 4:00 PM');
+  } else if (asksBrochure && primaryProp) {
+    if (primaryProp.brochureUrl) {
+      response = `${greeting}, here are the details for ${primaryProp.title} (${formatCurrencyShort(primaryProp.price, currency)}). You can view/download the brochure here: ${primaryProp.brochureUrl}\n\nWould you like to schedule a site visit as well?`;
+    } else {
+      response = `${greeting}, ${primaryProp.title} (${formatPropFull(primaryProp)}) doesn't have a PDF brochure uploaded yet, but I can connect you with our advisor at ${orgLabel} to share the floor plan. Would you like a callback?`;
+    }
+    suggestedFollowUps.push('Schedule a site visit', 'Connect with an advisor');
+  } else if (asksLocation && primaryProp) {
+    const mapNote = primaryProp.mapsUrl ? ` Google Maps: ${primaryProp.mapsUrl}` : '';
+    response = `${greeting}, ${primaryProp.title} is located at ${primaryProp.address}${primaryProp.microMarket ? `, ${primaryProp.microMarket}` : ''}, ${primaryProp.city}.${mapNote} Would you like to book a visit to see it in person?`;
+    suggestedFollowUps.push('Schedule a site visit', 'Send brochure');
+  } else if ((asksPrice || asksDetails) && primaryProp) {
+    const descNote = primaryProp.description ? `\n\n${primaryProp.description}` : '';
+    response = `${greeting}, here are the full details for ${primaryProp.title} at ${orgLabel}:\n${formatPropFull(primaryProp)}${descNote}\n\nWould you like to schedule a site visit or check anything else?`;
+    suggestedFollowUps.push('Schedule a site visit', 'Send brochure');
   } else {
-    response = `${greeting} thanks for reaching out! Could you share your preferred location, approximate budget, and configuration (like 2BHK or 3BHK) so our advisor can match the best options for you?`;
-    suggestedFollowUps.push('Share budget & configuration');
-    suggestedFollowUps.push('Request advisor callback');
+    const matchedProps = (filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
+    if (matchedProps.length > 0) {
+      const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
+      if (filteredProps.length === 0 && (requestedBedrooms || maxPrice)) {
+        response = `${greeting}, we don't have an exact match for that filter at ${orgLabel} right now, but here is what we have available:\n• ${summaryList}\n\nWould any of these work, or should I connect you with an advisor?`;
+      } else {
+        response = `${greeting}, at ${orgLabel} we currently have:\n• ${summaryList}\n\nWould you like the brochure, location details, or a site visit?`;
+      }
+      for (const p of matchedProps) {
+        suggestedFollowUps.push(`Send brochure for ${p.title}`);
+      }
+      suggestedFollowUps.push('Schedule a site visit');
+    } else {
+      response = `${greeting}, thanks for reaching out to ${orgLabel}! We don't have active listings matching that right now—would you like me to connect you with one of our property advisors?`;
+      suggestedFollowUps.push('Connect with an advisor');
+    }
   }
+
+  const matchedProps = (filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
 
   return {
     response,
@@ -209,8 +346,8 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     threadId,
   };
 
-  // 1. Mandatory Thread & Lead Verification
-  const [thread, leadRecord, orgChannel] = await Promise.all([
+  // 1. Mandatory Thread, Lead & Full Organization Context Verification
+  const [thread, leadRecord, orgChannel, organization, orgProperties, orgAdvisors, orgKbDocs] = await Promise.all([
     prisma.conversationThread.findFirst({
       where: { id: threadId, organizationId: orgId },
     }),
@@ -220,7 +357,44 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     }),
     prisma.organizationChannel.findUnique({
       where: { organizationId: orgId },
-      select: { defaultCurrency: true },
+      select: { defaultCurrency: true, defaultTimezone: true },
+    }),
+    prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, stateJurisdiction: true },
+    }),
+    prisma.property.findMany({
+      where: { organizationId: orgId, status: 'AVAILABLE' },
+      select: {
+        id: true,
+        title: true,
+        address: true,
+        city: true,
+        microMarket: true,
+        price: true,
+        bedrooms: true,
+        bathrooms: true,
+        propertyType: true,
+        builderName: true,
+        reraNumber: true,
+        possessionStatus: true,
+        features: true,
+        description: true,
+        brochureUrl: true,
+        mapsUrl: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 25,
+    }),
+    prisma.user.findMany({
+      where: { organizationId: orgId },
+      select: { name: true, role: true, phone: true, email: true },
+      take: 10,
+    }),
+    prisma.kBDocument.findMany({
+      where: { organizationId: orgId },
+      select: { title: true, category: true },
+      take: 10,
     }),
   ]);
 
@@ -364,12 +538,35 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   const clientFullName = params.customerName || leadRecord.fullName || '';
   const clientFirstName = clientFullName.split(' ')[0] || '';
 
+  const orgName = organization?.name || 'our Real Estate Advisory';
+  const orgInventorySummary =
+    orgProperties.length > 0
+      ? orgProperties
+          .map(
+            (p) =>
+              `  * [${p.id}] ${p.title} — ${p.bedrooms}BHK ${p.propertyType} (${p.bathrooms} baths) in ${p.microMarket || p.city} (${p.address}) | ${formatCurrencyShort(p.price, currency)}${p.builderName ? ` | Builder: ${p.builderName}` : ''}${p.reraNumber ? ` | RERA: ${p.reraNumber}` : ''}${p.possessionStatus ? ` | ${p.possessionStatus}` : ''}${p.features?.length ? ` | Features: ${p.features.join(', ')}` : ''}${p.brochureUrl ? ` | Brochure: ${p.brochureUrl}` : ''}${p.mapsUrl ? ` | Map: ${p.mapsUrl}` : ''}`,
+          )
+          .join('\n')
+      : '  * No active available listings currently in this organization.';
+  const advisorNames =
+    orgAdvisors
+      .map((a) => `${a.name || a.email || 'Advisor'} (${a.role}${a.phone ? `, ${a.phone}` : ''})`)
+      .join(', ') || 'Advisory Team';
+  const kbSummary =
+    orgKbDocs.length > 0
+      ? orgKbDocs.map((d) => `${d.title} (${d.category})`).join(', ')
+      : 'None uploaded';
+
   if (!ai) {
     logger.warn('[Agent Runtime] GEMINI_API_KEY not set. Using DB-grounded consultative fallback.');
     const fallback = await generateConsultativeFallback({
       customerMessage,
       leadId,
       organizationId: orgId,
+      organizationName: orgName,
+      organizationJurisdiction: organization?.stateJurisdiction,
+      advisors: orgAdvisors,
+      properties: orgProperties,
       executedTools: [],
       reason: 'API key missing from environment',
       customerName: clientFullName,
@@ -466,10 +663,8 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       };
     }
 
-    const effectivePrimary =
-      configuredModel === 'gemini-2.5-flash' ? 'gemini-3-flash-preview' : configuredModel;
     const candidateModels = Array.from(
-      new Set([effectivePrimary, 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash-lite']),
+      new Set([configuredModel, 'gemini-2.5-flash-lite', 'gemini-2.5-flash']),
     );
 
     const forceMatcherToolOnRound1 =
@@ -500,7 +695,15 @@ ACTIVE CONVERSATION CONTEXT:
 - Current Date: "${new Date().toISOString().slice(0, 10)}"
 - Lead Lifecycle Stage: "${stageBefore}"
 - Currency: "${currency}"
-- Authorized Lead ID: "${leadId}"`,
+- Authorized Lead ID: "${leadId}"
+
+ORGANIZATION PROFILE & VERIFIED INVENTORY (STRICT TENANT SCOPE):
+- Organization / Brokerage Name: "${orgName}"
+- Region / Jurisdiction: "${organization?.stateJurisdiction || 'India'}"
+- Team Advisors: ${advisorNames}
+- Knowledge Base Documents: ${kbSummary}
+- Active Available Listings (${orgProperties.length}):
+${orgInventorySummary}`,
                 tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
                 ...(forceMatcherToolOnRound1
                   ? {
@@ -555,6 +758,10 @@ ACTIVE CONVERSATION CONTEXT:
         customerMessage,
         leadId,
         organizationId: orgId,
+        organizationName: orgName,
+        organizationJurisdiction: organization?.stateJurisdiction,
+        advisors: orgAdvisors,
+        properties: orgProperties,
         executedTools,
         reason: `Model cascade error: ${errMessage.slice(0, 100)}`,
         customerName: clientFullName,

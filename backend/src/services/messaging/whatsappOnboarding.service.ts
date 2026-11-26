@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../../utils/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { getOrCreateOrgChannel } from '../channelRegistry.service.js';
-import { startOrgTelegramPolling } from '../telegram.service.js';
+import { startOrgTelegramPolling, stopOrgTelegramPolling, stopGlobalTelegramPolling } from '../telegram.service.js';
 
 export interface WhatsAppEmbeddedSignupInput {
   code?: string;
@@ -169,21 +169,58 @@ export async function connectTelegramBotForOrg(
     }
     username = meData.result.username || username;
 
-    const isHttps = params.publicBaseUrl.startsWith('https://');
+    const effectiveBaseUrl = (
+      process.env['API_PUBLIC_URL'] ||
+      process.env['APP_PUBLIC_URL'] ||
+      process.env['RENDER_EXTERNAL_URL'] ||
+      params.publicBaseUrl ||
+      ''
+    ).trim();
+    const isHttps = effectiveBaseUrl.startsWith('https://');
     if (isHttps) {
-      const webhookUrl = `${params.publicBaseUrl.replace(/\/$/, '')}/api/webhooks/telegram/${secret}`;
+      const webhookUrl = `${effectiveBaseUrl.replace(/\/$/, '')}/api/webhooks/telegram/${secret}`;
       const setRes = await fetch(`https://api.telegram.org/bot${cleanToken}/setWebhook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: webhookUrl }),
         signal: AbortSignal.timeout(8000),
       });
-      const setData = (await setRes.json()) as { ok: boolean };
-      webhookRegistered = Boolean(setData.ok);
+      const setData = (await setRes.json()) as { ok: boolean; description?: string };
+      if (!setRes.ok || !setData.ok) {
+        throw new Error(setData.description || 'Failed to register Telegram webhook');
+      }
+      webhookRegistered = true;
     } else {
       await startOrgTelegramPolling(organizationId, cleanToken);
       webhookRegistered = true;
     }
+  }
+
+  // Give priority to the latest organization when reusing the same bot token
+  if (cleanToken === process.env['TELEGRAM_BOT_TOKEN']?.trim()) {
+    stopGlobalTelegramPolling();
+  }
+  const previousOwners = await prisma.organizationChannel.findMany({
+    where: {
+      organizationId: { not: organizationId },
+      telegramBotToken: cleanToken,
+    },
+    select: { organizationId: true },
+  });
+  for (const prev of previousOwners) {
+    stopOrgTelegramPolling(prev.organizationId);
+  }
+  if (previousOwners.length > 0) {
+    await prisma.organizationChannel.updateMany({
+      where: {
+        organizationId: { not: organizationId },
+        telegramBotToken: cleanToken,
+      },
+      data: {
+        telegramBotToken: null,
+        telegramBotUsername: null,
+      },
+    });
   }
 
   const updated = await prisma.organizationChannel.update({
