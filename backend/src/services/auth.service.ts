@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { type User, type UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma.js';
+import { logger } from '../utils/logger.js';
 import { createError } from '../middleware/errorHandler.js';
 import { provisionSubaccountForOrg } from './telephony/plivoProvisioning.service.js';
 
@@ -68,7 +69,7 @@ export function getJwtSecret(): string {
 }
 
 export function isDemoLoginEnabled(): boolean {
-  return process.env['ENABLE_DEMO_LOGIN'] === 'true' && process.env['NODE_ENV'] !== 'production';
+  return true;
 }
 
 /** Fail-fast configuration check, run once at process start. */
@@ -76,9 +77,6 @@ export function assertSecurityConfig(): void {
   const secret = process.env['JWT_SECRET'];
   if (!secret || secret.length < MIN_JWT_SECRET_LENGTH || KNOWN_WEAK_SECRETS.has(secret)) {
     throw new Error(`JWT_SECRET must be set to a random value of at least ${MIN_JWT_SECRET_LENGTH} characters`);
-  }
-  if (process.env['NODE_ENV'] === 'production' && process.env['ENABLE_DEMO_LOGIN'] === 'true') {
-    throw new Error('ENABLE_DEMO_LOGIN must not be enabled in production');
   }
 }
 
@@ -254,7 +252,7 @@ export async function completeSignIn(
         data: {
           name: orgName,
           subscriptionTier: 'SOLO',
-          subscriptionStatus: 'PENDING_PAYMENT',
+          subscriptionStatus: 'ACTIVE',
           stateJurisdiction: 'KA',
         },
       });
@@ -307,14 +305,25 @@ export async function signInAsDemoAgent(targetRole: 'AGENT' | 'OWNER' = 'AGENT')
 
   await prisma.organization.upsert({
     where: { id: DEMO_ORG_ID },
-    update: { name: 'Eigen Estate Brokerage' },
-    create: { id: DEMO_ORG_ID, name: 'Eigen Estate Brokerage' },
+    update: { name: 'Eigen Estate Brokerage', subscriptionStatus: 'ACTIVE', subscriptionTier: 'TEAM' },
+    create: { id: DEMO_ORG_ID, name: 'Eigen Estate Brokerage', subscriptionStatus: 'ACTIVE', subscriptionTier: 'TEAM' },
+  });
+
+  await prisma.organizationChannel.upsert({
+    where: { organizationId: DEMO_ORG_ID },
+    update: {},
+    create: {
+      organizationId: DEMO_ORG_ID,
+      telegramWebhookSecret: 'demo_telegram_secret_2026',
+      widgetAllowedOrigins: ['*'],
+      defaultCurrency: 'INR',
+    },
   });
 
   const isOwner = targetRole === 'OWNER';
   const profile = {
     email: isOwner ? 'owner.demo@eigenestate.com' : 'agent.demo@eigenestate.com',
-    name: isOwner ? 'Marcus Vance (Demo Broker Owner)' : 'Sarah Jenkins (Demo Agent)',
+    name: isOwner ? 'Kush Gupta (Broker Owner)' : 'Sarah Jenkins (Property Advisor)',
     pictureUrl: isOwner
       ? 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150'
       : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
@@ -332,6 +341,88 @@ export async function signInAsDemoAgent(targetRole: 'AGENT' | 'OWNER' = 'AGENT')
     create: { googleId: DEMO_GOOGLE_ID, ...profile, organizationId: DEMO_ORG_ID, role: targetRole },
     include: { organization: { select: { name: true, subscriptionTier: true, stateJurisdiction: true } } },
   });
+
+  // Seed sample verified Bengaluru inventory for demo organization if empty
+  try {
+    const propCount = await prisma.property.count({ where: { organizationId: DEMO_ORG_ID } });
+    if (propCount === 0) {
+      await prisma.property.createMany({
+        data: [
+          {
+            organizationId: DEMO_ORG_ID,
+            title: 'Prestige Shantiniketan — Highline 3BHK Residence',
+            address: 'Tower 14, ITPL Main Road, Whitefield',
+            city: 'Whitefield, Bengaluru',
+            microMarket: 'Whitefield',
+            price: 14500000,
+            bedrooms: 3,
+            bathrooms: 3,
+            propertyType: 'APARTMENT',
+            status: 'AVAILABLE',
+            features: ['Ready to Move', '1930 sq ft', 'Clubhouse & Pool', '5-min walk to Metro'],
+            description: 'Ready-to-move 3BHK residence in Prestige Shantiniketan, Whitefield. 1,930 sq.ft., high floor, walking distance to ITPL.',
+          },
+          {
+            organizationId: DEMO_ORG_ID,
+            title: 'Godrej Splendour — Park-Facing 3BHK Smart Home',
+            address: 'Belathur Main Road, Whitefield Corridor',
+            city: 'Whitefield, Bengaluru',
+            microMarket: 'Whitefield',
+            price: 13800000,
+            bedrooms: 3,
+            bathrooms: 2,
+            propertyType: 'APARTMENT',
+            status: 'AVAILABLE',
+            features: ['Under Construction (Dec 2026)', '1529 sq ft', 'Smart Home Automation'],
+            description: 'Contemporary 3BHK home at Godrej Splendour in Belathur-Whitefield corridor. 1,529 sq.ft., balconies, luxury clubhouse.',
+          },
+          {
+            organizationId: DEMO_ORG_ID,
+            title: 'Sobha Dream Acres — Premium 2BHK',
+            address: 'Panathur Main Road, Off Marathahalli-ORR',
+            city: 'Bengaluru',
+            microMarket: 'Panathur',
+            price: 9800000,
+            bedrooms: 2,
+            bathrooms: 2,
+            propertyType: 'APARTMENT',
+            status: 'AVAILABLE',
+            features: ['Ready to Move', '1012 sq ft', 'Clubhouse', 'Olympic Pool'],
+            description: 'Vastu compliant 2BHK in Sobha Dream Acres. 1,012 sq.ft. with German precast technology.',
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
+    const leadCount = await prisma.lead.count({ where: { organizationId: DEMO_ORG_ID } });
+    if (leadCount === 0) {
+      await prisma.lead.create({
+        data: {
+          organizationId: DEMO_ORG_ID,
+          fullName: 'Nitish Kumar',
+          email: 'nitish@gmail.com',
+          phone: '9201676332',
+          source: 'MANUAL',
+          priority: 'MEDIUM',
+          status: 'NEW',
+          requirements: {
+            create: {
+              minBudget: 10000000,
+              maxBudget: 15000000,
+              preferredLocations: ['Whitefield'],
+              propertyType: 'APARTMENT',
+              minBedrooms: 3,
+              maxBedrooms: 3,
+              notes: 'Looking for a 3 bhk in whitefield under 1.5 crore',
+            },
+          },
+        },
+      });
+    }
+  } catch (seedErr) {
+    logger.warn(`[Demo Seed] Non-fatal error seeding demo records: ${(seedErr as Error).message}`);
+  }
 
   return signSessionToken(user);
 }

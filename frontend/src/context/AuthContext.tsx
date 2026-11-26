@@ -20,6 +20,7 @@ interface AuthState {
     credential: string,
     inviteToken?: string,
   ) => Promise<{ user: User; isNewWorkspace?: boolean }>;
+  signInAsDemoAgent: (role?: 'AGENT' | 'OWNER') => Promise<void>;
   refreshUser: () => Promise<User | null>;
   signOut: () => void;
 }
@@ -67,6 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { user: session.user, isNewWorkspace: session.isNewWorkspace };
   }, []);
 
+  const signInAsDemoAgent = useCallback(async (role?: 'AGENT' | 'OWNER') => {
+    const session = await authApi.signInAsDemoAgent(role);
+    setToken(session.token);
+    setUser(session.user);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     if (!getToken()) return null;
     try {
@@ -85,8 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, refreshUser, signOut }),
-    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, refreshUser, signOut],
+    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, refreshUser, signOut }),
+    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, signInAsDemoAgent, refreshUser, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
