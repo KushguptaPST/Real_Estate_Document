@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { organizationApi, propertiesApi } from '@/services/api';
-import { BrochureUploadField } from '@/components/property/BrochureUploadField';
+import { organizationApi } from '@/services/api';
 import { WorkspacePageSkeleton } from '@/components/ui/skeleton';
 
 type OnboardingPayload = Awaited<ReturnType<typeof organizationApi.getOnboarding>>;
@@ -39,13 +38,7 @@ export function OnboardingPage() {
   const [telegramToken, setTelegramToken] = useState('');
   const [showReplaceToken, setShowReplaceToken] = useState(false);
 
-  // Step 2: First Property + Advisor Phone
-  const [propTitle, setPropTitle] = useState('');
-  const [propCity, setPropCity] = useState('Bengaluru');
-  const [propMicroMarket, setPropMicroMarket] = useState('Whitefield');
-  const [propPrice, setPropPrice] = useState('18500000');
-  const [propBedrooms, setPropBedrooms] = useState('3');
-  const [propBrochureUrl, setPropBrochureUrl] = useState('');
+  // Step 2: Advisor Phone & Workspace Activation
   const [advisorPhone, setAdvisorPhone] = useState('');
 
   const loadOnboarding = useCallback(async () => {
@@ -98,18 +91,6 @@ export function OnboardingPage() {
       if (advisorPhone.trim() && user?.id) {
         await organizationApi.updateMemberPhone(user.id, advisorPhone.trim());
       }
-      if (propTitle.trim()) {
-        await propertiesApi.create({
-          title: propTitle.trim(),
-          address: `${propMicroMarket}, ${propCity}`,
-          city: propCity.trim(),
-          price: Number(propPrice) || 15000000,
-          bedrooms: Number(propBedrooms) || 3,
-          bathrooms: 2,
-          propertyType: 'APARTMENT',
-          ...(propBrochureUrl.trim() ? { brochureUrl: propBrochureUrl.trim() } : {}),
-        });
-      }
       await organizationApi.completeOnboarding();
       toast.success('Workspace activated! Your Telegram AI Advisor & Deal Copilot are live.');
       navigate('/leads');
@@ -126,7 +107,7 @@ export function OnboardingPage() {
 
   const steps = [
     { id: 1 as const, title: 'Telegram AI Bot', done: data.checklist.telegramConnected, icon: Send },
-    { id: 2 as const, title: 'Inventory & Advisor', done: data.checklist.hasInventory || data.onboardingCompleted, icon: Building2 },
+    { id: 2 as const, title: 'Advisor & Activation', done: data.checklist.hasInventory || data.onboardingCompleted, icon: Building2 },
   ];
 
   const futureChannels = [
@@ -313,28 +294,52 @@ export function OnboardingPage() {
 
         {activeStep === 2 && (
           <form onSubmit={handleFinishSetup} className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">2. First Property Inventory &amp; Advisor Contact</h2>
+            <h2 className="text-lg font-bold text-slate-900">2. Advisor Contact &amp; Workspace Activation</h2>
             <p className="text-xs text-slate-600">
-              Your Telegram AI strictly recommends verified listings stored here and routes escalation callbacks to your advisor.
+              Your Telegram AI uses your verified listings from the Properties section and routes escalation callbacks to your advisor.
             </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input value={advisorPhone} onChange={(e) => setAdvisorPhone(e.target.value)} placeholder="Advisor Mobile for Callbacks (+91...)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono" />
-              <input value={propTitle} onChange={(e) => setPropTitle(e.target.value)} placeholder="First Project Title (e.g. Emerald Towers)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs" />
-              <input value={propMicroMarket} onChange={(e) => setPropMicroMarket(e.target.value)} placeholder="Micro-market (e.g. Whitefield)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs" />
-              <input value={propCity} onChange={(e) => setPropCity(e.target.value)} placeholder="City (e.g. Bengaluru)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs" />
-              <input value={propPrice} onChange={(e) => setPropPrice(e.target.value)} placeholder="Price in INR (e.g. 18500000)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono" />
-              <input value={propBedrooms} onChange={(e) => setPropBedrooms(e.target.value)} placeholder="Bedrooms (e.g. 3)" className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono" />
-              <BrochureUploadField
-                value={propBrochureUrl}
-                onChange={setPropBrochureUrl}
-                className="md:col-span-2 pt-1"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Advisor Mobile for Callbacks (optional)
+                </label>
+                <input
+                  value={advisorPhone}
+                  onChange={(e) => setAdvisorPhone(e.target.value)}
+                  placeholder="+91..."
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-900">
+                    {data.details.propertyCount > 0
+                      ? `${data.details.propertyCount} Verified Listing${data.details.propertyCount === 1 ? '' : 's'} Ready`
+                      : 'No Properties Added Yet'}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Manage all listings in the Properties section.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/properties')}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-800 whitespace-nowrap cursor-pointer"
+                >
+                  {data.details.propertyCount > 0 ? 'View Properties →' : '+ Add Property →'}
+                </button>
+              </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center gap-4 text-xs">
               <span className="font-semibold text-slate-700">Activation Readiness:</span>
               <span className={data.checklist.telegramConnected ? 'text-emerald-700 font-semibold' : 'text-amber-700'}>
                 {data.checklist.telegramConnected ? `✓ Telegram Bot Live (@${data.details.telegramBotUsername})` : '• Telegram Bot Pending'}
+              </span>
+              <span className={data.checklist.hasInventory ? 'text-emerald-700 font-semibold' : 'text-amber-700'}>
+                {data.checklist.hasInventory ? `✓ ${data.details.propertyCount} Listing(s) in Properties` : '• Add a listing in Properties'}
               </span>
               <span className={advisorPhone.trim() || data.checklist.hasAdvisorPhone ? 'text-emerald-700 font-semibold' : 'text-slate-500'}>
                 {advisorPhone.trim() || data.checklist.hasAdvisorPhone ? '✓ Advisor Contact Set' : '• Advisor Phone Optional'}
