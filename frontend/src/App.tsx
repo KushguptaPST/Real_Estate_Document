@@ -62,7 +62,9 @@ function ProtectedLayout() {
     );
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.subscriptionStatus === 'PENDING_PAYMENT') return <Navigate to="/signup" replace />;
+  if (user.subscriptionStatus === 'PENDING_PAYMENT' && location.pathname !== '/onboarding') {
+    return <Navigate to="/signup" replace />;
+  }
 
   return (
     <div className="flex h-screen h-dvh w-full overflow-hidden bg-[#FAFAF8] text-slate-900 font-sans">
@@ -107,7 +109,9 @@ function AdminRouteGuard() {
     );
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.subscriptionStatus === 'PENDING_PAYMENT') return <Navigate to="/signup" replace />;
+  if (user.subscriptionStatus === 'PENDING_PAYMENT' && location.pathname !== '/onboarding') {
+    return <Navigate to="/signup" replace />;
+  }
   if (!user.isPlatformAdmin) return <Navigate to="/deals" replace />;
 
   return (
@@ -138,7 +142,7 @@ export default function App() {
           path="/login"
           element={
             user ? (
-              <Navigate to={user.subscriptionStatus === 'PENDING_PAYMENT' ? '/signup' : '/deals'} replace />
+              <Navigate to="/deals" replace />
             ) : (
               <LoginPage />
             )

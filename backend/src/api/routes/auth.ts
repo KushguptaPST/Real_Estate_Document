@@ -10,6 +10,7 @@ import {
   signInWithPassword,
 } from '../../services/auth.service.js';
 import { rateLimit } from '../../utils/rateLimit.js';
+import { logger } from '../../utils/logger.js';
 
 const router = Router();
 
@@ -89,11 +90,21 @@ router.post(
   '/google',
   authLimiter,
   asyncHandler(async (req, res) => {
+    logger.info('[Auth API] Inbound POST /api/auth/google received');
     const parsed = GoogleSignInSchema.safeParse(req.body);
-    if (!parsed.success) throw createError('Missing Google credential', 400);
+    if (!parsed.success) {
+      logger.warn('[Auth API] /api/auth/google missing credential or invalid body', { issues: parsed.error.issues });
+      throw createError('Missing Google credential', 400);
+    }
 
-    const session = await signInWithGoogle(parsed.data.credential, parsed.data.inviteToken);
-    res.json(session);
+    try {
+      const session = await signInWithGoogle(parsed.data.credential, parsed.data.inviteToken);
+      logger.info(`[Auth API] Google OAuth succeeded for ${session.user.email} (isNewWorkspace: ${session.isNewWorkspace})`);
+      res.json(session);
+    } catch (err: any) {
+      logger.error(`[Auth API] Google OAuth failed: ${err.message}`);
+      throw err;
+    }
   }),
 );
 

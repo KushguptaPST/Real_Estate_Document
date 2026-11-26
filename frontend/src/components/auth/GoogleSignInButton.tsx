@@ -52,12 +52,14 @@ export function GoogleSignInButton({
         window.google.accounts.id.initialize({
           client_id: CLIENT_ID,
           callback: async ({ credential }) => {
+            console.log('[GoogleSignInButton] Credential token received from Google Identity Services');
             setSigningIn(true);
             setConfigError(null);
             try {
               await onCredentialRef.current(credential);
             } catch (err) {
               const msg = err instanceof Error ? err.message : 'Google authentication failed';
+              console.error('[GoogleSignInButton] onCredential failed:', msg);
               setConfigError(msg);
               onErrorRef.current?.(msg);
             } finally {
@@ -65,10 +67,15 @@ export function GoogleSignInButton({
             }
           },
           error_callback: (err: { type?: string }) => {
+            console.warn('[GoogleSignInButton] Google Identity Services error callback received:', err);
             if (err?.type === 'popup_closed_by_user') return;
             if (err?.type === 'origin_mismatch') {
               const msg =
                 'Google OAuth Notice: This domain (e.g. real-estate-document.vercel.app) must be added to Authorized JavaScript Origins in Google Cloud Console. Use Instant Demo Access or Email Login to sign in immediately.';
+              setConfigError(msg);
+              onErrorRef.current?.(msg);
+            } else {
+              const msg = `Google sign-in error: ${err?.type || 'unknown'}`;
               setConfigError(msg);
               onErrorRef.current?.(msg);
             }

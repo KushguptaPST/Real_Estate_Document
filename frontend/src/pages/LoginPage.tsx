@@ -33,12 +33,25 @@ export function LoginPage() {
 
   const handleGoogleCredential = async (credential: string) => {
     setError(null);
-    const res = await signInWithGoogle(credential, inviteToken);
-    if (res.isNewWorkspace || res.user.subscriptionStatus === 'PENDING_PAYMENT') {
-      navigate('/signup', { replace: true });
-      return;
+    try {
+      console.log('[OAuth] Google credential received. Authenticating with backend...');
+      const res = await signInWithGoogle(credential, inviteToken);
+      console.log('[OAuth] Authenticated successfully:', {
+        email: res.user.email,
+        isNewWorkspace: res.isNewWorkspace,
+        subscriptionStatus: res.user.subscriptionStatus,
+      });
+
+      if (res.isNewWorkspace) {
+        console.log('[OAuth] New email workspace detected! Routing to channel onboarding wizard (/onboarding)...');
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      console.error('[OAuth] Google sign-in failure:', err);
+      setError(err?.message || 'Google sign-in failed');
     }
-    navigate(from, { replace: true });
   };
 
   const handlePasswordSignIn = async (e: React.FormEvent) => {

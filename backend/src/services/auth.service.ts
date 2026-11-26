@@ -196,17 +196,25 @@ export async function signInWithGoogle(
   credential: string,
   inviteToken?: string,
 ): Promise<{ token: string; user: SessionUser; isNewWorkspace?: boolean }> {
-  const ticket = await getGoogleClient()
-    .verifyIdToken({ idToken: credential, audience: requireEnv('GOOGLE_CLIENT_ID') })
-    .catch(() => {
-      throw createError('Invalid Google credential', 401);
+  logger.info('[OAuth] Verifying Google ID token...');
+  let ticket;
+  try {
+    ticket = await getGoogleClient().verifyIdToken({
+      idToken: credential,
+      audience: requireEnv('GOOGLE_CLIENT_ID'),
     });
+  } catch (err: any) {
+    logger.error(`[OAuth] Google verifyIdToken error: ${err.message}`);
+    throw createError('Invalid Google credential', 401);
+  }
 
   const payload = ticket.getPayload();
   if (!payload?.sub || !payload.email || !payload.email_verified) {
+    logger.warn(`[OAuth] Google verification rejected: sub=${payload?.sub}, email=${payload?.email}, verified=${payload?.email_verified}`);
     throw createError('Google account email is not verified', 401);
   }
 
+  logger.info(`[OAuth] Google token verified successfully: email=${payload.email}, name="${payload.name}"`);
   return completeSignIn(
     { googleId: payload.sub, email: payload.email, name: payload.name ?? null, pictureUrl: payload.picture ?? null },
     inviteToken,
@@ -219,22 +227,33 @@ export async function completeSignIn(
   inviteToken?: string,
 ): Promise<{ token: string; user: SessionUser; isNewWorkspace?: boolean }> {
   const email = identity.email.trim().toLowerCase();
+  logger.info(`[OAuth] Processing completeSignIn for: ${email}`);
   const profile = { email, name: identity.name, pictureUrl: identity.pictureUrl, lastLoginAt: new Date() };
 
   // Check if an account already exists with this email address
   const byEmail = await prisma.user.findUnique({ where: { email } });
   if (byEmail && byEmail.googleId && byEmail.googleId !== identity.googleId) {
+    logger.warn(`[OAuth] Email conflict: ${email} already linked to another Google ID`);
     throw createError('This email is linked to a different Google account', 409);
   }
 
   let user: User;
   if (byEmail) {
+    logger.info(`[OAuth] Existing user found for ${email} (ID: ${byEmail.id}). Linking Google ID.`);
     // If user previously registered via email/password or invitation without a googleId, link it now
     user = await prisma.user.update({
       where: { id: byEmail.id },
       data: { googleId: identity.googleId, ...profile },
     });
+    // Ensure organization is active so onboarding and dashboard are accessible
+    if (user.organizationId) {
+      await prisma.organization.updateMany({
+        where: { id: user.organizationId, subscriptionStatus: 'PENDING_PAYMENT' },
+        data: { subscriptionStatus: 'ACTIVE' },
+      });
+    }
   } else {
+    logger.info(`[OAuth] Upserting user record for new Google identity: ${email}`);
     user = await prisma.user.upsert({
       where: { googleId: identity.googleId },
       update: profile,
@@ -244,15 +263,17 @@ export async function completeSignIn(
 
   let isNewWorkspace = false;
   if (inviteToken) {
+    logger.info(`[OAuth] Accepting team invitation token for user: ${email}`);
     user = await acceptInvitation(user, inviteToken);
   } else if (!user.organizationId) {
+    logger.info(`[OAuth] No workspace exists for new user ${email}. Provisioning workspace for onboarding.`);
     const orgName = identity.name ? `${identity.name}'s Brokerage` : 'My Brokerage';
     const provisioned = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: {
           name: orgName,
           subscriptionTier: 'SOLO',
-          subscriptionStatus: 'PENDING_PAYMENT',
+          subscriptionStatus: 'ACTIVE',
           stateJurisdiction: 'KA',
         },
       });
@@ -261,6 +282,8 @@ export async function completeSignIn(
           organizationId: org.id,
           telegramWebhookSecret: crypto.randomBytes(18).toString('hex'),
           widgetAllowedOrigins: ['http://localhost:3000', 'http://localhost:5173'],
+          onboardingCompleted: false,
+          onboardingStep: 1,
         },
       });
       await tx.organizationWallet.create({
@@ -280,8 +303,11 @@ export async function completeSignIn(
 
     user = provisioned.updatedUser;
     isNewWorkspace = true;
+    logger.info(`[OAuth] Provisioned new workspace: orgId=${provisioned.org.id}, isNewWorkspace=true for ${email}`);
     if (process.env['NODE_ENV'] !== 'test') {
-      provisionSubaccountForOrg(provisioned.org.id, provisioned.org.name).catch(() => {});
+      provisionSubaccountForOrg(provisioned.org.id, provisioned.org.name).catch((err) => {
+        logger.warn(`[OAuth] Non-fatal subaccount provisioning error: ${err?.message}`);
+      });
     }
   }
 
@@ -294,6 +320,7 @@ export async function completeSignIn(
     },
   });
 
+  logger.info(`[OAuth] Issued session token for ${email} (org: ${hydratedUser.organization?.name}, new: ${isNewWorkspace})`);
   return { ...signSessionToken(hydratedUser), isNewWorkspace };
 }
 
