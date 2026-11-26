@@ -104,7 +104,7 @@ const assistantJsonSchema = {
 const SYSTEM_INSTRUCTION = `You are the AI Knowledge Assistant for Contingency Deadline Copilot, an expert assistant for real-estate transaction coordinators and agents.
 
 CRITICAL NON-NEGOTIABLES:
-1. CONTRACT TEXT TAKES ABSOLUTE PRECEDENCE: When asked about contract terms, acceptance dates, contingencies, purchase price, parties, or deadlines, ALWAYS extract the answer directly from the uploaded CONTRACT DOCUMENTS & CLAUSES (PAGE-BY-PAGE). Always cite the document page and provide the exact verbatim quote (e.g., Section 2.1 Date of Acceptance or Signature blocks: "September 17, 2026").
+1. CONTRACT TEXT TAKES ABSOLUTE PRECEDENCE: When asked about contract terms, acceptance dates, contingencies, purchase price, parties, or deadlines, ALWAYS extract the answer directly from the uploaded CONTRACT DOCUMENTS & CLAUSES (PAGE-BY-PAGE). Always cite the document page and provide the exact verbatim quote (e.g., Section 2.1 Date of Acceptance or Signature blocks: "September 17, 2026"). Note: In Indian or international agreements (such as an Agreement to Sell), "Execution Date", "Date of Execution", "Effective Date", or "Agreement Date" serves as the contract acceptance/effective date—extract and cite that date when asked for the acceptance date.
 2. ZERO HALLUCINATION: Answer strictly and exclusively from the provided UNTRUSTED DATA and DEAL FACTS. Never invent terms, dates, or clauses.
 3. CITATIONS & VERBATIM QUOTES: Every factual statement or claim MUST have an inline citation marker like [^1], [^2]. In the citations array, provide the EXACT verbatim quote matching the document page text so the system can verify and highlight it in the PDF viewer.
 4. CONTRACT PRECEDENCE: Addenda and Counter Offers take strict precedence over the base Purchase Agreement. If an addendum modifies a contingency (e.g. inspection days changed from 10 to 17), you MUST report the modified number (17) and explicitly document the override in the overrides array and answer.
@@ -184,12 +184,29 @@ export async function askDealAssistant(params: {
     })
     .join('\n');
 
-  const docContextText = retrieval.chunks
-    .map(
-      (c) =>
-        `[Document: "${c.documentName}" | Type: ${c.docType} | Page ${c.pageNumber} | Section: "${c.sectionTitle || 'General'}"]\n${c.content}`,
-    )
-    .join('\n\n---\n\n');
+  const clauseFallbackText =
+    retrieval.chunks.length === 0 && deal.clauses.length > 0
+      ? deal.clauses
+          .map(
+            (cl) =>
+              `[Extracted Clause: "${cl.clauseType}" | Page ${cl.pageNumber ?? 1}]\n${cl.rawText}`,
+          )
+          .join('\n\n---\n\n')
+      : '';
+
+  const docContextText =
+    retrieval.chunks.length > 0
+      ? retrieval.chunks
+          .map(
+            (c) =>
+              `[Document: "${c.documentName}" | Type: ${c.docType} | Page ${c.pageNumber} | Section: "${c.sectionTitle || 'General'}"]\n${c.content}`,
+          )
+          .join('\n\n---\n\n')
+      : clauseFallbackText;
+
+  const isIndexingInProgress =
+    retrieval.chunks.length === 0 &&
+    deal.documents.some((d) => d.indexStatus === 'PENDING' || d.indexStatus === 'INDEXING');
 
   const contextPrompt = `<<DEAL_FACTS>>
 Address: ${deal.propertyAddress}
@@ -202,8 +219,8 @@ Acceptance Date: ${deal.acceptanceDate ? deal.acceptanceDate.toISOString().split
 ${formattedDeadlines || 'No deadlines recorded.'}
 <</CONFIRMED_DEADLINES>>
 
-<<DOC_DATA mode="${retrieval.mode}" chunks="${retrieval.chunks.length}">>
-${docContextText || 'No uploaded documents.'}
+<<DOC_DATA mode="${retrieval.mode}" chunks="${retrieval.chunks.length}" indexingInProgress="${isIndexingInProgress}">>
+${docContextText || (deal.documents.length > 0 ? 'Document is currently finishing page-level indexing; please retry in a few seconds.' : 'No uploaded documents.')}
 <</DOC_DATA>>
 
 USER QUESTION: "${question}"`;
@@ -219,8 +236,7 @@ USER QUESTION: "${question}"`;
       [
         process.env['GEMINI_MODEL'],
         'gemini-2.5-flash-lite',
-        'gemini-3.5-flash-lite',
-        'gemini-3.5-flash',
+        'gemini-2.5-flash',
       ].filter(Boolean) as string[],
     ),
   );

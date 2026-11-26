@@ -141,13 +141,21 @@ router.post(
 
         const pages = await extractPagesFromPdf(file.path);
         const sampleText = pages.map((p) => p.text).join('\n').slice(0, 10000);
-        const classification = await classifyDocument({ filename: file.originalname, sampleText });
         const chunks = chunkDocumentPages(pages);
 
-        for (const chunk of chunks) {
-          const embedding = await generateEmbedding(chunk.content);
-          await prisma.documentChunk.create({
-            data: {
+        const [classification, embeddedChunks] = await Promise.all([
+          classifyDocument({ filename: file.originalname, sampleText }),
+          Promise.all(
+            chunks.map(async (chunk) => ({
+              chunk,
+              embedding: await generateEmbedding(chunk.content),
+            })),
+          ),
+        ]);
+
+        if (embeddedChunks.length > 0) {
+          await prisma.documentChunk.createMany({
+            data: embeddedChunks.map(({ chunk, embedding }) => ({
               documentId: document.id,
               dealId,
               organizationId: orgId,
@@ -158,7 +166,7 @@ router.post(
               tokenCount: chunk.tokenCount,
               source: chunk.source,
               embedding: embedding as unknown as object,
-            },
+            })),
           });
         }
 
