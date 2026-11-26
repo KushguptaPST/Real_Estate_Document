@@ -369,7 +369,7 @@ export function PropertiesPage() {
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending / Escrow</span>
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending / Under Contract</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 border border-purple-100 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
               <Megaphone className="h-5 w-5" />
             </div>

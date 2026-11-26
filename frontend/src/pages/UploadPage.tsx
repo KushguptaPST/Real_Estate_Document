@@ -61,7 +61,7 @@ export function UploadPage() {
     setDirectUploading(true);
     setSubmitting(true);
     setError(null);
-    setDirectStage('Reading contract PDF & initializing escrow room...');
+    setDirectStage('Reading contract PDF & initializing deal room...');
 
     try {
       const address =
@@ -151,7 +151,7 @@ export function UploadPage() {
           </Badge>
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-mono font-medium ml-auto">
             <Lock className="h-3.5 w-3.5 text-emerald-700" />
-            256-Bit Encrypted Escrow Room
+            256-Bit Encrypted Deal Room
           </span>
         </div>
 

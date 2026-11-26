@@ -60,7 +60,7 @@ export function DealHeader({ deal, notifSettings, activeTab }: Props) {
 
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-0.5 text-[10px] font-semibold">
                     <ShieldCheck className="h-3 w-3 text-emerald-600" />
-                    <span>{deal.status === 'ACTIVE' ? 'In Escrow' : deal.status}</span>
+                    <span>{deal.status === 'ACTIVE' ? 'Active Deal' : deal.status}</span>
                   </span>
 
                   {alertsActive ? (

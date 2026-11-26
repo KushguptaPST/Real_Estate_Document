@@ -30,7 +30,7 @@ const COMMAND_ITEMS: CommandItem[] = [
   {
     id: 'deals',
     title: 'Transactions Pipeline',
-    subtitle: 'View escrow transactions and active contingency dates',
+    subtitle: 'View active deals and transaction deadlines',
     category: 'Navigation',
     icon: Layers,
     path: '/deals',

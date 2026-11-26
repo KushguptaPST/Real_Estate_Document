@@ -26,7 +26,7 @@ import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 import { prefetchRoute } from '@/routes/prefetch';
 
 const MAIN_NAV = [
-  { href: '/deals', label: 'Deals & Escrows', shortLabel: 'Deals', icon: Layers },
+  { href: '/deals', label: 'All Deals', shortLabel: 'Deals', icon: Layers },
   { href: '/leads', label: 'Lead Pipeline', shortLabel: 'Leads', icon: Users },
   { href: '/properties', label: 'Properties', shortLabel: 'Properties', icon: Building2 },
   { href: '/analytics', label: 'Analytics', shortLabel: 'Analytics', icon: TrendingUp },

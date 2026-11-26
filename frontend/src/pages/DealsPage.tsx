@@ -175,11 +175,11 @@ export function DealsPage() {
             </h1>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              <span>{activeCount} Active Escrows</span>
+              <span>{activeCount} Active Deals</span>
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Track statutory contract deadlines, inspection contingencies, and escrow milestones.
+            Track statutory contract deadlines, inspection contingencies, and deal milestones.
           </p>
         </div>
 
@@ -241,7 +241,7 @@ export function DealsPage() {
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] font-semibold text-slate-500 block">
-                Active Escrows
+                Active Deals
               </span>
               <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
                 {loading ? <Skeleton className="h-7 w-14 mt-1" /> : activeCount}
@@ -353,7 +353,7 @@ export function DealsPage() {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>In Escrow</span>
+            <span>Active Deals</span>
             <span className={`ml-1.5 text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
               activeTab === 'ACTIVE' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
             }`}>
@@ -548,7 +548,7 @@ export function DealsPage() {
                                 : 'bg-slate-400'
                             }`}
                           />
-                          <span>{deal.status === 'ACTIVE' ? 'In Escrow' : 'Closed'}</span>
+                          <span>{deal.status === 'ACTIVE' ? 'Active Deal' : 'Closed'}</span>
                         </span>
                       </TableCell>
 

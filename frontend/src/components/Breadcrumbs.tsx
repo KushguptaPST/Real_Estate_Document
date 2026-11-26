@@ -8,7 +8,7 @@ const PATH_LABELS: Record<string, string> = {
   organization: 'Team / Org',
   billing: 'Plan & Billing',
   onboarding: 'Channel Setup',
-  deals: 'Deals & Tasks',
+  deals: 'All Deals',
   upload: 'New Contract',
   audit: 'Audit Log',
   analytics: 'Analytics',
