@@ -195,6 +195,34 @@ async function generateConsultativeFallback(params: {
     return true;
   });
 
+  // Extract requested location tokens (ignoring filler, BHK, and budget words)
+  const stopWords = new Set([
+    'in', 'at', 'near', 'around', 'for', 'the', 'and', 'or', 'under', 'below', 'above', 'over', 'upto', 'max',
+    'budget', 'bhk', 'bed', 'beds', 'bedroom', 'bedrooms', 'cr', 'crore', 'crores', 'l', 'lac', 'lacs', 'lakh', 'lakhs',
+    'home', 'homes', 'house', 'houses', 'flat', 'flats', 'apartment', 'apartments', 'villa', 'villas', 'property',
+    'properties', 'listing', 'listings', 'available', 'show', 'give', 'want', 'need', 'looking', 'find', 'search',
+    'any', 'some', 'please', 'with', 'within', 'from', 'have', 'you', 'got', 'there', 'only', 'one', 'all', 'road',
+  ]);
+  const locationPhraseMatch = customerMessage.match(/\b(?:in|at|near|around)\s+([a-zA-Z0-9\s]{2,40}?)(?:,|\.|under|below|above|\d+\s*bhk|$)/i);
+  const rawLocationTokens = customerMessage
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stopWords.has(w));
+
+  const propMatchesLocation = (p: (typeof allOrgProps)[number], tokens: string[]) => {
+    const hay = `${p.title} ${p.address} ${p.microMarket ?? ''} ${p.city}`.toLowerCase();
+    return tokens.some((t) => hay.includes(t));
+  };
+
+  const hasLocationQuery = Boolean(locationPhraseMatch) || rawLocationTokens.length > 0;
+  const locationMatchedProps = hasLocationQuery
+    ? filteredProps.filter((p) => propMatchesLocation(p, rawLocationTokens))
+    : filteredProps;
+  const requestedLocationLabel =
+    locationPhraseMatch?.[1]?.trim() ||
+    (rawLocationTokens.length > 0 ? rawLocationTokens.join(' ') : '');
+
   // Check if user mentioned a specific property title or micro-market/city
   const mentionedProp = allOrgProps.find(
     (p) =>
@@ -313,11 +341,23 @@ async function generateConsultativeFallback(params: {
     response = `${greeting}, here are the full details for ${primaryProp.title} at ${orgLabel}:\n${formatPropFull(primaryProp)}${descNote}\n\nWould you like to schedule a site visit or check anything else?`;
     suggestedFollowUps.push('Schedule a site visit', 'Send brochure');
   } else {
-    const matchedProps = (filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
-    if (matchedProps.length > 0) {
+    const exactBhkProps = requestedBedrooms
+      ? locationMatchedProps.filter((p) => p.bedrooms === requestedBedrooms)
+      : locationMatchedProps;
+    const bestMatches = exactBhkProps.length > 0 ? exactBhkProps : locationMatchedProps;
+    const matchedProps = (bestMatches.length > 0 ? bestMatches : filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
+
+    if (hasLocationQuery && locationMatchedProps.length === 0 && allOrgProps.length > 0) {
+      const availableAreas = Array.from(
+        new Set(allOrgProps.map((p) => p.microMarket || p.city).filter(Boolean)),
+      ).join(', ');
+      const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
+      response = `${greeting}, we don't currently have any verified listings in "${requestedLocationLabel}" at ${orgLabel}. Our active inventory is in ${availableAreas}:\n• ${summaryList}\n\nWould you like details on any of these, or should I connect you with an advisor to source options in ${requestedLocationLabel}?`;
+      suggestedFollowUps.push('Connect with an advisor', 'Schedule a site visit');
+    } else if (matchedProps.length > 0) {
       const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
       if (filteredProps.length === 0 && (requestedBedrooms || maxPrice)) {
-        response = `${greeting}, we don't have an exact match for that filter at ${orgLabel} right now, but here is what we have available:\n• ${summaryList}\n\nWould any of these work, or should I connect you with an advisor?`;
+        response = `${greeting}, we don't have an exact match for that budget/configuration at ${orgLabel} right now, but here is what we have available:\n• ${summaryList}\n\nWould any of these work, or should I connect you with an advisor?`;
       } else {
         response = `${greeting}, at ${orgLabel} we currently have:\n• ${summaryList}\n\nWould you like the brochure, location details, or a site visit?`;
       }
