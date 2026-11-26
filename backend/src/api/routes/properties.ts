@@ -89,7 +89,9 @@ router.post(
     if (driver === 'imagekit') {
       url = getSignedDocumentUrl(storagePath, 7 * 24 * 3600);
     } else {
-      const base = (process.env['API_PUBLIC_URL'] || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+      const proto = req.header('x-forwarded-proto') || req.protocol || 'https';
+      const host = req.header('x-forwarded-host') || req.get('host');
+      const base = (process.env['API_PUBLIC_URL'] || `${proto}://${host}`).replace(/\/+$/, '');
       url = `${base}/api/properties/brochures/${encodeURIComponent(path.basename(file.path))}`;
     }
 

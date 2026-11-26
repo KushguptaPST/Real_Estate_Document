@@ -149,6 +149,7 @@ async function generateConsultativeFallback(params: {
     mapsUrl?: string | null;
   }>;
   executedTools: ExecutedToolRecord[];
+  trustedContext?: TrustedAgentContext;
   reason: string;
   customerName?: string;
   currency?: string;
@@ -275,8 +276,30 @@ async function generateConsultativeFallback(params: {
     response = `${greeting}, I'd be glad to arrange a site visit for ${primaryProp.title} (${primaryProp.microMarket || primaryProp.city}). We have slots open tomorrow at 11:00 AM or 4:00 PM—which time works better for you?`;
     suggestedFollowUps.push('Tomorrow 11:00 AM', 'Tomorrow 4:00 PM');
   } else if (asksBrochure && primaryProp) {
-    if (primaryProp.brochureUrl) {
-      response = `${greeting}, here are the details for ${primaryProp.title} (${formatCurrencyShort(primaryProp.price, currency)}). You can view/download the brochure here: ${primaryProp.brochureUrl}\n\nWould you like to schedule a site visit as well?`;
+    if (primaryProp.brochureUrl && params.trustedContext) {
+      const colRes = await executeAgentTool(
+        'send_property_collateral',
+        {
+          leadId: params.leadId,
+          propertyId: primaryProp.id,
+          includeBrochure: true,
+          includeLocationPin: false,
+        },
+        params.trustedContext,
+      );
+      executedTools.push({
+        toolName: 'send_property_collateral',
+        status: colRes.status,
+        durationMs: colRes.durationMs,
+      });
+      const dispatched = ((colRes.data as any)?.dispatchedItems as string[] | undefined) ?? [];
+      if (dispatched.includes('telegram_brochure_pdf') || dispatched.includes('brochure_pdf')) {
+        response = `${greeting}, I've sent the ${primaryProp.title} brochure PDF directly in chat! Would you like to schedule a site visit as well?`;
+      } else {
+        response = `${greeting}, the ${primaryProp.title} brochure PDF couldn't be delivered right now (the file may need to be re-uploaded). Would you like me to connect you with our advisor at ${orgLabel} to share it?`;
+      }
+    } else if (primaryProp.brochureUrl) {
+      response = `${greeting}, here are the details for ${primaryProp.title} (${formatCurrencyShort(primaryProp.price, currency)}). Brochure: ${primaryProp.brochureUrl}\n\nWould you like to schedule a site visit as well?`;
     } else {
       response = `${greeting}, ${primaryProp.title} (${formatPropFull(primaryProp)}) doesn't have a PDF brochure uploaded yet, but I can connect you with our advisor at ${orgLabel} to share the floor plan. Would you like a callback?`;
     }
@@ -568,6 +591,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       advisors: orgAdvisors,
       properties: orgProperties,
       executedTools: [],
+      trustedContext,
       reason: 'API key missing from environment',
       customerName: clientFullName,
       currency,
@@ -763,6 +787,7 @@ ${orgInventorySummary}`,
         advisors: orgAdvisors,
         properties: orgProperties,
         executedTools,
+        trustedContext,
         reason: `Model cascade error: ${errMessage.slice(0, 100)}`,
         customerName: clientFullName,
         currency,
