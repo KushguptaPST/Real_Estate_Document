@@ -69,7 +69,7 @@ export function getJwtSecret(): string {
 }
 
 export function isDemoLoginEnabled(): boolean {
-  return true;
+  return process.env['NODE_ENV'] !== 'production' && process.env['ENABLE_DEMO_LOGIN'] === 'true';
 }
 
 /** Fail-fast configuration check, run once at process start. */

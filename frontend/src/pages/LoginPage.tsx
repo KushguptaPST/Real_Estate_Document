@@ -12,18 +12,16 @@ import {
   Sparkles,
   UserCheck,
   Loader2,
-  Mail,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
 
 export function LoginPage() {
-  const { signInWithGoogle, signInAsDemoAgent, loginWithPassword } = useAuth();
+  const { signInWithGoogle, loginWithPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,19 +35,6 @@ export function LoginPage() {
     setError(null);
     await signInWithGoogle(credential, inviteToken);
     navigate(from, { replace: true });
-  };
-
-  const handleDemoSignIn = async (role: 'OWNER' | 'AGENT' = 'OWNER') => {
-    try {
-      setDemoLoading(true);
-      setError(null);
-      await signInAsDemoAgent(role);
-      navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err?.message || 'Demo login failed');
-    } finally {
-      setDemoLoading(false);
-    }
   };
 
   const handlePasswordSignIn = async (e: React.FormEvent) => {
@@ -221,48 +206,6 @@ export function LoginPage() {
                   </div>
                 </div>
               )}
-
-              {/* ── 1-Click Instant Demo Login (Sandbox Workspace) ── */}
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                    Instant Demo Access
-                  </span>
-                  <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-                    No Sign-Up Required
-                  </span>
-                </div>
-                <p className="text-[11px] text-emerald-950 leading-relaxed">
-                  Enter the live workspace immediately to test verified Whitefield listings, buyer leads, and autonomous AI copilot chats:
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleDemoSignIn('OWNER')}
-                    disabled={demoLoading}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {demoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5 text-emerald-400" />}
-                    <span>Broker Owner</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoSignIn('AGENT')}
-                    disabled={demoLoading}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs border border-slate-300 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
-                  >
-                    {demoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5 text-slate-600" />}
-                    <span>Property Advisor</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">or sign in below</span>
-                <div className="flex-grow border-t border-slate-200"></div>
-              </div>
 
               <div className="space-y-3">
                 <GoogleSignInButton
