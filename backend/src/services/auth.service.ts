@@ -252,7 +252,7 @@ export async function completeSignIn(
         data: {
           name: orgName,
           subscriptionTier: 'SOLO',
-          subscriptionStatus: 'ACTIVE',
+          subscriptionStatus: 'PENDING_PAYMENT',
           stateJurisdiction: 'KA',
         },
       });

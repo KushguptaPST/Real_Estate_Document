@@ -36,7 +36,7 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanDetails> = {
     maxDeals: 50,
     features: [
       '500 AI Calling Minutes (~1,000–1,250 cold dials/mo, ₹0 unanswered)',
-      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹12/min)',
+      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹15/min)',
       'Unlimited Embeddable Website Chat Widget & Telegram Bot',
       '1 Indian Plivo DID Number & WhatsApp Speed-to-Lead (₹3/lead)',
       'Property Brochure PDF & Google Maps Location Pin Dispatch',
@@ -53,7 +53,7 @@ export const PLAN_CONFIGS: Record<PlanTier, PlanDetails> = {
     maxDeals: null,
     features: [
       '1,600 AI Calling Minutes (~3,200–4,000 cold dials/mo)',
-      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹12/min)',
+      'ElevenLabs Flash v2.5 Voice + 30s Fair Pulse Billing (₹15/min)',
       'Unlimited Embeddable Website Chat Widget & Telegram Bot',
       'WhatsApp Coexistence Mode (Auto-pause on advisor mobile reply)',
       'Up to 10 Workspace Seats (Google Verified Auth + Invitations)',

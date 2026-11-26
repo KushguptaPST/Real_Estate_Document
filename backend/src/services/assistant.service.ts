@@ -235,8 +235,10 @@ USER QUESTION: "${question}"`;
     new Set(
       [
         process.env['GEMINI_MODEL'],
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+        'gemini-3.6-flash',
       ].filter(Boolean) as string[],
     ),
   );
@@ -435,7 +437,7 @@ export async function askPortfolioAssistant(params: {
   if (!apiKey) throw createError('GEMINI_API_KEY not configured', 500);
 
   const ai = new GoogleGenAI({ apiKey });
-  const model = process.env['GEMINI_MODEL'] || 'gemini-2.5-flash-lite';
+  const model = process.env['GEMINI_MODEL'] || 'gemini-3.8-flash';
 
   const response = await ai.models.generateContent({
     model,

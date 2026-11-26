@@ -576,10 +576,10 @@ describe('Redesigned Startup-Grade Agentic AI, Omnichannel & Plivo Voice Archite
       expect(verifyRes.body.includedCreditsInr).toBe(6000);
       expect(verifyRes.body.newBalance).toBe(6000);
 
-      // Verify fair 30s pulse billing (25s connected call -> ₹6.00 at ₹12/min)
+      // Verify fair 30s pulse billing (25s connected call -> ₹7.50 at ₹15/min)
       const pulseTx = await walletService.deductVoiceCall(orgId, 25, { leadName: 'Pulse Check' });
-      expect(pulseTx?.amount).toBe(-6);
-      expect(pulseTx?.balanceAfter).toBe(5994);
+      expect(pulseTx?.amount).toBe(-7.5);
+      expect(pulseTx?.balanceAfter).toBe(5992.5);
     } finally {
       await prisma.walletLedgerEntry.deleteMany({ where: { wallet: { organizationId: orgId } } });
       await prisma.organizationWallet.deleteMany({ where: { organizationId: orgId } });

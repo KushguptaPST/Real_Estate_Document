@@ -75,11 +75,13 @@ export async function extractClausesFromPdf(filePath: string): Promise<Extractio
   const apiKey = process.env['GEMINI_API_KEY'];
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
-  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-2.5-flash-lite';
+  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-3.8-flash';
   const candidateModels = Array.from(new Set([
     envModel,
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
+    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
   ].filter(Boolean) as string[]));
 
 
@@ -111,11 +113,25 @@ export async function extractClausesFromPdf(filePath: string): Promise<Extractio
   for (const model of candidateModels) {
     try {
       logger.info(`[Gemini] Attempting extraction with model: ${model}`);
-      const response = await ai.models.generateContent({
-        model,
-        contents: promptContents,
-        config: { responseMimeType: 'application/json', responseJsonSchema, temperature: 0 },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25_000);
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model,
+          contents: promptContents,
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema,
+            temperature: 0,
+            abortSignal: controller.signal,
+          },
+        }),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            reject(new Error(`Gemini request timed out after 25s for model ${model}`));
+          });
+        }),
+      ]).finally(() => clearTimeout(timeoutId));
 
       if (!response.text) throw new Error('Gemini returned no extraction result');
 

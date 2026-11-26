@@ -98,13 +98,14 @@ For each task:
 
   promptContents.push({ text: prompt });
 
-  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-2.5-flash-lite';
+  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-3.5-flash-lite';
   const candidateModels = Array.from(
     new Set(
       [
         envModel,
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
       ].filter(Boolean) as string[],
     ),
   );

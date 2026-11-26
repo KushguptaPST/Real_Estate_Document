@@ -54,7 +54,7 @@ export interface WalletState {
 
 // Authoritative INR unit rates (Plivo + Deepgram + Gemini + ElevenLabs Flash v2.5 + WhatsApp)
 const UNIT_RATES: UnitRates = {
-  voicePerMinute: 12,
+  voicePerMinute: 15,
   whatsappPerLead: 3,
   voiceCloneProfile: 1200,
 };
@@ -268,7 +268,7 @@ export class WalletService {
     if (durationSeconds <= 0) return null;
 
     const dbWallet = await ensureDbWallet(orgId);
-    // Fair 30-second pulse billing (₹6.00 per 30s pulse at ₹12/min; ₹0 on unanswered calls)
+    // Fair 30-second pulse billing (₹7.50 per 30s pulse at ₹15/min; ₹0 on unanswered calls)
     const pulses = Math.max(1, Math.ceil(durationSeconds / 30));
     const billedMinutes = Math.max(1, Math.ceil(durationSeconds / 60));
     const cost = Math.round(pulses * (UNIT_RATES.voicePerMinute / 2) * 100) / 100;

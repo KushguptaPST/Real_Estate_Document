@@ -54,7 +54,7 @@ export async function transcribeAudioBuffer(
   if (geminiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const model = process.env['GEMINI_MODEL'] || 'gemini-2.5-flash';
+      const model = process.env['GEMINI_MODEL'] || 'gemini-3.8-flash';
       const base64Audio = audioBuffer.toString('base64');
 
       const response = await ai.models.generateContent({

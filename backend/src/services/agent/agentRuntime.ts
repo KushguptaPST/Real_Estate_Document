@@ -653,7 +653,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   // 3. Verified Model Configuration & API Key Fallback Contract
   const apiKey = process.env['GEMINI_API_KEY'];
   const platformCfg = await getPlatformConfig().catch(() => null);
-  const configuredModel = platformCfg?.primaryLlmModel || process.env['GEMINI_MODEL'] || 'gemini-2.5-flash';
+  const configuredModel = platformCfg?.primaryLlmModel || process.env['GEMINI_MODEL'] || 'gemini-3.8-flash';
   const ai = params.aiClient ?? (apiKey ? new GoogleGenAI({ apiKey }) : null);
   const clientFullName = params.customerName || leadRecord.fullName || '';
   const clientFirstName = clientFullName.split(' ')[0] || '';
@@ -786,7 +786,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     }
 
     const candidateModels = Array.from(
-      new Set([configuredModel, 'gemini-2.5-flash-lite', 'gemini-2.5-flash']),
+      new Set([configuredModel, 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.5-flash']),
     );
 
     const forceMatcherToolOnRound1 =

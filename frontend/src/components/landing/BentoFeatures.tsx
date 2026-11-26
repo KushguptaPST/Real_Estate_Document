@@ -68,15 +68,15 @@ export function BentoFeatures() {
     <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-28 space-y-16">
       {/* ── Section Header ── */}
       <div className="text-center space-y-3 max-w-2xl mx-auto">
-        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200/90 bg-zinc-100 px-3.5 py-1 text-xs font-medium tracking-wide text-zinc-700">
-          <Building2 className="h-3.5 w-3.5 text-zinc-900" />
-          <span>Complete Brokerage Operating System</span>
+        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200/90 bg-zinc-100 px-4 py-1.5 text-sm font-medium tracking-wide text-zinc-700">
+          <Building2 className="h-4 w-4 text-zinc-900" />
+          <span>Built for Real Estate Teams</span>
         </div>
-        <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-[#0A0A0A] leading-[1.08]">
-          Engineered for high-performing brokerages.
+        <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-[#0A0A0A] leading-[1.1]">
+          Everything you need from first inquiry to closing day.
         </h2>
-        <p className="text-base text-[#52525B] leading-relaxed max-w-[62ch] mx-auto">
-          One unified system that automates front-office inbound sales and protects back-office closing deadlines with deterministic precision.
+        <p className="text-base sm:text-lg text-[#52525B] leading-relaxed max-w-[58ch] mx-auto">
+          One simple workspace that replies to new buyers automatically and tracks every contract deadline for your team.
         </p>
       </div>
 
@@ -90,28 +90,28 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <Volume2 className="h-3.5 w-3.5 text-zinc-900" />
-                <span>Front-Office AI Voice Engine</span>
+                <span>24/7 Lead Assistant</span>
               </div>
-              <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Sub-60s Speed-to-Lead
+              <span className="text-xs sm:text-sm text-emerald-700 font-bold bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-200">
+                Replies Under 60s
               </span>
             </div>
 
             <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              Autonomous Voice Sales Copilot &amp; Neural Memos
+              Instant Buyer Replies &amp; Voice Messages
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Responds to inbound buyer inquiries across WhatsApp and Telegram with hyper-realistic advisor voice memos. Incorporates natural spoken syntax, subtle room tone, and native OGG-OPUS audio waveforms.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Automatically replies to new buyer messages on Telegram and WhatsApp with property details, PDF brochures, and natural voice messages — even when your team is busy.
             </p>
 
             {/* Interactive Playable Voice Note Card */}
             <div className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono border-b border-zinc-200 pb-2">
-                <span className="text-zinc-600 font-bold">Spoken by Advisor Digital Twin</span>
-                <span className="text-emerald-700 font-bold">Delivered via WhatsApp</span>
+              <div className="flex items-center justify-between text-xs sm:text-sm border-b border-zinc-200 pb-2">
+                <span className="text-zinc-700 font-semibold">AI Assistant Voice Message</span>
+                <span className="text-emerald-700 font-bold">Sent on WhatsApp &amp; Telegram</span>
               </div>
 
               {/* Player Controls */}
@@ -148,20 +148,20 @@ export function BentoFeatures() {
                 </span>
               </div>
 
-              <p className="text-xs text-zinc-800 italic font-serif leading-relaxed bg-white p-3 rounded-xl border border-zinc-200/70">
-                &ldquo;Hey Liam, Rahul here! 1420 Ocean just went under contract, but an off-market 3-bed in Bellevue literally opened up this morning at $1.28M. I’ve penciled in Saturday at 11:00 AM for us to walk it.&rdquo;
+              <p className="text-sm text-zinc-800 italic leading-relaxed bg-white p-3.5 rounded-xl border border-zinc-200/70">
+                &ldquo;Hey Liam, Rahul here! 1420 Ocean just went under contract, but a 3-bed in Bellevue opened up this morning at $1.28M. I’ve penciled in Saturday at 11:00 AM for us to tour it.&rdquo;
               </p>
             </div>
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-            <span className="text-xs text-zinc-400 font-mono">11 custom agent tools &bull; ReAct loop</span>
+            <span className="text-xs sm:text-sm text-zinc-500">Matches properties &amp; sends brochures automatically</span>
             <Link
               to="/signup"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
             >
-              <span>Explore Voice Copilot</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              <span>Try Assistant</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </motion.div>
@@ -174,83 +174,83 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <UserCheck className="h-3.5 w-3.5 text-zinc-900" />
-                <span>Advisor Control</span>
+                <span>Team Control</span>
               </div>
-              <span className="text-[10px] font-mono text-zinc-400 uppercase">Zero Rogue AI</span>
+              <span className="text-xs text-zinc-500 font-medium">You Stay in Charge</span>
             </div>
 
             <h3 className="text-2xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              3-Tier Human Governance &amp; Instant Takeover
+              Step In Anytime With 1-Click Takeover
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Maintain complete oversight. Switch seamlessly between autonomous autopilot, draft-only proposal queues, and instant 1-click human advisor takeover.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Choose how much the AI handles: let it reply automatically, review drafts before they send, or take over the conversation yourself in one click.
             </p>
 
             {/* Interactive State Toggle */}
-            <div className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-3 font-mono text-xs">
+            <div className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-3 text-xs sm:text-sm">
               <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-zinc-200/60">
                 <button
                   type="button"
                   onClick={() => setGovernanceMode('autopilot')}
-                  className={`py-1.5 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                  className={`py-2 rounded-lg text-center font-bold transition-all cursor-pointer text-xs ${
                     governanceMode === 'autopilot'
                       ? 'bg-white text-[#0A0A0A] shadow-2xs'
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  AUTOPILOT
+                  Auto-Reply
                 </button>
                 <button
                   type="button"
                   onClick={() => setGovernanceMode('draft')}
-                  className={`py-1.5 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                  className={`py-2 rounded-lg text-center font-bold transition-all cursor-pointer text-xs ${
                     governanceMode === 'draft'
                       ? 'bg-white text-[#0A0A0A] shadow-2xs'
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  DRAFT_ONLY
+                  Review Drafts
                 </button>
                 <button
                   type="button"
                   onClick={() => setGovernanceMode('takeover')}
-                  className={`py-1.5 rounded-lg text-center font-bold transition-all cursor-pointer text-[11px] ${
+                  className={`py-2 rounded-lg text-center font-bold transition-all cursor-pointer text-xs ${
                     governanceMode === 'takeover'
                       ? 'bg-amber-100 text-amber-900 shadow-2xs border border-amber-300'
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  TAKEOVER
+                  Human Only
                 </button>
               </div>
 
               {/* State Explanation Box */}
-              <div className="p-3 rounded-xl bg-white border border-zinc-200 space-y-1">
-                <div className="font-bold text-zinc-900 text-xs font-sans">
-                  {governanceMode === 'autopilot' && 'Autopilot Mode Active'}
-                  {governanceMode === 'draft' && 'Draft-Only Review Queue'}
-                  {governanceMode === 'takeover' && 'Human Advisor in Command'}
+              <div className="p-3.5 rounded-xl bg-white border border-zinc-200 space-y-1">
+                <div className="font-bold text-zinc-900 text-sm font-sans">
+                  {governanceMode === 'autopilot' && 'Auto-Reply Active'}
+                  {governanceMode === 'draft' && 'Approval Queue'}
+                  {governanceMode === 'takeover' && 'Agent in Control'}
                 </div>
-                <p className="text-[11px] text-zinc-500 font-sans leading-relaxed">
-                  {governanceMode === 'autopilot' && 'AI responds in under 60 seconds with voice notes and books showings automatically.'}
-                  {governanceMode === 'draft' && 'AI drafts outbound messages for broker one-click approval before sending.'}
-                  {governanceMode === 'takeover' && 'AI execution is paused immediately. The human broker has direct microphone control.'}
+                <p className="text-xs sm:text-sm text-zinc-600 font-sans leading-relaxed">
+                  {governanceMode === 'autopilot' && 'Replies to buyers in under 60 seconds and books property tours automatically.'}
+                  {governanceMode === 'draft' && 'Prepares suggested replies for your agent to approve before sending.'}
+                  {governanceMode === 'takeover' && 'AI pauses immediately so your human agent can chat directly with the buyer.'}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-            <span className="text-xs text-zinc-400 font-mono">Fail-closed safety architecture</span>
+            <span className="text-xs sm:text-sm text-zinc-500">Full control over every chat</span>
             <Link
               to="/signup"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
             >
-              <span>View Governance Guardrails</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              <span>Learn More</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </motion.div>
@@ -263,21 +263,21 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <Calendar className="h-3.5 w-3.5 text-zinc-900" />
-                <span>Showing Logistics</span>
+                <span>Site Visits</span>
               </div>
-              <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 Direct Booking
               </span>
             </div>
 
             <h3 className="text-2xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              Conflict-Free Showing Scheduler
+              Automatic Property Tour Booking
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Every qualified interaction closes with a confirmed in-person walkthrough. Checks broker availability in real time and dispatches Google Maps pins and floor plans.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Checks your team’s free time slots, confirms in-person property tours with buyers, and sends them the address and map pin automatically.
             </p>
 
             {/* Showing Confirmation Preview Card */}
@@ -327,21 +327,21 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <Scale className="h-3.5 w-3.5 text-zinc-900" />
-                <span>Back-Office Legal Precision</span>
+                <span>Closing Deadlines</span>
               </div>
-              <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                50-State Statutory Code
+              <span className="text-xs sm:text-sm text-emerald-700 font-bold bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-200">
+                50-State Rules
               </span>
             </div>
 
             <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              Deterministic Statutory Escrow Calendar Engine
+              Smart Contract &amp; Deadline Calendar
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Zero date math errors. Automatically factors statutory business vs. calendar days, federal banking holidays, weekend roll-forward rules, and exact state daily cutoff standards.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Never calculate inspection or loan deadlines by hand. Automatically accounts for weekends, public holidays, and each state’s exact cutoff times.
             </p>
 
             {/* Visual Rollover Matrix */}
@@ -388,13 +388,13 @@ export function BentoFeatures() {
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-            <span className="text-xs text-zinc-400 font-mono">100% deterministic &bull; Zero LLM hallucinations</span>
+            <span className="text-xs sm:text-sm text-zinc-500">Accurate dates &bull; Zero guesswork</span>
             <Link
               to="/contracts"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
             >
-              <span>Explore Statutory Engine</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              <span>View State Rules</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </motion.div>
@@ -407,37 +407,37 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <Search className="h-3.5 w-3.5 text-zinc-900" />
-                <span>Zero Hallucinations</span>
+                <span>Verified Answers</span>
               </div>
-              <span className="text-[10px] font-mono text-zinc-400 uppercase">Exact PDF Bounding Box</span>
+              <span className="text-xs text-zinc-500 font-medium">Direct PDF Highlight</span>
             </div>
 
             <h3 className="text-2xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              Verbatim PDF Line Citations
+              Instant Proof From Your Signed PDF
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Every extracted deadline anchors directly to exact line numbers and page coordinates in your signed contract. Verified server-side via Unicode NFKC normalization.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Every extracted deadline links straight back to the exact page and line in your uploaded purchase agreement so you can verify it in one click.
             </p>
 
             {/* Document Inspection Reticle Artifact */}
             <div
               onMouseEnter={() => setLensHovered(true)}
               onMouseLeave={() => setLensHovered(false)}
-              className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-2.5 font-mono text-xs cursor-pointer"
+              className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-2.5 text-xs sm:text-sm cursor-pointer"
             >
-              <div className="flex items-center justify-between text-[10px] text-zinc-400 uppercase border-b border-zinc-200 pb-1.5">
-                <span>Contract Line Inspector</span>
+              <div className="flex items-center justify-between text-xs text-zinc-500 border-b border-zinc-200 pb-1.5">
+                <span>Contract Line Preview</span>
                 <span className="text-emerald-700 font-bold flex items-center gap-1">
-                  <Eye className="h-3 w-3" />
-                  Hover to Inspect
+                  <Eye className="h-3.5 w-3.5" />
+                  Hover to Highlight
                 </span>
               </div>
 
-              <div className="space-y-1.5 font-mono text-[11px] leading-relaxed bg-white p-3 rounded-xl border border-zinc-200 shadow-2xs">
-                <div className="text-zinc-400 text-[10px]">Page 4, Line 17: ...upon mutual acceptance of this contract...</div>
+              <div className="space-y-1.5 text-xs leading-relaxed bg-white p-3 rounded-xl border border-zinc-200 shadow-2xs">
+                <div className="text-zinc-400">Page 4, Line 17: ...upon mutual acceptance of this contract...</div>
                 <div
                   className={`px-2 py-1 rounded border transition-all ${
                     lensHovered
@@ -447,29 +447,29 @@ export function BentoFeatures() {
                 >
                   Line 18: Buyer shall have 10 calendar days to complete inspections...
                 </div>
-                <div className="text-zinc-400 text-[10px]">Page 4, Line 19: ...prior to 9:00 PM statutory cutoff...</div>
+                <div className="text-zinc-400">Page 4, Line 19: ...prior to 9:00 PM statutory cutoff...</div>
               </div>
 
-              <div className="p-2 rounded-lg bg-zinc-100 text-[10px] text-zinc-600 flex items-center justify-between">
-                <span>Anchor: [X: 142.5, Y: 388.2, Pg: 4]</span>
-                <strong className="text-zinc-800">NWMLS Form 35 §4.2</strong>
+              <div className="p-2.5 rounded-lg bg-zinc-100 text-xs text-zinc-600 flex items-center justify-between">
+                <span>Matched on Page 4, Line 18</span>
+                <strong className="text-zinc-800">NWMLS Form 35</strong>
               </div>
             </div>
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-            <span className="text-xs text-zinc-400 font-mono">Court-admissible verification</span>
+            <span className="text-xs sm:text-sm text-zinc-500">Easy to double-check any date</span>
             <Link
               to="/security"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
             >
-              <span>Security &amp; E&amp;O</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              <span>Security Details</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </motion.div>
 
-        {/* ── BENTO 6: Transactional Outbox & E&O Audit Vault (6 Cols) ── */}
+        {/* ── BENTO 6: Activity History & Reminders (6 Cols) ── */}
         <motion.div
           whileHover={{ y: -4 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
@@ -477,55 +477,55 @@ export function BentoFeatures() {
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200/80">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs sm:text-sm font-medium border border-zinc-200/80">
                 <Lock className="h-3.5 w-3.5 text-zinc-900" />
-                <span>E&amp;O Risk Shield</span>
+                <span>Compliance &amp; Safety</span>
               </div>
-              <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                15% Policy Credit
+              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Audit Ready
               </span>
             </div>
 
             <h3 className="text-2xl font-bold tracking-tight text-[#0A0A0A] leading-tight">
-              Transactional Outbox &amp; Audit Vault
+              Automatic Reminders &amp; Complete Activity Log
             </h3>
 
-            <p className="text-sm text-[#52525B] leading-relaxed">
-              Every milestone calculation, agent override, and email dispatch is cryptographically hashed with SHA-256 and sent via idempotent outbox daemon.
+            <p className="text-sm sm:text-base text-[#52525B] leading-relaxed">
+              Every deadline alert, date update, and client message is saved in a permanent timeline so your brokerage always has a clear paper trail.
             </p>
 
             {/* Audit Vault Preview */}
-            <div className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-2.5 font-mono text-xs">
-              <div className="flex items-center justify-between text-[10px] text-zinc-400 uppercase border-b border-zinc-200 pb-2">
-                <span>Tamper-Evident Ledger</span>
-                <span className="text-emerald-700 font-bold">SHA-256 Validated</span>
+            <div className="rounded-2xl bg-[#FAF9F6] border border-zinc-200/90 p-4 space-y-2.5 text-xs sm:text-sm">
+              <div className="flex items-center justify-between text-xs text-zinc-500 border-b border-zinc-200 pb-2">
+                <span>Deal Activity Timeline</span>
+                <span className="text-emerald-700 font-bold">Verified Record</span>
               </div>
 
-              <div className="space-y-1.5 text-[11px]">
+              <div className="space-y-1.5 text-xs">
                 <div className="p-2.5 rounded-xl bg-white border border-zinc-200 flex items-center justify-between shadow-2xs">
-                  <span className="text-zinc-700 font-semibold">T-3 Escrow Notice Dispatched</span>
+                  <span className="text-zinc-700 font-semibold">3-Day Inspection Reminder Sent</span>
                   <span className="text-emerald-700 font-bold">DELIVERED</span>
                 </div>
-                <div className="p-2 rounded-xl bg-white border border-zinc-200 text-zinc-600 text-[10px] truncate shadow-2xs">
-                  SHA256: 7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1f
+                <div className="p-2.5 rounded-xl bg-white border border-zinc-200 text-zinc-600 text-xs truncate shadow-2xs">
+                  Confirmed by Stork Rikle &bull; Nov 25, 2:14 PM
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-950 flex items-center gap-2">
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span>Admissible in E&amp;O insurance claims &amp; real estate commission audits</span>
+                <span>Protects your brokerage during compliance checks &amp; closing reviews</span>
               </div>
             </div>
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-            <span className="text-xs text-zinc-400 font-mono">Immutable cryptographic chain</span>
+            <span className="text-xs sm:text-sm text-zinc-500">Full history for every deal</span>
             <Link
               to="/security"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0A0A0A] hover:text-emerald-700 transition-colors group"
             >
-              <span>Audit Specifications</span>
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              <span>View Audit Trail</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </motion.div>

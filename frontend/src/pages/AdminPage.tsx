@@ -515,7 +515,7 @@ export function AdminPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                           <div className="p-3 rounded-xl bg-white border border-slate-200/70">
                             <p className="text-slate-500 font-medium">AI Voice Calling</p>
-                            <p className="font-bold text-slate-900 mt-1 tabular-nums">₹12.00 / min billed</p>
+                            <p className="font-bold text-slate-900 mt-1 tabular-nums">₹15.00 / min billed</p>
                             <p className="text-[11px] text-emerald-700 mt-0.5">~₹2.45/min blended vendor cost</p>
                           </div>
                           <div className="p-3 rounded-xl bg-white border border-slate-200/70">

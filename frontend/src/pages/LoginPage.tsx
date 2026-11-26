@@ -33,7 +33,11 @@ export function LoginPage() {
 
   const handleGoogleCredential = async (credential: string) => {
     setError(null);
-    await signInWithGoogle(credential, inviteToken);
+    const res = await signInWithGoogle(credential, inviteToken);
+    if (res.isNewWorkspace || res.user.subscriptionStatus === 'PENDING_PAYMENT') {
+      navigate('/signup', { replace: true });
+      return;
+    }
     navigate(from, { replace: true });
   };
 

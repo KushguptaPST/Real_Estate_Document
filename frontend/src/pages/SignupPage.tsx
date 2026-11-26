@@ -54,7 +54,7 @@ const PLANS = [
     tagline: 'Daily AI cold calling (~40–50 dials/day) + WhatsApp',
     features: [
       '500 AI Calling Mins (~1,000–1,250 cold dials/mo)',
-      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      '₹0 on unanswered dials • 30s pulse billing (₹15/min)',
       'ElevenLabs Studio Voice + 1 Plivo India DID',
       'Unlimited Website Chat Widget & Telegram Bot',
       'WhatsApp Speed-to-Lead + PDF Brochure & Location Pin',
@@ -72,7 +72,7 @@ const PLANS = [
     popular: true,
     features: [
       '1,600 AI Calling Mins (~3,200–4,000 cold dials/mo)',
-      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      '₹0 on unanswered dials • 30s pulse billing (₹15/min)',
       'ElevenLabs Studio Voice + Plivo Batch Campaign Dialer',
       'Unlimited Website Chat Widget & Telegram Bot',
       'WhatsApp Coexistence (Auto-pause when advisor replies)',
@@ -92,7 +92,7 @@ const PLANS = [
     popular: false,
     features: [
       '4,000 AI Calling Mins (~8,000–10,000 cold dials/mo)',
-      '₹0 on unanswered dials • 30s pulse billing (₹12/min)',
+      '₹0 on unanswered dials • 30s pulse billing (₹15/min)',
       'Up to 100 Team Seats + Isolated Plivo Subaccount',
       'Multi-Project RERA Inventory & Hybrid Knowledge Search',
       'Tenant API Keys & HMAC-Signed Inbound Lead Webhooks',

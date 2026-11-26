@@ -203,7 +203,7 @@ export function PricingPage() {
   const faqs = [
     {
       q: 'How does the AI voice calling billing work?',
-      a: 'Each plan includes pre-loaded wallet credits (₹6,000 / ₹19,200 / ₹48,000) billed at ₹12/connected minute in fair 30-second pulses (₹6 per 30s), with ₹0 charged on unanswered dials. Top up anytime in INR via Razorpay.',
+      a: 'Each plan includes pre-loaded wallet credits (₹6,000 / ₹19,200 / ₹48,000) billed at ₹15/connected minute in fair 30-second pulses (₹7.50 per 30s), with ₹0 charged on unanswered dials. Top up anytime in INR via Razorpay.',
     },
     {
       q: 'What channels are included in every plan?',
@@ -381,7 +381,7 @@ export function PricingPage() {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>₹0 on unanswered calls &bull; 30s pulse billing (₹12/min)</span>
+                  <span>₹0 on unanswered calls &bull; 30s pulse billing (₹15/min)</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
@@ -636,7 +636,7 @@ export function PricingPage() {
                   className="rounded-full text-xs font-medium border-[#E5E7EB] hover:bg-[#F8F9FA] h-8"
                 >
                   <Phone className="mr-1.5 h-3 w-3 text-[#047857]" />
-                  Simulate Call (-₹12)
+                  Simulate Call (-₹15)
                 </Button>
                 <Button
                   variant="outline"
