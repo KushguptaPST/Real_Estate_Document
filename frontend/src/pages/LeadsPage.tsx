@@ -79,6 +79,99 @@ export function LeadsPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Helper to extract effective requirements (including client heuristics when AI extraction is pending/partial)
+  function getEffectiveRequirements(targetLead: Lead | null) {
+    if (!targetLead) return null;
+    const req = targetLead.requirements;
+    const rawText = req?.notes ||
+      (targetLead as any).conversations?.[0]?.messages?.find((m: any) => m.senderType === 'CUSTOMER')?.content ||
+      (targetLead as any).notes || '';
+    const lower = rawText.toLowerCase();
+
+    let minBedrooms: number | null = req?.minBedrooms ?? null;
+    let maxBedrooms: number | null = req?.maxBedrooms ?? null;
+    let maxBudget: number | null = req?.maxBudget ?? null;
+    let minBudget: number | null = req?.minBudget ?? null;
+    let preferredLocations: string[] = req?.preferredLocations && req.preferredLocations.length > 0
+      ? [...req.preferredLocations]
+      : [];
+    let propertyType: string | null = req?.propertyType ?? null;
+    let possessionTimeline: string | null = req?.possessionTimeline ?? null;
+
+    if (rawText) {
+      if (!minBedrooms) {
+        const bhkMatch = lower.match(/(\d+)\s*(?:-|to)?\s*(\d+)?\s*(?:bhk|bedroom|bed)\b/);
+        if (bhkMatch) {
+          minBedrooms = parseInt(bhkMatch[1], 10);
+          maxBedrooms = bhkMatch[2] ? parseInt(bhkMatch[2], 10) : minBedrooms;
+        }
+      }
+
+      if (!maxBudget) {
+        const crMatch = lower.match(/(?:under|below|upto|budget(?:\s*of)?|around)?\s*(\d+(?:\.\d+)?)\s*(?:cr|crore|crores)\b/);
+        if (crMatch) {
+          maxBudget = Math.round(parseFloat(crMatch[1]) * 10_000_000);
+        } else {
+          const lakhMatch = lower.match(/(?:under|below|upto|budget(?:\s*of)?|around)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|lac|lacs|l)\b/);
+          if (lakhMatch) {
+            maxBudget = Math.round(parseFloat(lakhMatch[1]) * 100_000);
+          }
+        }
+      }
+
+      if (preferredLocations.length === 0) {
+        const knownLocations = [
+          'whitefield', 'indiranagar', 'koramangala', 'bellandur', 'sarjapur',
+          'marathahalli', 'electronic city', 'hsr layout', 'jayanagar', 'jp nagar',
+          'hebbal', 'yelahanka', 'bannerghatta', 'bengaluru', 'bangalore', 'mumbai',
+          'delhi', 'gurugram', 'noida', 'pune', 'hyderabad', 'chennai'
+        ];
+        for (const loc of knownLocations) {
+          if (lower.includes(loc)) {
+            const formattedLoc = loc.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            if (!preferredLocations.includes(formattedLoc)) {
+              preferredLocations.push(formattedLoc);
+            }
+          }
+        }
+      }
+
+      if (!propertyType) {
+        if (lower.includes('apartment') || lower.includes('flat') || lower.includes('bhk') || lower.includes('condo')) {
+          propertyType = 'Apartment';
+        } else if (lower.includes('villa') || lower.includes('row house')) {
+          propertyType = 'Villa';
+        } else if (lower.includes('house') || lower.includes('independent')) {
+          propertyType = 'Independent House';
+        } else if (lower.includes('plot') || lower.includes('land')) {
+          propertyType = 'Plot / Land';
+        }
+      }
+
+      if (!possessionTimeline) {
+        if (lower.includes('ready') || lower.includes('immediate') || lower.includes('now')) {
+          possessionTimeline = 'Immediate (Ready to Move)';
+        } else if (lower.includes('60 days') || lower.includes('2 months')) {
+          possessionTimeline = 'Within 60 Days';
+        } else if (lower.includes('30 days') || lower.includes('1 month')) {
+          possessionTimeline = 'Within 30 Days';
+        }
+      }
+    }
+
+    return {
+      rawText,
+      notes: rawText || req?.notes || null,
+      minBedrooms,
+      maxBedrooms,
+      minBudget,
+      maxBudget,
+      preferredLocations,
+      propertyType: propertyType || req?.propertyType || null,
+      possessionTimeline: possessionTimeline || req?.possessionTimeline || null,
+    };
+  }
+
   function copyToClipboard(text: string, fieldName: string) {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
@@ -1556,7 +1649,7 @@ export function LeadsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {leads.map((lead) => {
-            const req = lead.requirements;
+            const req = getEffectiveRequirements(lead);
             const initials = lead.fullName
               .split(' ')
               .map((n: string) => n[0])
@@ -1835,7 +1928,9 @@ export function LeadsPage() {
       />
 
       {/* ── Lead Quick-Details & Inbound Inquiry Modal ── */}
-      {selectedLeadForDetails && (
+      {selectedLeadForDetails && (() => {
+        const modalReq = getEffectiveRequirements(selectedLeadForDetails);
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="w-full max-w-2xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
             {/* Modal Header */}
@@ -1996,19 +2091,19 @@ export function LeadsPage() {
                       <IndianRupee className="h-3 w-3 text-emerald-600" /> Target Budget
                     </span>
                     <div className="text-sm font-extrabold text-slate-900 font-mono">
-                      {selectedLeadForDetails.requirements?.minBudget || selectedLeadForDetails.requirements?.maxBudget ? (
+                      {modalReq?.minBudget || modalReq?.maxBudget ? (
                         <>
-                          {selectedLeadForDetails.requirements.minBudget ? formatIndianPrice(selectedLeadForDetails.requirements.minBudget) : '₹0'}
+                          {modalReq.minBudget ? formatIndianPrice(modalReq.minBudget) : '₹0'}
                           {' - '}
-                          {selectedLeadForDetails.requirements.maxBudget ? formatIndianPrice(selectedLeadForDetails.requirements.maxBudget) : 'Flexible'}
+                          {modalReq.maxBudget ? formatIndianPrice(modalReq.maxBudget) : 'Flexible'}
                         </>
                       ) : (
                         'Flexible / Unspecified'
                       )}
                     </div>
-                    {selectedLeadForDetails.requirements?.maxBudget && (
+                    {modalReq?.maxBudget && (
                       <span className="text-[10px] text-slate-400 font-mono block">
-                        Full: {formatIndianPriceFull(selectedLeadForDetails.requirements.maxBudget)}
+                        Full: {formatIndianPriceFull(modalReq.maxBudget)}
                       </span>
                     )}
                   </div>
@@ -2019,8 +2114,8 @@ export function LeadsPage() {
                       <MapPin className="h-3 w-3 text-rose-500" /> Target Area / Localities
                     </span>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {selectedLeadForDetails.requirements?.preferredLocations && selectedLeadForDetails.requirements.preferredLocations.length > 0 ? (
-                        selectedLeadForDetails.requirements.preferredLocations.map((loc, idx) => (
+                      {modalReq?.preferredLocations && modalReq.preferredLocations.length > 0 ? (
+                        modalReq.preferredLocations.map((loc, idx) => (
                           <span
                             key={idx}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[11px]"
@@ -2041,12 +2136,12 @@ export function LeadsPage() {
                       <Home className="h-3 w-3 text-slate-500" /> Property Configuration
                     </span>
                     <div className="text-xs font-bold text-slate-900">
-                      {selectedLeadForDetails.requirements?.minBedrooms ? `${selectedLeadForDetails.requirements.minBedrooms} BHK` : 'Any BHK'}
+                      {modalReq?.minBedrooms ? `${modalReq.minBedrooms} BHK` : 'Any BHK'}
                       {' • '}
-                      {selectedLeadForDetails.requirements?.propertyType || 'Residential (Any)'}
+                      {modalReq?.propertyType || 'Residential (Any)'}
                     </div>
                     <span className="text-[10px] text-slate-400">
-                      {selectedLeadForDetails.requirements?.maxBedrooms ? `Max ${selectedLeadForDetails.requirements.maxBedrooms} bedrooms` : 'Flexible size'}
+                      {modalReq?.maxBedrooms ? `Max ${modalReq.maxBedrooms} bedrooms` : 'Flexible size'}
                     </span>
                   </div>
 
@@ -2056,7 +2151,7 @@ export function LeadsPage() {
                       <Clock className="h-3 w-3 text-amber-500" /> Timeline &amp; Possession
                     </span>
                     <div className="text-xs font-bold text-slate-900">
-                      {selectedLeadForDetails.requirements?.possessionTimeline || 'Flexible / Inactive timeline'}
+                      {modalReq?.possessionTimeline || 'Flexible / Inactive timeline'}
                     </div>
                     <span className="text-[10px] text-slate-400">
                       {selectedLeadForDetails.priority === 'URGENT' || selectedLeadForDetails.priority === 'HIGH' ? 'Immediate high-priority buyer' : 'Standard qualification'}
@@ -2126,7 +2221,8 @@ export function LeadsPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -245,11 +245,13 @@ export async function ingestInboundLead(input: InboundLeadInput) {
     }
   }
 
-  // 2. Non-blocking Async Requirements Extraction and Inbound Message Ingestion if Enquiry Text Provided
-  if (input.enquiryText && input.enquiryText.trim().length > 5) {
-    extractAndPersistRequirements(lead.id, input.enquiryText, orgId).catch((err) => {
+  // 2. Synchronous/Awaited Requirements Extraction and Inbound Message Ingestion if Enquiry Text Provided
+  if (input.enquiryText && input.enquiryText.trim().length > 3) {
+    try {
+      await extractAndPersistRequirements(lead.id, input.enquiryText, orgId);
+    } catch (err: any) {
       logger.warn(`[Lead Service] Background requirement extraction error: ${err.message}`);
-    });
+    }
 
     // Ingest the customer enquiry into the conversation thread to trigger Autopilot auto-reply
     import('./conversation.service.js').then(({ handleCustomerMessage }) => {
@@ -267,20 +269,100 @@ export async function ingestInboundLead(input: InboundLeadInput) {
   return getLeadDetails(lead.id, orgId);
 }
 
+// ── Helper: Heuristic Parser for Indian & Global Real Estate Enquiries ─────────
+export function parseHeuristicRequirements(text: string): Partial<ExtractedRequirements> {
+  const lower = text.toLowerCase();
+  let minBedrooms: number | null = null;
+  let maxBedrooms: number | null = null;
+  let maxBudget: number | null = null;
+  let minBudget: number | null = null;
+  const preferredLocations: string[] = [];
+  let propertyType: string | null = null;
+  let possessionTimeline: string | null = null;
+
+  // Bedrooms: e.g. "3 bhk", "3bhk", "3 bed", "3 bedroom", "2-3 bhk"
+  const bhkMatch = lower.match(/(\d+)\s*(?:-|to)?\s*(\d+)?\s*(?:bhk|bedroom|bed)\b/);
+  if (bhkMatch) {
+    minBedrooms = parseInt(bhkMatch[1], 10);
+    maxBedrooms = bhkMatch[2] ? parseInt(bhkMatch[2], 10) : minBedrooms;
+  }
+
+  // Budget in Crores: e.g. "1.5 crore", "1.5cr", "2 cr", "under 1.5 crore"
+  const crMatch = lower.match(/(?:under|below|upto|budget(?:\s*of)?|around)?\s*(\d+(?:\.\d+)?)\s*(?:cr|crore|crores)\b/);
+  if (crMatch) {
+    maxBudget = Math.round(parseFloat(crMatch[1]) * 10_000_000);
+  }
+
+  // Budget in Lakhs: e.g. "80 lakh", "80l", "75 lakhs"
+  const lakhMatch = lower.match(/(?:under|below|upto|budget(?:\s*of)?|around)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|lac|lacs|l)\b/);
+  if (lakhMatch && !crMatch) {
+    maxBudget = Math.round(parseFloat(lakhMatch[1]) * 100_000);
+  }
+
+  // Locations (Bangalore & major Indian metropolitan localities)
+  const knownLocations = [
+    'whitefield', 'indiranagar', 'koramangala', 'bellandur', 'sarjapur',
+    'marathahalli', 'electronic city', 'hsr layout', 'jayanagar', 'jp nagar',
+    'hebbal', 'yelahanka', 'bannerghatta', 'bengaluru', 'bangalore', 'mumbai',
+    'delhi', 'gurugram', 'noida', 'pune', 'hyderabad', 'chennai'
+  ];
+  for (const loc of knownLocations) {
+    if (lower.includes(loc)) {
+      const formattedLoc = loc.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (!preferredLocations.includes(formattedLoc)) {
+        preferredLocations.push(formattedLoc);
+      }
+    }
+  }
+
+  // Property type
+  if (lower.includes('apartment') || lower.includes('flat') || lower.includes('bhk') || lower.includes('condo')) {
+    propertyType = 'APARTMENT';
+  } else if (lower.includes('villa') || lower.includes('row house')) {
+    propertyType = 'VILLA';
+  } else if (lower.includes('house') || lower.includes('independent')) {
+    propertyType = 'INDEPENDENT_HOUSE';
+  } else if (lower.includes('plot') || lower.includes('land')) {
+    propertyType = 'PLOT';
+  }
+
+  // Timeline
+  if (lower.includes('ready') || lower.includes('immediate') || lower.includes('now')) {
+    possessionTimeline = 'IMMEDIATE';
+  } else if (lower.includes('60 days') || lower.includes('2 months')) {
+    possessionTimeline = '60_DAYS';
+  } else if (lower.includes('30 days') || lower.includes('1 month')) {
+    possessionTimeline = '30_DAYS';
+  }
+
+  return {
+    minBudget,
+    maxBudget,
+    minBedrooms,
+    maxBedrooms,
+    preferredLocations,
+    propertyType,
+    possessionTimeline,
+  };
+}
+
 /**
  * Uses Gemini to extract structured requirement proposal, records proposal, and updates LeadRequirement.
  */
 export async function extractAndPersistRequirements(leadId: string, text: string, organizationId: string) {
   const orgId = requireOrgId(organizationId);
   const apiKey = process.env['GEMINI_API_KEY'];
+
+  // Start with deterministic heuristic extraction as robust baseline
+  const heuristics = parseHeuristicRequirements(text);
   let extracted: ExtractedRequirements = {
-    minBudget: null,
-    maxBudget: null,
-    preferredLocations: [],
-    propertyType: null,
-    minBedrooms: null,
-    maxBedrooms: null,
-    possessionTimeline: null,
+    minBudget: heuristics.minBudget ?? null,
+    maxBudget: heuristics.maxBudget ?? null,
+    preferredLocations: heuristics.preferredLocations || [],
+    propertyType: heuristics.propertyType ?? null,
+    minBedrooms: heuristics.minBedrooms ?? null,
+    maxBedrooms: heuristics.maxBedrooms ?? null,
+    possessionTimeline: heuristics.possessionTimeline ?? null,
     summaryNotes: text.slice(0, 500),
     clarificationNeeded: [],
   };
@@ -310,10 +392,10 @@ ${text}
 <</UNTRUSTED_CONTENT>>
 
 Extract:
-1. minBudget & maxBudget (in USD, positive numbers or null).
-2. preferredLocations (array of neighborhood or city names).
-3. propertyType (e.g., "CONDO", "SINGLE_FAMILY", "TOWNHOUSE", "MULTI_FAMILY", or null).
-4. minBedrooms & maxBedrooms (integer numbers or null).
+1. minBudget & maxBudget (positive numbers in standard integer/float currency units. If in Crores/Cr/crore, 1 Cr = 10000000. E.g. "1.5 crore" = 15000000. If in Lakhs/L/lakh, 1 Lakh = 100000. E.g. "80 lakh" = 8000000. If in USD, use standard dollar figure).
+2. preferredLocations (array of neighborhood or city names, e.g. ["Whitefield"]).
+3. propertyType (e.g., "APARTMENT", "CONDO", "SINGLE_FAMILY", "VILLA", "INDEPENDENT_HOUSE", or null).
+4. minBedrooms & maxBedrooms (integer numbers, e.g. "3 bhk" = 3).
 5. possessionTimeline (e.g. "IMMEDIATE", "30_DAYS", "60_DAYS", "90_DAYS", or null).
 6. summaryNotes (concise synthesis of what buyer wants).
 7. clarificationNeeded (array of missing critical preference items).`;
@@ -332,7 +414,18 @@ Extract:
 
         if (response.text) {
           const raw = JSON.parse(response.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
-          extracted = RequirementExtractionSchema.parse(raw);
+          const parsedAi = RequirementExtractionSchema.parse(raw);
+          extracted = {
+            minBudget: parsedAi.minBudget ?? extracted.minBudget,
+            maxBudget: parsedAi.maxBudget ?? extracted.maxBudget,
+            preferredLocations: parsedAi.preferredLocations && parsedAi.preferredLocations.length > 0 ? parsedAi.preferredLocations : extracted.preferredLocations,
+            propertyType: parsedAi.propertyType ?? extracted.propertyType,
+            minBedrooms: parsedAi.minBedrooms ?? extracted.minBedrooms,
+            maxBedrooms: parsedAi.maxBedrooms ?? extracted.maxBedrooms,
+            possessionTimeline: parsedAi.possessionTimeline ?? extracted.possessionTimeline,
+            summaryNotes: parsedAi.summaryNotes || extracted.summaryNotes,
+            clarificationNeeded: parsedAi.clarificationNeeded || [],
+          };
           logger.info(`[Lead Service] Extracted requirements for lead ${leadId} using ${model}`);
           break;
         }
@@ -342,6 +435,7 @@ Extract:
     }
   }
 
+  // 1. Persist requirement proposal record for audit and review
   let proposalRecord: any = null;
   try {
     proposalRecord = await prisma.leadRequirementProposal.create({
@@ -381,6 +475,36 @@ Extract:
     });
   } catch (dbErr) {
     logger.warn(`[Lead Service] Could not persist requirement proposal for lead ${leadId}: ${(dbErr as Error).message}`);
+  }
+
+  // 2. Also directly populate/upsert active LeadRequirement so the lead immediately reflects extracted criteria
+  try {
+    await prisma.leadRequirement.upsert({
+      where: { leadId },
+      create: {
+        leadId,
+        minBudget: extracted.minBudget,
+        maxBudget: extracted.maxBudget,
+        preferredLocations: extracted.preferredLocations,
+        propertyType: extracted.propertyType,
+        minBedrooms: extracted.minBedrooms,
+        maxBedrooms: extracted.maxBedrooms,
+        possessionTimeline: extracted.possessionTimeline,
+        notes: text,
+      },
+      update: {
+        minBudget: extracted.minBudget ?? undefined,
+        maxBudget: extracted.maxBudget ?? undefined,
+        preferredLocations: extracted.preferredLocations && extracted.preferredLocations.length > 0 ? extracted.preferredLocations : undefined,
+        propertyType: extracted.propertyType ?? undefined,
+        minBedrooms: extracted.minBedrooms ?? undefined,
+        maxBedrooms: extracted.maxBedrooms ?? undefined,
+        possessionTimeline: extracted.possessionTimeline ?? undefined,
+        notes: text,
+      },
+    });
+  } catch (upsertErr) {
+    logger.warn(`[Lead Service] Could not upsert active LeadRequirement for lead ${leadId}: ${(upsertErr as Error).message}`);
   }
 
   return proposalRecord;
