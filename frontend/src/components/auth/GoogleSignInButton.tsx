@@ -68,7 +68,7 @@ export function GoogleSignInButton({
             if (err?.type === 'popup_closed_by_user') return;
             if (err?.type === 'origin_mismatch') {
               const msg =
-                'Google OAuth Notice: This domain is not listed in Authorized JavaScript Origins in Google Cloud Console.';
+                'Google OAuth Notice: This domain (e.g. real-estate-document.vercel.app) must be added to Authorized JavaScript Origins in Google Cloud Console. Use Instant Demo Access or Email Login to sign in immediately.';
               setConfigError(msg);
               onErrorRef.current?.(msg);
             }
