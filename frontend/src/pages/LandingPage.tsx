@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -15,9 +15,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Lenis from 'lenis';
 
-import { Hero3DCanvas } from '@/components/landing/Hero3DCanvas';
+const Hero3DCanvas = lazy(() => import('@/components/landing/Hero3DCanvas').then((m) => ({ default: m.Hero3DCanvas })));
 import { HeroDualTerminal } from '@/components/landing/HeroDualTerminal';
 import { PinnedWorkflowShowcase } from '@/components/landing/PinnedWorkflowShowcase';
 import { BentoFeatures } from '@/components/landing/BentoFeatures';
@@ -109,37 +108,13 @@ export function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // ── 1. Lenis Smooth Scrolling Engine ─────────────────────────────────────
+  // ── 1. Native Trackpad-Smooth Header Scroll Listener ─────────────────────
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: 'vertical',
-      gestureOrientation: 'vertical',
-      smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 1.5,
-    });
-
-    lenis.on('scroll', ScrollTrigger.update);
-
-    const tickerCb = (time: number) => {
-      lenis.raf(time * 1000);
-    };
-
-    gsap.ticker.add(tickerCb);
-    gsap.ticker.lagSmoothing(0);
-
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 30);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      gsap.ticker.remove(tickerCb);
-      lenis.destroy();
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // ── 2. GSAP Master Timeline & Scroll Choreography ────────────────────────
@@ -229,8 +204,10 @@ export function LandingPage() {
 
       {/* ── 2. Hero Section: Clean, Authoritative & Professional ── */}
       <section className="relative min-h-[92vh] flex flex-col justify-center items-center px-4 sm:px-6 pt-28 sm:pt-32 pb-24 text-center overflow-hidden">
-        {/* Subtle, High-FPS Three.js Glass Geometry */}
-        <Hero3DCanvas />
+        {/* Subtle, High-FPS Three.js Glass Geometry (lazy loaded) */}
+        <Suspense fallback={null}>
+          <Hero3DCanvas />
+        </Suspense>
 
         <div className="relative z-10 max-w-5xl mx-auto space-y-8">
           {/* Eyebrow Badge */}

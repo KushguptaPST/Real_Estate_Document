@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   ChevronLeft,
   ChevronRight,
@@ -749,10 +750,14 @@ export function PdfViewer({
           className="flex-1 overflow-auto p-6 sm:p-8 flex items-start justify-center relative bg-[#ECEEF1] shadow-inner select-text"
         >
           {loading && (
-            <div className="flex flex-col items-center gap-3 text-slate-500 text-xs py-20">
-              <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
-              <span className="font-bold text-slate-900">Rendering contractual document&hellip;</span>
-              <span className="text-[11px] text-slate-500">Parsing vector layers, text bounds &amp; OCR signatures</span>
+            <div className="w-full max-w-[540px] bg-white rounded-sm p-8 shadow-md border border-slate-200 space-y-4 my-auto">
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-11/12" />
+              <Skeleton className="h-3.5 w-5/6" />
+              <Skeleton className="h-28 w-full rounded-md my-4" />
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-4/5" />
             </div>
           )}
 

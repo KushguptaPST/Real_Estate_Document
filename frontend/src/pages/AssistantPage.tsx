@@ -6,6 +6,7 @@ import { useAssistant } from '@/hooks/useAssistant';
 import { PdfViewer } from '@/components/pdf/PdfViewer';
 import { ChatWindow } from '@/components/assistant/ChatWindow';
 import { DealHeader } from '@/components/deal/DealHeader';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   FileText,
   AlertTriangle,
@@ -196,9 +197,17 @@ export function AssistantPage() {
         {/* Left Pane: Interactive PDF Viewer (7 cols / 58% width) */}
         <div className="lg:col-span-7 h-full flex flex-col min-h-[460px] lg:min-h-0">
           {loadingDocs ? (
-            <div className="rounded-2xl border border-slate-200/90 bg-white h-full flex flex-col items-center justify-center gap-2 text-slate-500 text-xs shadow-xs">
-              <Loader2 className="h-6 w-6 animate-spin text-slate-900" />
-              <span>Loading transaction contract documents...</span>
+            <div className="rounded-2xl border border-slate-200/90 bg-white h-full p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-7 w-28 rounded-lg" />
+              </div>
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-11/12" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-32 w-full rounded-xl" />
+              <Skeleton className="h-4 w-4/5" />
             </div>
           ) : documents.length === 0 ? (
             <div className="rounded-2xl border border-slate-200/90 bg-white h-full flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3 shadow-xs">

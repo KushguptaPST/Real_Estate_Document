@@ -6,6 +6,8 @@ const PATH_LABELS: Record<string, string> = {
   properties: 'Inventory',
   knowledge: 'Knowledge RAG',
   organization: 'Team / Org',
+  billing: 'Plan & Billing',
+  onboarding: 'Channel Setup',
   deals: 'Deals & Tasks',
   upload: 'New Contract',
   audit: 'Audit Log',

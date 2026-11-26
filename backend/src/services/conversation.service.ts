@@ -107,18 +107,27 @@ export async function getOrCreateLeadThread(
   // Pick primary thread
   let primaryThread = allThreads.find((t) => t.messages.length > 0);
   if (lead.externalId?.startsWith('telegram:')) {
-    primaryThread = allThreads.find((t) => t.channel === 'WEB_CHAT') ?? primaryThread;
+    primaryThread =
+      allThreads.find((t) => t.channel === 'TELEGRAM' || t.channel === 'WEB_CHAT') ?? primaryThread;
   } else if (lead.source === 'WHATSAPP') {
     primaryThread = allThreads.find((t) => t.channel === 'WHATSAPP') ?? primaryThread;
+  } else if (lead.source === 'WEB_WIDGET') {
+    primaryThread = allThreads.find((t) => t.channel === 'WEB_WIDGET') ?? primaryThread;
+  } else if (lead.source === 'VOICE_CALL') {
+    primaryThread = allThreads.find((t) => t.channel === 'VOICE_CALL') ?? primaryThread;
   }
   primaryThread = primaryThread ?? allThreads[0];
 
   // If no thread exists yet, create an initial one
   if (!primaryThread) {
     const defaultChannel: MessageChannel = lead.externalId?.startsWith('telegram:')
-      ? 'WEB_CHAT'
+      ? 'TELEGRAM'
       : lead.source === 'WHATSAPP'
       ? 'WHATSAPP'
+      : lead.source === 'WEB_WIDGET'
+      ? 'WEB_WIDGET'
+      : lead.source === 'VOICE_CALL'
+      ? 'VOICE_CALL'
       : 'EMAIL';
 
     primaryThread = await prisma.conversationThread.create({
@@ -192,10 +201,14 @@ async function dispatchOutboundMessage(params: {
     }
 
     try {
+      const orgChannel = await prisma.organizationChannel.findUnique({
+        where: { organizationId },
+        select: { telegramBotToken: true },
+      });
       const delivered = await sendTelegramMessage(
         tgChatId,
         content,
-        { parseMode: 'HTML' }
+        { parseMode: 'HTML', botToken: orgChannel?.telegramBotToken ?? undefined }
       );
       if (delivered) {
         await prisma.conversationMessage.update({
@@ -594,8 +607,8 @@ export async function toggleAutoPilot(
       entityId: threadId,
       actor: actor ?? 'system',
       note: autoReplyEnabled
-        ? 'Assisted Draft Mode enabled. AI suggested replies are generated as drafts for review.'
-        : 'Manual Mode enabled. AI suggested replies are paused.',
+        ? 'Autopilot Mode enabled. AI sales agent replies automatically.'
+        : 'Assisted Draft Mode enabled. AI replies are queued as drafts for advisor review.',
     },
   });
 

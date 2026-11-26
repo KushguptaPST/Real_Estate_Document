@@ -13,6 +13,7 @@ import { logger } from '../utils/logger.js';
 import { prisma } from '../utils/prisma.js';
 import { runSalesAgentLoop } from './agent/agentRuntime.js';
 import { getProperties } from './propertyMatch.service.js';
+import { transcribeAudioBuffer } from './voice/transcription.service.js';
 
 interface TelegramUser {
   id: number;
@@ -55,6 +56,76 @@ let isRunning = false;
 let pollingAbortController: AbortController | null = null;
 let lastUpdateId = 0;
 
+interface OrgPollerState {
+  token: string;
+  running: boolean;
+  lastUpdateId: number;
+  controller: AbortController | null;
+}
+
+const orgPollers = new Map<string, OrgPollerState>();
+
+export async function startOrgTelegramPolling(organizationId: string, botToken: string): Promise<void> {
+  if (process.env['NODE_ENV'] === 'test' || !botToken.trim()) return;
+  const cleanToken = botToken.trim();
+
+  const prev = orgPollers.get(organizationId);
+  if (prev && prev.token === cleanToken && prev.running) {
+    return;
+  }
+  if (prev) {
+    prev.running = false;
+    prev.controller?.abort();
+  }
+
+  // Ensure any stale webhook is cleared before long-polling on localhost/dev
+  await fetch(`https://api.telegram.org/bot${cleanToken}/deleteWebhook`, {
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => {});
+
+  const state: OrgPollerState = {
+    token: cleanToken,
+    running: true,
+    lastUpdateId: 0,
+    controller: null,
+  };
+  orgPollers.set(organizationId, state);
+
+  void (async () => {
+    let consecutiveErrors = 0;
+    while (state.running) {
+      try {
+        state.controller = new AbortController();
+        const url = `https://api.telegram.org/bot${cleanToken}/getUpdates?offset=${state.lastUpdateId + 1}&timeout=20`;
+        const response = await fetch(url, { signal: state.controller.signal });
+        if (!response.ok) {
+          logger.warn(`[Telegram Org Poller] HTTP ${response.status} for org ${organizationId}: ${response.statusText}`);
+          await new Promise((r) => setTimeout(r, 4000));
+          continue;
+        }
+        const data = (await response.json()) as { ok: boolean; result: TelegramUpdate[] };
+        consecutiveErrors = 0;
+        if (data.ok && Array.isArray(data.result)) {
+          for (const update of data.result) {
+            state.lastUpdateId = Math.max(state.lastUpdateId, update.update_id);
+            if (update.message) {
+              handleIncomingMessage(update.message, organizationId, cleanToken).catch((err) => {
+                logger.error(`[Telegram Org Poller] Message error (${organizationId}): ${err.message}`);
+              });
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError' || !state.running) break;
+        consecutiveErrors++;
+        await new Promise((r) => setTimeout(r, Math.min(consecutiveErrors * 5000, 30000)));
+      }
+    }
+  })();
+
+  logger.info(`🚀 [Telegram] Active local long-polling started for org ${organizationId}`);
+}
+
 /**
  * Sends a text message to a Telegram chat.
  */
@@ -64,9 +135,10 @@ export async function sendTelegramMessage(
   options?: {
     parseMode?: 'HTML' | 'Markdown';
     replyMarkup?: any;
+    botToken?: string;
   },
 ): Promise<boolean> {
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
+  const token = options?.botToken || process.env['TELEGRAM_BOT_TOKEN'];
   if (!token) return false;
 
   try {
@@ -100,8 +172,9 @@ export async function sendTelegramMessage(
 export async function sendTelegramChatAction(
   chatId: number | string,
   action: 'typing' = 'typing',
+  botToken?: string,
 ): Promise<void> {
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
+  const token = botToken || process.env['TELEGRAM_BOT_TOKEN'];
   if (!token) return;
 
   try {
@@ -112,6 +185,100 @@ export async function sendTelegramChatAction(
     });
   } catch {
     // Ignore non-critical chat action failure
+  }
+}
+
+/**
+ * Sends a PDF/document file or URL to a Telegram chat.
+ * Handles both public HTTPS URLs and local /uploads/ paths via multipart upload.
+ */
+export async function sendTelegramDocument(
+  chatId: number | string,
+  documentUrl: string,
+  options?: {
+    filename?: string;
+    caption?: string;
+    botToken?: string;
+  },
+): Promise<boolean> {
+  const token = options?.botToken || process.env['TELEGRAM_BOT_TOKEN'];
+  if (!token || !documentUrl) return false;
+
+  try {
+    const filename = options?.filename || 'Brochure.pdf';
+    const isLocalPath =
+      documentUrl.startsWith('/uploads/') ||
+      documentUrl.startsWith('http://localhost:') ||
+      documentUrl.startsWith('http://127.0.0.1:');
+
+    if (isLocalPath) {
+      const cleanRel = documentUrl.replace(/^https?:\/\/[^/]+/, '').replace(/^\/+/, '');
+      const absPath = path.resolve(process.cwd(), cleanRel);
+      if (!fs.existsSync(absPath)) {
+        logger.warn(`[Telegram] Local document not found at ${absPath}`);
+        return false;
+      }
+      const fileBuf = fs.readFileSync(absPath);
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('document', new Blob([fileBuf], { type: 'application/pdf' }), filename);
+      if (options?.caption) formData.append('caption', options.caption.slice(0, 1024));
+
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = (await res.json()) as any;
+      if (!data.ok) {
+        logger.warn(`[Telegram] sendDocument (local) failed: ${data.description}`);
+        return false;
+      }
+      return true;
+    }
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        document: documentUrl,
+        caption: options?.caption?.slice(0, 1024),
+      }),
+    });
+    const data = (await res.json()) as any;
+    if (!data.ok) {
+      logger.warn(`[Telegram] sendDocument (url) failed: ${data.description}`);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    logger.error(`[Telegram] Error sending document: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Sends a map location pin to a Telegram chat.
+ */
+export async function sendTelegramLocation(
+  chatId: number | string,
+  latitude: number,
+  longitude: number,
+  botToken?: string,
+): Promise<boolean> {
+  const token = botToken || process.env['TELEGRAM_BOT_TOKEN'];
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendLocation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, latitude, longitude }),
+    });
+    const data = (await res.json()) as any;
+    return Boolean(data.ok);
+  } catch {
+    return false;
   }
 }
 
@@ -271,8 +438,9 @@ export async function sendTelegramVoiceMessage(
   chatId: number | string,
   text: string,
   caption?: string,
+  botToken?: string,
 ): Promise<boolean> {
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
+  const token = botToken || process.env['TELEGRAM_BOT_TOKEN'];
   if (!token) return false;
 
   try {
@@ -370,8 +538,9 @@ async function getOrCreateTelegramLead(user: TelegramUser, orgId: string) {
         externalId,
         fullName,
         email,
-        source: 'PORTAL_INQUIRY',
+        source: 'TELEGRAM',
         status: 'NEW',
+        stage: 'NEW_INBOUND',
         priority: 'MEDIUM',
       },
       include: { requirements: true },
@@ -387,12 +556,12 @@ async function getOrCreateTelegramLead(user: TelegramUser, orgId: string) {
     logger.info(`[Telegram] Created new Lead for user ${fullName} (${user.id}) in org ${orgId}`);
   }
 
-  // Find or create conversation thread for Telegram (WEB_CHAT channel)
+  // Find or create conversation thread for Telegram
   let thread = await prisma.conversationThread.findFirst({
     where: {
       leadId: lead.id,
       organizationId: orgId,
-      channel: 'WEB_CHAT',
+      channel: { in: ['TELEGRAM', 'WEB_CHAT'] },
     },
   });
 
@@ -401,7 +570,7 @@ async function getOrCreateTelegramLead(user: TelegramUser, orgId: string) {
       data: {
         leadId: lead.id,
         organizationId: orgId,
-        channel: 'WEB_CHAT',
+        channel: 'TELEGRAM',
         state: 'AUTOPILOT',
         autoReplyEnabled: true,
       },
@@ -412,22 +581,32 @@ async function getOrCreateTelegramLead(user: TelegramUser, orgId: string) {
 }
 
 /**
- * Downloads and saves user voice sample from Telegram for cloning.
+ * Downloads incoming Telegram voice note and transcribes it using Deepgram / Gemini Audio.
  */
-export async function saveIncomingVoiceSample(fileId: string, userId: number | string): Promise<string | null> {
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
-  if (!token) return null;
+export async function transcribeTelegramVoice(
+  fileId: string,
+  userId: number | string,
+  botToken?: string,
+): Promise<{ transcript: string; savedPath: string | null }> {
+  const token = botToken || process.env['TELEGRAM_BOT_TOKEN'];
+  if (!token) {
+    return { transcript: '', savedPath: null };
+  }
 
   try {
     const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
     const fileData = (await fileRes.json()) as any;
-    if (!fileData.ok || !fileData.result?.file_path) return null;
+    if (!fileData.ok || !fileData.result?.file_path) {
+      return { transcript: '', savedPath: null };
+    }
 
     const remotePath = fileData.result.file_path;
     const downloadUrl = `https://api.telegram.org/file/bot${token}/${remotePath}`;
 
     const audioRes = await fetch(downloadUrl);
-    if (!audioRes.ok) return null;
+    if (!audioRes.ok) {
+      return { transcript: '', savedPath: null };
+    }
 
     const buffer = Buffer.from(await audioRes.arrayBuffer());
     const uploadDir = path.resolve(process.cwd(), 'uploads/voice_samples');
@@ -436,35 +615,39 @@ export async function saveIncomingVoiceSample(fileId: string, userId: number | s
     }
 
     const oggPath = path.join(uploadDir, `voice_sample_${userId}.ogg`);
-    const wavPath = path.join(uploadDir, `voice_sample_${userId}.wav`);
     fs.writeFileSync(oggPath, buffer);
 
-    try {
-      execSync(`/opt/homebrew/bin/ffmpeg -y -i "${oggPath}" -ar 24000 "${wavPath}" 2>/dev/null`);
-      logger.info(`[Telegram Voice] Converted voice sample to WAV: ${wavPath}`);
-      return wavPath;
-    } catch {
-      return oggPath;
-    }
+    const result = await transcribeAudioBuffer(buffer, 'audio/ogg');
+    return { transcript: result.text, savedPath: oggPath };
   } catch (err: any) {
-    logger.error(`[Telegram Voice] Failed to save voice sample: ${err.message}`);
-    return null;
+    logger.error(`[Telegram Voice] Failed to transcribe voice message: ${err.message}`);
+    return { transcript: '', savedPath: null };
   }
+}
+
+export async function handleTelegramWebhookUpdate(
+  msg: TelegramMessage,
+  orgId: string,
+  botToken?: string,
+): Promise<void> {
+  return handleIncomingMessage(msg, orgId, botToken);
 }
 
 /**
  * Processes an incoming Telegram message through the AI Sales Agent.
  */
-async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promise<void> {
+async function handleIncomingMessage(
+  msg: TelegramMessage,
+  orgId: string,
+  botToken?: string,
+): Promise<void> {
   const chatId = msg.chat.id;
   let text = (msg.text || '').trim();
-  const isVoiceInput = Boolean(msg.voice);
-  let savedVoiceSamplePath: string | null = null;
 
   if (msg.voice) {
-    savedVoiceSamplePath = await saveIncomingVoiceSample(msg.voice.file_id, msg.from.id);
+    const { transcript } = await transcribeTelegramVoice(msg.voice.file_id, msg.from.id, botToken);
     if (!text) {
-      text = `Hello, I sent a voice note (${msg.voice.duration}s) about property options.`;
+      text = transcript || `Customer sent a voice note (${msg.voice.duration}s) asking about properties.`;
     }
   }
 
@@ -472,18 +655,13 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
 
   const { lead, thread } = await getOrCreateTelegramLead(msg.from, orgId);
 
-  // If user sent a voice sample, acknowledge and confirm audio capture
-  if (savedVoiceSamplePath) {
-    await sendTelegramMessage(
-      chatId,
-      `🎙️ <b>Voice Sample Captured (${msg.voice?.duration}s)!</b>\n\nI have saved your audio sample. Our AI will analyze your vocal timbre and tone.`,
-      { parseMode: 'HTML' }
-    );
-  }
-
   // Command: /voice
   if (text.toLowerCase() === '/voice' || text.includes('Voice Note') || text.includes('Voice Mode')) {
-    await sendTelegramMessage(chatId, `💬 <b>Text-Only Mode Active!</b>\n\nVoice notes are turned off. All property assistance and replies will be delivered as clean text messages.`, { parseMode: 'HTML' });
+    await sendTelegramMessage(
+      chatId,
+      `💬 <b>Text-Only Mode Active!</b>\n\nVoice notes are turned off. All property assistance and replies will be delivered as clean text messages.`,
+      { parseMode: 'HTML', botToken },
+    );
     return;
   }
 
@@ -511,6 +689,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     await sendTelegramMessage(chatId, resumeMsg, {
       parseMode: 'HTML',
       replyMarkup: { remove_keyboard: true },
+      botToken,
     });
     return;
   }
@@ -543,6 +722,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     await sendTelegramMessage(chatId, welcome, {
       parseMode: 'HTML',
       replyMarkup: { remove_keyboard: true },
+      botToken,
     });
     return;
   }
@@ -556,17 +736,17 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
       `• /ai or /resume — Switch back to AI mode from human takeover\n` +
       `• /help — Show this help message\n\n` +
       `You can also just talk naturally! E.g.: <i>"Looking for a 3-bed house with a backyard under ₹1.5 Cr"</i>`;
-    await sendTelegramMessage(chatId, helpText, { parseMode: 'HTML' });
+    await sendTelegramMessage(chatId, helpText, { parseMode: 'HTML', botToken });
     return;
   }
 
   // 4. Command: /properties or Quick Button
   if (text.toLowerCase() === '/properties' || text.includes('Available Properties')) {
-    await sendTelegramChatAction(chatId, 'typing');
+    await sendTelegramChatAction(chatId, 'typing', botToken);
     const allProperties = await getProperties({ organizationId: orgId });
     const properties = allProperties.slice(0, 5);
     if (!properties || properties.length === 0) {
-      await sendTelegramMessage(chatId, 'Currently no active listings found in verified inventory.');
+      await sendTelegramMessage(chatId, 'Currently no active listings found in verified inventory.', { botToken });
       return;
     }
 
@@ -582,7 +762,7 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
       listingsText += `• <b>${p.title}</b>\n  📍 ${p.address}, ${p.city}\n  💵 <b>${priceFormatted}</b> | 🛏 ${p.bedrooms} Beds | 🛁 ${p.bathrooms} Baths\n  ✨ Status: ${p.status}\n\n`;
     }
     listingsText += `<i>Would you like to schedule a tour or see more details on any of these?</i>`;
-    await sendTelegramMessage(chatId, listingsText, { parseMode: 'HTML' });
+    await sendTelegramMessage(chatId, listingsText, { parseMode: 'HTML', botToken });
     return;
   }
 
@@ -601,10 +781,10 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
   let isTyping = true;
   const typingTimer = setInterval(() => {
     if (isTyping) {
-      sendTelegramChatAction(chatId, 'typing').catch(() => {});
+      sendTelegramChatAction(chatId, 'typing', botToken).catch(() => {});
     }
   }, 4000);
-  sendTelegramChatAction(chatId, 'typing').catch(() => {});
+  sendTelegramChatAction(chatId, 'typing', botToken).catch(() => {});
 
   // Load recent messages for agent context
   const recentHistory = await prisma.conversationMessage.findMany({
@@ -628,18 +808,15 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
       customerMessage: text,
       recentMessages: formattedHistory,
       customerName: lead.fullName,
+      channel: 'TELEGRAM',
     });
   } catch (agentErr: any) {
     logger.error(`[Telegram] Error executing sales agent loop: ${agentErr.message}`);
     const firstName = lead.fullName ? lead.fullName.split(' ')[0] : 'there';
-    const lowerText = text.toLowerCase();
-    const isReady = lowerText.includes('ready') || lowerText.includes('immediate') || lowerText.includes('now');
     agentResult = {
-      response: isReady
-        ? `Hey ${firstName}! For ready-to-move options in Whitefield, Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr are both ready with complete OC. Would you like to schedule a quick walkthrough this week?`
-        : `Hey ${firstName}! For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour for late 2026. Are you looking to move in right away, or are you flexible on timeline?`,
-      suggestedFollowUps: ['Visit Prestige Shantiniketan', 'Visit Brigade Woods'],
-      reasoning: 'Conversational fallback response',
+      response: `Hey ${firstName}! Could you share your preferred location, approximate budget, and configuration (like 2BHK or 3BHK) so I can check our verified inventory for you?`,
+      suggestedFollowUps: ['Share budget & location', 'Schedule a callback'],
+      reasoning: 'DB-safe fallback response',
       executedTools: [],
       exhaustedLimit: false,
     };
@@ -655,11 +832,12 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
     const notice =
       `👤 <b>A human advisor is currently assigned to this conversation.</b>\n\n` +
       `Our advisor team has received your message: <i>"${text}"</i>.\n\n` +
-      `<i>Tap below or send <b>/ai</b> to resume chatting with the automated AI Copilot:</i>`;
+      `<i>Send <b>/ai</b> to resume chatting with the automated AI Copilot:</i>`;
 
     await sendTelegramMessage(chatId, notice, {
       parseMode: 'HTML',
       replyMarkup: { remove_keyboard: true },
+      botToken,
     });
     return;
   }
@@ -683,11 +861,12 @@ async function handleIncomingMessage(msg: TelegramMessage, orgId: string): Promi
   // Deliver text message
   await sendTelegramMessage(chatId, replyContent, {
     replyMarkup: { remove_keyboard: true },
+    botToken,
   });
 
   // Audio voice note is disabled by default (text-only mode)
   if (process.env['ENABLE_TELEGRAM_VOICE'] === 'true' && replyContent && !agentResult.suppressed) {
-    sendTelegramVoiceMessage(chatId, replyContent).catch((err) => {
+    sendTelegramVoiceMessage(chatId, replyContent, undefined, botToken).catch((err) => {
       logger.warn(`[Telegram Voice] Voice note delivery failed: ${err.message}`);
     });
   }
@@ -747,9 +926,26 @@ async function pollUpdates(orgId: string): Promise<void> {
  * Initializes and starts the Telegram Bot Service.
  */
 export async function initTelegramBot(): Promise<void> {
+  // Start per-organization Telegram bot polling on localhost/dev when public HTTPS isn't active
+  const publicUrl = process.env['APP_PUBLIC_URL'] || process.env['API_PUBLIC_URL'] || '';
+  if (!publicUrl.startsWith('https://')) {
+    try {
+      const channels = await prisma.organizationChannel.findMany({
+        where: { telegramBotToken: { not: null } },
+        select: { organizationId: true, telegramBotToken: true },
+      });
+      for (const ch of channels) {
+        if (ch.telegramBotToken) {
+          await startOrgTelegramPolling(ch.organizationId, ch.telegramBotToken);
+        }
+      }
+    } catch (err: any) {
+      logger.warn(`[Telegram] Failed loading org bot pollers: ${err.message}`);
+    }
+  }
+
   const token = process.env['TELEGRAM_BOT_TOKEN'];
   if (!token) {
-    logger.info('[Telegram] TELEGRAM_BOT_TOKEN not configured. Skipping bot start.');
     return;
   }
 
@@ -793,6 +989,12 @@ export async function initTelegramBot(): Promise<void> {
  * Stops the Telegram Bot Polling loop cleanly.
  */
 export function stopTelegramBot(): void {
+  for (const [, state] of orgPollers) {
+    state.running = false;
+    state.controller?.abort();
+  }
+  orgPollers.clear();
+
   if (!isRunning) return;
   logger.info('[Telegram] Stopping Telegram bot polling...');
   isRunning = false;

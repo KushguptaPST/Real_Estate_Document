@@ -14,7 +14,7 @@ import {
   ArrowRight,
   X,
   PhoneCall,
-  Cpu,
+  CreditCard,
 } from 'lucide-react';
 
 interface CommandItem {
@@ -52,14 +52,6 @@ const COMMAND_ITEMS: CommandItem[] = [
     path: '/campaigns',
   },
   {
-    id: 'admin',
-    title: 'Super-Admin Mission Control',
-    subtitle: 'Global multi-tenant telemetry, P&L margins, and 1-click model failover',
-    category: 'Navigation',
-    icon: Cpu,
-    path: '/admin',
-  },
-  {
     id: 'properties',
     title: 'Property Inventory',
     subtitle: 'Browse active listings, prices, and buyer match scores',
@@ -90,6 +82,14 @@ const COMMAND_ITEMS: CommandItem[] = [
     category: 'Navigation',
     icon: ShieldCheck,
     path: '/organization',
+  },
+  {
+    id: 'billing',
+    title: 'Plan & Billing',
+    subtitle: 'Upgrade subscription, manage quotas, and top up wallet',
+    category: 'Navigation',
+    icon: CreditCard,
+    path: '/billing',
   },
   {
     id: 'audit',

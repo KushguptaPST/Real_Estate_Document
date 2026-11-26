@@ -4,9 +4,11 @@ import { propertiesApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { PropertyMarketingModal } from '@/components/property/PropertyMarketingModal';
 import { PropertyCmaModal } from '@/components/property/PropertyCmaModal';
+import { BrochureUploadField } from '@/components/property/BrochureUploadField';
 import { CsvImportModal } from '@/components/CsvImportModal';
 import { formatPropertyPrice, formatPropertyPriceFull } from '@/utils/currency';
 import { useToast } from '@/context/ToastContext';
+import { CardGridSkeleton } from '@/components/ui/skeleton';
 import {
   Building2,
   Search,
@@ -22,33 +24,123 @@ import {
   FileSpreadsheet,
   TrendingUp,
   ShieldCheck,
+  FileText,
+  ExternalLink,
+  Pencil,
 } from 'lucide-react';
+
+const PRESET_PROPERTY_TYPES = [
+  { value: 'APARTMENT', label: 'Apartment / Flat' },
+  { value: 'PENTHOUSE', label: 'Penthouse' },
+  { value: 'VILLA', label: 'Villa' },
+  { value: 'DUPLEX', label: 'Duplex' },
+  { value: 'ROW_HOUSE', label: 'Row House' },
+  { value: 'STUDIO', label: 'Studio' },
+  { value: 'CONDO', label: 'Condo' },
+  { value: 'SINGLE_FAMILY', label: 'Independent House / Single Family' },
+  { value: 'TOWNHOUSE', label: 'Townhouse' },
+  { value: 'PLOT', label: 'Plot / Land' },
+  { value: 'COMMERCIAL', label: 'Commercial / Office' },
+  { value: 'RETAIL', label: 'Retail / Showroom' },
+  { value: 'FARMHOUSE', label: 'Farmhouse' },
+] as const;
 
 export function PropertiesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isOwner = user?.role === 'OWNER';
-  const [properties, setProperties] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [properties, setProperties] = useState<any[]>(() => propertiesApi.getCached() ?? []);
+  const [loading, setLoading] = useState(() => !propertiesApi.getCached());
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'AVAILABLE' | 'UNDER_CONTRACT' | 'SOLD'>('ALL');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<any | null>(null);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [selectedMarketingProperty, setSelectedMarketingProperty] = useState<any | null>(null);
   const [selectedCmaProperty, setSelectedCmaProperty] = useState<any | null>(null);
 
-  // New Property Form State
+  // Create / Edit Property Form State
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
+  const [microMarket, setMicroMarket] = useState('');
+  const [builderName, setBuilderName] = useState('');
+  const [reraNumber, setReraNumber] = useState('');
+  const [possessionStatus, setPossessionStatus] = useState('');
   const [price, setPrice] = useState<number | ''>('');
   const [bedrooms, setBedrooms] = useState<number | ''>('');
   const [bathrooms, setBathrooms] = useState<number | ''>('');
-  const [propertyType, setPropertyType] = useState('CONDO');
+  const [propertyType, setPropertyType] = useState('APARTMENT');
+  const [customPropertyType, setCustomPropertyType] = useState('');
+  const [listingStatus, setListingStatus] = useState<'AVAILABLE' | 'UNDER_CONTRACT' | 'SOLD' | 'OFF_MARKET'>('AVAILABLE');
+  const [description, setDescription] = useState('');
+  const [featuresInput, setFeaturesInput] = useState('');
+  const [brochureUrl, setBrochureUrl] = useState('');
+  const [floorPlanUrl, setFloorPlanUrl] = useState('');
+  const [mapsUrl, setMapsUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  function resetPropertyForm() {
+    setEditingProperty(null);
+    setTitle('');
+    setAddress('');
+    setCity('');
+    setMicroMarket('');
+    setBuilderName('');
+    setReraNumber('');
+    setPossessionStatus('');
+    setPrice('');
+    setBedrooms('');
+    setBathrooms('');
+    setPropertyType('APARTMENT');
+    setCustomPropertyType('');
+    setListingStatus('AVAILABLE');
+    setDescription('');
+    setFeaturesInput('');
+    setBrochureUrl('');
+    setFloorPlanUrl('');
+    setMapsUrl('');
+    setFormErrors({});
+  }
+
+  function openCreateModal() {
+    resetPropertyForm();
+    setShowAddModal(true);
+  }
+
+  function openEditModal(p: any) {
+    setEditingProperty(p);
+    setTitle(p.title || '');
+    setAddress(p.address || '');
+    setCity(p.city || '');
+    setMicroMarket(p.microMarket || '');
+    setBuilderName(p.builderName || '');
+    setReraNumber(p.reraNumber || '');
+    setPossessionStatus(p.possessionStatus || '');
+    setPrice(p.price ?? '');
+    setBedrooms(p.bedrooms ?? '');
+    setBathrooms(p.bathrooms ?? 2);
+    const incomingType = (p.propertyType || 'APARTMENT').trim();
+    const isPreset = PRESET_PROPERTY_TYPES.some((t) => t.value === incomingType);
+    if (isPreset) {
+      setPropertyType(incomingType);
+      setCustomPropertyType('');
+    } else {
+      setPropertyType('__CUSTOM__');
+      setCustomPropertyType(incomingType);
+    }
+    setListingStatus((p.status as any) || 'AVAILABLE');
+    setDescription(p.description || '');
+    setFeaturesInput(Array.isArray(p.features) ? p.features.join(', ') : '');
+    setBrochureUrl(p.brochureUrl || '');
+    setFloorPlanUrl(p.floorPlanUrl || '');
+    setMapsUrl(p.mapsUrl || '');
+    setFormErrors({});
+    setShowAddModal(true);
+  }
 
   // Debounce search keystrokes by 250ms
   useEffect(() => {
@@ -63,29 +155,38 @@ export function PropertiesPage() {
   }, [debouncedSearch, statusFilter]);
 
   async function fetchProperties() {
-    try {
+    const queryParams = {
+      search: debouncedSearch || undefined,
+      status: statusFilter !== 'ALL' ? statusFilter : undefined,
+    };
+    const cached = propertiesApi.getCached(queryParams);
+    if (cached) {
+      setProperties(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+    try {
       setError(null);
-      const data = await propertiesApi.list({
-        search: debouncedSearch || undefined,
-        status: statusFilter !== 'ALL' ? statusFilter : undefined,
-      });
+      const data = await propertiesApi.list(queryParams);
       setProperties(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load properties');
+      if (!cached) setError(err.message || 'Failed to load properties');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCreateProperty(e: React.FormEvent) {
+  async function handleSaveProperty(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!title.trim()) errs.title = 'Listing title is required';
     if (!address.trim()) errs.address = 'Street address is required';
     if (!city.trim()) errs.city = 'City / locality is required';
     if (!price || Number(price) <= 0) errs.price = 'Valid asking price is required';
-    if (!bedrooms || Number(bedrooms) <= 0) errs.bedrooms = 'Bedrooms count is required';
+    if (bedrooms === '' || Number(bedrooms) < 0) errs.bedrooms = 'Valid bedrooms count is required (0 for Studio/Plot)';
+    const resolvedPropertyType = propertyType === '__CUSTOM__' ? customPropertyType.trim() : propertyType;
+    if (!resolvedPropertyType) errs.propertyType = 'Please write a custom property type';
 
     if (Object.keys(errs).length > 0) {
       setFormErrors(errs);
@@ -93,30 +194,45 @@ export function PropertiesPage() {
       return;
     }
 
+    const features = featuresInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const payload = {
+      title: title.trim(),
+      address: address.trim(),
+      city: city.trim(),
+      microMarket: microMarket.trim() || null,
+      builderName: builderName.trim() || null,
+      reraNumber: reraNumber.trim() || null,
+      possessionStatus: possessionStatus.trim() || null,
+      price: Number(price),
+      bedrooms: Number(bedrooms),
+      bathrooms: Number(bathrooms || 2),
+      propertyType: resolvedPropertyType,
+      status: listingStatus,
+      features,
+      description: description.trim() || null,
+      brochureUrl: brochureUrl.trim() || null,
+      floorPlanUrl: floorPlanUrl.trim() || null,
+      mapsUrl: mapsUrl.trim() || null,
+    };
+
     try {
       setSubmitting(true);
-      await propertiesApi.create({
-        title: title.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        price: Number(price),
-        bedrooms: Number(bedrooms),
-        bathrooms: Number(bathrooms || 2),
-        propertyType,
-        status: 'AVAILABLE',
-      });
+      if (editingProperty?.id) {
+        await propertiesApi.update(editingProperty.id, payload);
+        toast.success('Property updated', 'Listing details and attached documents saved.');
+      } else {
+        await propertiesApi.create(payload);
+        toast.success('Property listing created successfully');
+      }
       setShowAddModal(false);
-      setTitle('');
-      setAddress('');
-      setCity('');
-      setPrice('');
-      setBedrooms('');
-      setBathrooms('');
-      setFormErrors({});
+      resetPropertyForm();
       fetchProperties();
-      toast.success('Property listing created successfully');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create property');
+      toast.error(err.message || 'Failed to save property');
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +279,7 @@ export function PropertiesPage() {
           </button>
           {isOwner ? (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={openCreateModal}
               className="btn-stripe-primary text-xs h-9 px-4 gap-1.5 cursor-pointer"
             >
               <Plus className="h-4 w-4" />
@@ -301,10 +417,7 @@ export function PropertiesPage() {
 
       {/* ── Content States ── */}
       {loading ? (
-        <div className="rounded-2xl bg-white border border-slate-200/90 flex flex-col items-center justify-center py-20 text-xs text-slate-500 shadow-xs">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-900 mb-3" />
-          <span>Loading MLS property inventory...</span>
-        </div>
+        <CardGridSkeleton count={6} />
       ) : error ? (
         <div className="banner-error text-xs">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -317,7 +430,7 @@ export function PropertiesPage() {
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             Add your first real estate listing to enable AI matching and automated CMA valuation.
           </p>
-          <button onClick={() => setShowAddModal(true)} className="btn-stripe-primary mt-4 text-xs bg-slate-900 hover:bg-slate-800 text-white">
+          <button onClick={openCreateModal} className="btn-stripe-primary mt-4 text-xs bg-slate-900 hover:bg-slate-800 text-white">
             <Plus className="h-3.5 w-3.5" /> Add First Listing
           </button>
         </div>
@@ -376,18 +489,67 @@ export function PropertiesPage() {
                   </div>
                 </div>
 
+                {/* Attached Documents & Collateral Strip */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                  {p.brochureUrl ? (
+                    <a
+                      href={p.brochureUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                    >
+                      <FileText className="h-3 w-3 shrink-0" />
+                      <span>Brochure PDF</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  ) : isOwner ? (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(p)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-dashed border-slate-300 text-[11px] font-medium text-slate-500 hover:text-slate-900 hover:border-slate-400 transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Attach Brochure PDF</span>
+                    </button>
+                  ) : null}
+                  {p.floorPlanUrl && (
+                    <a
+                      href={p.floorPlanUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <FileText className="h-3 w-3 shrink-0" />
+                      <span>Floor Plan</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                  {p.mapsUrl && (
+                    <a
+                      href={p.mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span>Map Pin</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                </div>
+
                 {/* AI Tools Action Bar */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     onClick={() => setSelectedMarketingProperty(p)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
                   >
                     <Megaphone className="h-3.5 w-3.5 text-purple-600" />
                     <span>Marketing Kit</span>
                   </button>
                   <button
                     onClick={() => setSelectedCmaProperty(p)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 py-2 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
                   >
                     <BarChart3 className="h-3.5 w-3.5 text-emerald-600" />
                     <span>CMA Valuation</span>
@@ -395,11 +557,26 @@ export function PropertiesPage() {
                 </div>
               </div>
 
-              <div className="mt-3.5 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between font-mono">
-                <span>ID: {p.id.slice(-8)}</span>
-                <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-700" /> Verified MLS
-                </span>
+              <div className="mt-3.5 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between gap-2 font-mono">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span>ID: {p.id.slice(-8)}</span>
+                  {p.reraNumber && <span className="truncate text-slate-500">&bull; RERA: {p.reraNumber}</span>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(p)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-sans font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3 text-emerald-700" /> Verified MLS
+                  </span>
+                </div>
               </div>
             </div>
           ))}
@@ -424,30 +601,37 @@ export function PropertiesPage() {
         />
       )}
 
-      {/* ── Add Property Modal ── */}
+      {/* ── Create / Edit Property Modal ── */}
       {showAddModal &&
         createPortal(
           <div
             onClick={(e) => {
-              if (e.target === e.currentTarget) setShowAddModal(false);
+              if (e.target === e.currentTarget) {
+                setShowAddModal(false);
+                resetPropertyForm();
+              }
             }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto"
           >
-            <div className="w-full max-w-lg rounded-2xl bg-white p-6 border border-slate-200 shadow-2xl space-y-4 my-auto relative">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 border border-slate-200 shadow-2xl space-y-4 my-auto relative">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Building2 className="h-4.5 w-4.5 text-emerald-700" />
-                  Add Property Listing to Inventory
+                  {editingProperty ? `Edit Listing: ${editingProperty.title}` : 'Add Property Listing to Inventory'}
                 </h2>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  type="button"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    resetPropertyForm();
+                  }}
                   className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
-              <form noValidate onSubmit={handleCreateProperty} className="space-y-3.5 text-xs">
+              <form noValidate onSubmit={handleSaveProperty} className="space-y-3.5 text-xs">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Listing Title *</label>
                   <input
@@ -555,12 +739,12 @@ export function PropertiesPage() {
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Bedrooms (BHK) *</label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       required
-                      placeholder="e.g. 3 or 4"
+                      placeholder="e.g. 3 or 0 for Plot"
                       value={bedrooms}
                       onChange={(e) => {
-                        setBedrooms(e.target.value ? Number(e.target.value) : '');
+                        setBedrooms(e.target.value === '' ? '' : Number(e.target.value));
                         if (formErrors.bedrooms) setFormErrors((p) => ({ ...p, bedrooms: '' }));
                       }}
                       className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 font-mono focus:outline-none transition-all ${
@@ -580,20 +764,175 @@ export function PropertiesPage() {
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Type</label>
                     <select
                       value={propertyType}
-                      onChange={(e) => setPropertyType(e.target.value)}
+                      onChange={(e) => {
+                        setPropertyType(e.target.value);
+                        if (formErrors.propertyType) setFormErrors((p) => ({ ...p, propertyType: '' }));
+                      }}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:outline-none font-medium"
                     >
-                      <option value="CONDO">Condo</option>
-                      <option value="SINGLE_FAMILY">Single Family</option>
-                      <option value="TOWNHOUSE">Townhouse</option>
+                      {PRESET_PROPERTY_TYPES.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                      <option value="__CUSTOM__">Other (Write Custom Type...)</option>
                     </select>
+                  </div>
+                </div>
+
+                {propertyType === '__CUSTOM__' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Custom Property Type *
+                    </label>
+                    <input
+                      type="text"
+                      value={customPropertyType}
+                      onChange={(e) => {
+                        setCustomPropertyType(e.target.value);
+                        if (formErrors.propertyType) setFormErrors((p) => ({ ...p, propertyType: '' }));
+                      }}
+                      placeholder="e.g. Service Apartment, Warehouse, Co-living, Beach Villa"
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none ${
+                        formErrors.propertyType
+                          ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500'
+                          : 'border-slate-200 focus:border-slate-900'
+                      }`}
+                    />
+                    {formErrors.propertyType && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1 font-medium">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        {formErrors.propertyType}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Bathrooms</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={bathrooms}
+                      onChange={(e) => setBathrooms(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="2"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                    <select
+                      value={listingStatus}
+                      onChange={(e) => setListingStatus(e.target.value as any)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none font-medium"
+                    >
+                      <option value="AVAILABLE">Available</option>
+                      <option value="UNDER_CONTRACT">Under Contract</option>
+                      <option value="SOLD">Sold</option>
+                      <option value="OFF_MARKET">Off Market</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Micro-Market</label>
+                    <input
+                      type="text"
+                      value={microMarket}
+                      onChange={(e) => setMicroMarket(e.target.value)}
+                      placeholder="e.g. Whitefield"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Builder / Dev</label>
+                    <input
+                      type="text"
+                      value={builderName}
+                      onChange={(e) => setBuilderName(e.target.value)}
+                      placeholder="e.g. Brigade Group"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">RERA Number</label>
+                    <input
+                      type="text"
+                      value={reraNumber}
+                      onChange={(e) => setReraNumber(e.target.value)}
+                      placeholder="PRM/KA/RERA/..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Possession Status</label>
+                    <input
+                      type="text"
+                      value={possessionStatus}
+                      onChange={(e) => setPossessionStatus(e.target.value)}
+                      placeholder="Ready to Move / Dec 2027"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Features (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={featuresInput}
+                    onChange={(e) => setFeaturesInput(e.target.value)}
+                    placeholder="Clubhouse, East Facing, Covered Parking, EV Charging"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                  <textarea
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Key highlights for AI sales advisor..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                  />
+                </div>
+
+                <BrochureUploadField value={brochureUrl} onChange={setBrochureUrl} />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Floor Plan URL (optional)</label>
+                    <input
+                      type="url"
+                      value={floorPlanUrl}
+                      onChange={(e) => setFloorPlanUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Google Maps Link (optional)</label>
+                    <input
+                      type="url"
+                      value={mapsUrl}
+                      onChange={(e) => setMapsUrl(e.target.value)}
+                      placeholder="https://maps.google.com/..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
+                    />
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setShowAddModal(false)}
+                    onClick={() => {
+                      setShowAddModal(false);
+                      resetPropertyForm();
+                    }}
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     Cancel
@@ -604,7 +943,7 @@ export function PropertiesPage() {
                     className="rounded-xl bg-[#0A0A0A] px-4 py-2 text-xs font-bold text-white hover:bg-black transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
                   >
                     {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    Save Listing
+                    {editingProperty ? 'Update Listing' : 'Save Listing'}
                   </button>
                 </div>
               </form>

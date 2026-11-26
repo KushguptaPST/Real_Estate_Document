@@ -582,15 +582,22 @@ describe('Phase 1A: Lead Ownership, Atomic Claiming, Assignment History & Pool M
       expect(unassignedIds).toContain(unassignedLead.id);
       expect(unassignedIds).not.toContain(assignedLead.id);
 
-      // 2. Assigned user query
-      const assignedRes = await request(app)
+      // 2. Assigned user query (OWNER sees team member leads; AGENT cannot query other advisor's private leads)
+      const ownerAssignedRes = await request(app)
+        .get(`/api/leads?assignedUserId=${agentA2.user.id}`)
+        .set('Authorization', `Bearer ${ownerA.token}`);
+
+      expect(ownerAssignedRes.status).toBe(200);
+      const ownerAssignedIds = ownerAssignedRes.body.map((l: any) => l.id);
+      expect(ownerAssignedIds).toContain(assignedLead.id);
+      expect(ownerAssignedIds).not.toContain(unassignedLead.id);
+
+      const peerAssignedRes = await request(app)
         .get(`/api/leads?assignedUserId=${agentA2.user.id}`)
         .set('Authorization', `Bearer ${agentA1.token}`);
 
-      expect(assignedRes.status).toBe(200);
-      const assignedIds = assignedRes.body.map((l: any) => l.id);
-      expect(assignedIds).toContain(assignedLead.id);
-      expect(assignedIds).not.toContain(unassignedLead.id);
+      expect(peerAssignedRes.status).toBe(200);
+      expect(peerAssignedRes.body.map((l: any) => l.id)).not.toContain(assignedLead.id);
     });
   });
 });

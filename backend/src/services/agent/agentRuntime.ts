@@ -1,19 +1,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Agent Runtime — Phase 2A Bounded Execution Loop & Human Takeover Guards
+// Agent Runtime — Multi-Agent Bounded Execution Loop, Guardrails & Traceability
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { GoogleGenAI } from '@google/genai';
-import { type UserRole } from '@prisma/client';
+import {
+  type AgentSpecialist,
+  type LeadLifecycleStage,
+  type MessageChannel,
+  type UserRole,
+} from '@prisma/client';
 import { prisma } from '../../utils/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { requireOrgId } from '../../utils/tenant.js';
+import { getPlatformConfig } from '../platformConfig.service.js';
+import { recordGeminiCost } from '../costTracker.service.js';
 import {
   AGENT_FUNCTION_DECLARATIONS,
   executeAgentTool,
   type TrustedAgentContext,
 } from './agentTools.js';
+import {
+  computeNextStage,
+  isExplicitHumanRequest,
+  isOptOutOrDnd,
+  recordAgentRunTrace,
+  routeToSpecialist,
+  verifyAgentOutput,
+} from './orchestrator.js';
 
 export const MAX_AGENT_ROUNDS = 5;
+
+export { isExplicitHumanRequest };
 
 export interface RunSalesAgentParams {
   leadId: string;
@@ -26,6 +43,7 @@ export interface RunSalesAgentParams {
   recentMessages?: Array<{ senderType: string; content: string }>;
   aiClient?: any;
   customerName?: string;
+  channel?: MessageChannel;
 }
 
 export interface ExecutedToolRecord {
@@ -46,68 +64,64 @@ export interface SalesAgentResult {
   siteVisitBooking?: unknown;
   escalation?: unknown;
   followUpProposal?: unknown;
+  collateralSent?: unknown;
+  matchedProperties?: Array<{
+    id: string;
+    title: string;
+    city: string;
+    price: number;
+    bedrooms: number;
+    brochureUrl?: string | null;
+    mapsUrl?: string | null;
+  }>;
+  specialist?: AgentSpecialist;
+  stage?: LeadLifecycleStage;
+  guardrailFlags?: string[];
   exhaustedLimit: boolean;
   suppressed?: boolean;
   suppressedReason?: string;
 }
 
-export function isExplicitHumanRequest(text: string): boolean {
-  if (!text) return false;
-  const lower = text.toLowerCase().trim();
-  return (
-    /\b(talk|speak|connect|reach)\b.*\b(human|person|agent|advisor|representative|specialist|manager)\b/i.test(lower) ||
-    /\b(human|real person|advisor|manager)\b.*\b(please|now|immediately|instead)\b/i.test(lower) ||
-    /\b(want|need|prefer|demand)\b.*\b(human|person|advisor|agent)\b/i.test(lower) ||
-    /\b(transfer|hand over|escalate)\b.*\b(to|me)?\b/i.test(lower) ||
-    /\b(stop bot|no ai|stop ai|human please)\b/i.test(lower)
-  );
+const BASE_SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner representing a brokerage channel partner.
+You speak warmly, concisely, and authentically like an experienced human property consultant.
+NEVER invent properties, prices, RERA IDs, possession dates, or amenities that were not returned by a tool.
+
+CORE OPERATING RULES:
+1. QUALIFICATION FIRST:
+   - Discover the buyer's preferred micro-market/location, budget ceiling, configuration (e.g., 2BHK/3BHK/villa), and move-in timeline.
+   - Call "propose_buyer_requirements" whenever the buyer states preferences.
+   - Call "evaluate_buyer_qualification" once preferences are known.
+2. VERIFIED INVENTORY & ELASTIC MATCHING:
+   - Always call "search_properties" before recommending any property.
+   - Pitch at most 1 or 2 verified properties by exact title and price. If exact matches are empty, suggest the nearby/stretch options returned by "search_properties".
+3. COLLATERAL & KNOWLEDGE:
+   - If the buyer asks for a brochure, floor plan, or location pin, call "send_property_collateral" with the verified propertyId.
+   - If the buyer asks about RERA, approvals, payment plans, or specs, call "query_project_knowledge".
+4. SITE VISIT LOCK & ADVISOR HANDOFF:
+   - Offer 2 specific slots using "check_site_visit_availability".
+   - ONLY call "book_site_visit" after the buyer explicitly agrees to a date and time.
+   - Call "escalate_to_human" when the buyer asks for a human advisor, requests binding price cuts/discounts, or raises legal/financing disputes.
+5. NO BULLET ESSAYS:
+   - Keep replies conversational, plain text, and end with strictly ONE clear follow-up question.`;
+
+function formatCurrencyShort(amount: number, currency = 'INR'): string {
+  if (currency === 'USD') {
+    if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2).replace(/\.00$/, '')}M`;
+    if (amount >= 1_000) return `$${Math.round(amount / 1_000)}K`;
+    return `$${amount.toLocaleString('en-US')}`;
+  }
+  if (amount >= 10_000_000) {
+    return `₹${(amount / 10_000_000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')} Cr`;
+  }
+  if (amount >= 100_000) {
+    return `₹${(amount / 100_000).toFixed(2).replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1')} L`;
+  }
+  return `₹${amount.toLocaleString('en-IN')}`;
 }
 
-const SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner chatting 1-on-1 directly with a home buyer on WhatsApp/Telegram.
-You talk like a real human senior property consultant—warm, direct, authentic, and concise.
-You NEVER sound scripted, robotic, or like a corporate brochure.
-
-CRITICAL CONVERSATIONAL RULES (HOW REAL HUMANS TALK):
-1. TALK WITH THE CLIENT — KEEP IT SHORT & PUNCHY:
-   - Maximum 2 to 4 conversational sentences total (strictly under 60 words).
-   - Never write essays, walls of text, or marketing monologues. A real person texting or leaving a quick voice memo does not talk in paragraphs.
-   - Address the client naturally by their first name (e.g., "Hey Badal," or "Hi Badal,").
-
-2. CASUAL, AUTHENTIC ADVISORY EXPERTISE:
-   - Speak like an expert friend who knows the local market inside out:
-     e.g., "3BHK in Whitefield around 2 Cr is a solid budget—you have good options with top builders."
-   - DO NOT recite promotional or Wikipedia fluff (avoid: "one of Bengaluru's most dynamic corridors with operational Purple Line Metro").
-   - Mention at most 1 or 2 options simply by project name and price:
-     e.g., "Right now I have a ready-to-move 3BHK in Prestige Shantiniketan around 2.15 Cr, and Brigade Woods on ECC Road at 1.85 Cr."
-   - Do NOT dump full specifications (skip sq ft, modular kitchen, parking, Olympic pool) unless the client explicitly asks for details.
-
-3. ALWAYS BOUNCE THE BALL BACK (TWO-WAY DIALOGUE):
-   - End with ONE simple, natural conversational question to find out what they care about:
-     e.g., "Are you looking to move in right away, or open to under-construction projects like Godrej too?"
-     or "Do you need something walking distance to ITPL, or do you prefer a quieter residential lane?"
-   - Never interrogate with multiple questions. Ask just ONE natural question.
-
-4. VOICE NOTE FRIENDLY:
-   - The client will hear this spoken aloud as a voice note.
-   - It must sound like a real, natural voice message from a trusted private advisor.
-   - NO bullet points, NO asterisks, NO markdown headers, NO numbered lists. Pure conversational English.
-
-5. GROUNDED TOOLS & QUALIFICATION:
-   - Always call "search_properties" to check actual database inventory.
-   - Call "propose_buyer_requirements" to record their preferences quietly in the CRM.
-   - Call "evaluate_buyer_qualification" once their preferences are known.
-   - Only book site visits if the client explicitly confirms date and time.
-   - Call "escalate_to_human" if the buyer explicitly asks for a human advisor, if non-standard discounts are demanded, or if sensitive legal/financing issues arise.
-
-6. NEVER PRESENT "OPTIONS" OR LISTS:
-   - Never say "Here are some options" or treat this like a multiple-choice menu.
-   - Never give buttons, numbers, or bulleted choices. Just talk directly with the client in a real, continuous dialogue.`;
-
 /**
- * Consultative Senior Advisor Fallback:
- * If cloud LLM is temporarily unreachable (e.g. rate limit, connectivity),
- * provides an authentic, conversational response grounded in verified database inventory
- * rather than a generic robotic placeholder.
+ * Strictly DB-grounded fallback when the cloud LLM is unavailable or API key is unset.
+ * Never invents hardcoded project names—only references verified properties in the org's DB.
  */
 async function generateConsultativeFallback(params: {
   customerMessage: string;
@@ -116,82 +130,73 @@ async function generateConsultativeFallback(params: {
   executedTools: ExecutedToolRecord[];
   reason: string;
   customerName?: string;
+  currency?: string;
 }): Promise<SalesAgentResult> {
-  const { customerMessage, organizationId, executedTools, reason, customerName } = params;
+  const { customerMessage, organizationId, executedTools, reason, customerName, currency = 'INR' } = params;
   const lower = customerMessage.toLowerCase();
-  const firstName = customerName ? customerName.split(' ')[0] : 'there';
-  const greeting = firstName && firstName !== 'there' ? `Hey ${firstName}!` : 'Hey!';
-
-  const isBangalore =
-    lower.includes('whitefield') ||
-    lower.includes('bengaluru') ||
-    lower.includes('bangalore') ||
-    lower.includes('bhk') ||
-    lower.includes('crore') ||
-    lower.includes('lakh');
+  const firstName = customerName ? customerName.split(' ')[0] : '';
+  const greeting = firstName ? `Hey ${firstName},` : 'Hey!';
 
   const bedroomsMatch = customerMessage.match(/(\d+)\s*(?:bhk|bed|bedroom)/i);
-  const requestedBedrooms = bedroomsMatch
-    ? parseInt(bedroomsMatch[1], 10)
-    : lower.includes('3bhk')
-    ? 3
-    : lower.includes('2bhk')
-    ? 2
-    : undefined;
+  const requestedBedrooms = bedroomsMatch ? parseInt(bedroomsMatch[1]!, 10) : undefined;
 
   const matchedProps = await prisma.property.findMany({
     where: {
       organizationId,
       status: 'AVAILABLE',
       ...(requestedBedrooms ? { bedrooms: { gte: requestedBedrooms } } : {}),
-      ...(isBangalore ? { city: { contains: 'Whitefield', mode: 'insensitive' } } : {}),
     },
     take: 2,
-    orderBy: { price: 'asc' },
+    orderBy: { createdAt: 'desc' },
   });
 
   let response = '';
   const suggestedFollowUps: string[] = [];
 
-  if (isBangalore || lower.includes('whitefield')) {
-    if (lower.includes('ready') || lower.includes('immediate') || lower.includes('right away') || lower.includes('now')) {
-      response = `${greeting} For ready-to-move options in Whitefield, Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr are both ready with full OC. Would you like to do a quick walkthrough of Prestige or Brigade this week?`;
-      suggestedFollowUps.push('Visit Prestige Shantiniketan');
-      suggestedFollowUps.push('Visit Brigade Woods');
-      suggestedFollowUps.push('Send floor plan brochure');
-    } else {
-      response = `${greeting} For a 3BHK in Whitefield around 2 Cr, you have some solid options. Right now I have ready units in Prestige Shantiniketan at ₹2.15 Cr and Brigade Woods at ₹1.85 Cr, plus Godrej Splendour if you are open to late 2026. Are you looking to move in right away, or are you flexible on timeline?`;
-      suggestedFollowUps.push('Looking to move in immediately');
-      suggestedFollowUps.push('Flexible on timeline');
-      suggestedFollowUps.push('Tell me about Prestige Shantiniketan');
+  if (matchedProps.length > 0) {
+    const summaryList = matchedProps
+      .map((p) => `${p.title} in ${p.microMarket || p.city} at ${formatCurrencyShort(p.price, currency)}`)
+      .join(' and ');
+    const wantsBrochure = /\b(brochure|pdf|floor\s*plan|details)\b/i.test(lower);
+
+    response = wantsBrochure
+      ? `${greeting} we have ${summaryList} available right now. Could you confirm your target budget and preferred move-in timeline so I can share the right floor plan and schedule a visit?`
+      : `${greeting} thanks for reaching out! From our active inventory we currently have ${summaryList}. Which micro-market and budget range are you targeting so I can narrow this down for you?`;
+
+    for (const p of matchedProps) {
+      suggestedFollowUps.push(`Send brochure for ${p.title}`);
     }
+    suggestedFollowUps.push('Schedule a site visit');
   } else {
-    if (matchedProps.length > 0) {
-      const p1 = matchedProps[0];
-      response = `${greeting} I'm reviewing our verified inventory for you—standout options like ${p1.title} are currently available. Are you looking to relocate immediately, or exploring options for later?`;
-      suggestedFollowUps.push('Looking to move soon');
-      suggestedFollowUps.push('Exploring for later');
-    } else {
-      response = `${greeting} I am pulling up our verified listings matching your preferences right now. Are you looking to move in immediately, or is your timeline flexible?`;
-      suggestedFollowUps.push('Immediate move-in');
-      suggestedFollowUps.push('Flexible timeline');
-    }
+    response = `${greeting} thanks for reaching out! Could you share your preferred location, approximate budget, and configuration (like 2BHK or 3BHK) so our advisor can match the best options for you?`;
+    suggestedFollowUps.push('Share budget & configuration');
+    suggestedFollowUps.push('Request advisor callback');
   }
 
   return {
     response,
-    suggestedFollowUps,
-    reasoning: `Conversational advisor response: ${reason}`,
+    suggestedFollowUps: suggestedFollowUps.slice(0, 3),
+    reasoning: `DB-grounded fallback response: ${reason}`,
     executedTools,
+    matchedProperties: matchedProps.map((p) => ({
+      id: p.id,
+      title: p.title,
+      city: p.city,
+      price: p.price,
+      bedrooms: p.bedrooms,
+      brochureUrl: p.brochureUrl,
+      mapsUrl: p.mapsUrl,
+    })),
     exhaustedLimit: false,
   };
 }
 
 /**
- * Executes the bounded multi-turn agent execution loop with strict safety,
- * takeover guards, and tool calling.
+ * Executes the bounded multi-agent execution loop with specialist routing,
+ * takeover & DND guards, verifiable tools, and persistent trace logging.
  */
 export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<SalesAgentResult> {
+  const startTime = Date.now();
   const { leadId, threadId, customerMessage, recentMessages = [] } = params;
   const orgId = requireOrgId(params.organizationId);
 
@@ -204,14 +209,31 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     threadId,
   };
 
-  // 1. Mandatory Human Takeover Guard: Recheck active thread state from database
-  const thread = await prisma.conversationThread.findFirst({
-    where: { id: threadId, organizationId: orgId },
-  });
+  // 1. Mandatory Thread & Lead Verification
+  const [thread, leadRecord, orgChannel] = await Promise.all([
+    prisma.conversationThread.findFirst({
+      where: { id: threadId, organizationId: orgId },
+    }),
+    prisma.lead.findFirst({
+      where: { id: leadId, organizationId: orgId },
+      include: { requirements: true, _count: { select: { matches: true } } },
+    }),
+    prisma.organizationChannel.findUnique({
+      where: { organizationId: orgId },
+      select: { defaultCurrency: true },
+    }),
+  ]);
 
   if (!thread) {
     throw new Error(`Conversation thread ${threadId} not found in organization ${orgId}`);
   }
+  if (!leadRecord) {
+    throw new Error(`Lead ${leadId} not found in organization ${orgId}`);
+  }
+
+  const effectiveChannel: MessageChannel = params.channel ?? thread.channel;
+  const stageBefore: LeadLifecycleStage = leadRecord.stage ?? 'NEW_INBOUND';
+  const currency = orgChannel?.defaultCurrency ?? 'INR';
 
   if (
     thread.state === 'HUMAN_TAKEOVER' ||
@@ -225,13 +247,51 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       suggestedFollowUps: [],
       reasoning: 'Suppressed due to active human takeover or paused state',
       executedTools: [],
+      stage: stageBefore,
       exhaustedLimit: false,
       suppressed: true,
-      suppressedReason: `Human takeover is active. Automated agent execution is disabled.`,
+      suppressedReason: 'Human takeover is active. Automated agent execution is disabled.',
     };
   }
 
-  // 1b. Fast-Path Deterministic Safeguard: Explicit request for a human advisor
+  // 1b. Deterministic DND / Opt-Out Safeguard
+  if (isOptOutOrDnd(customerMessage)) {
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { doNotCall: true, stage: 'DISQUALIFIED', status: 'LOST' },
+    });
+    await prisma.conversationThread.update({
+      where: { id: threadId },
+      data: { state: 'CLOSED', autoReplyEnabled: false },
+    });
+
+    await recordAgentRunTrace({
+      organizationId: orgId,
+      leadId,
+      threadId,
+      channel: effectiveChannel,
+      specialist: 'ESCALATION',
+      intent: 'OPTOUT_DND',
+      stageBefore,
+      stageAfter: 'DISQUALIFIED',
+      toolsExecuted: [],
+      guardrailFlags: ['DND_OPT_OUT_ENFORCED'],
+      latencyMs: Date.now() - startTime,
+    });
+
+    return {
+      response: "Understood—I have marked your number as do-not-contact and won't message or call you further. Wishing you all the best!",
+      suggestedFollowUps: [],
+      reasoning: 'Deterministic opt-out / DND compliance safeguard triggered.',
+      executedTools: [],
+      specialist: 'ESCALATION',
+      stage: 'DISQUALIFIED',
+      guardrailFlags: ['DND_OPT_OUT_ENFORCED'],
+      exhaustedLimit: false,
+    };
+  }
+
+  // 1c. Fast-Path Deterministic Safeguard: Explicit request for a human advisor
   if (isExplicitHumanRequest(customerMessage)) {
     logger.info(`[Agent Runtime] Fast-path explicit human request detected for lead ${leadId}`);
     const escalationResult = await executeAgentTool(
@@ -246,42 +306,98 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       trustedContext,
     );
 
+    const executed = [
+      {
+        toolName: 'escalate_to_human',
+        status: escalationResult.status,
+        durationMs: escalationResult.durationMs,
+      },
+    ];
+
+    await recordAgentRunTrace({
+      organizationId: orgId,
+      leadId,
+      threadId,
+      channel: effectiveChannel,
+      specialist: 'ESCALATION',
+      intent: 'HUMAN_REQUEST',
+      stageBefore,
+      stageAfter: 'ADVISOR_HANDOFF',
+      toolsExecuted: executed,
+      guardrailFlags: ['FAST_PATH_HUMAN_HANDOFF'],
+      latencyMs: Date.now() - startTime,
+    });
+
     return {
       response:
-        "I understand and have alerted our advisor team. A dedicated human advisor has been notified and will reach out to you directly.",
+        effectiveChannel === 'VOICE_CALL'
+          ? 'Sure thing, let me connect you directly with our senior property advisor now.'
+          : 'I understand and have alerted our senior advisor team with your details. A human advisor will reach out to you directly.',
       suggestedFollowUps: ['A dedicated advisor will follow up with you shortly.'],
       reasoning: 'Fast-path escalation: buyer explicitly requested a human advisor.',
-      executedTools: [
-        {
-          toolName: 'escalate_to_human',
-          status: escalationResult.status,
-          durationMs: escalationResult.durationMs,
-        },
-      ],
+      executedTools: executed,
       escalation: escalationResult.data,
+      specialist: 'ESCALATION',
+      stage: 'ADVISOR_HANDOFF',
+      guardrailFlags: ['FAST_PATH_HUMAN_HANDOFF'],
       exhaustedLimit: false,
     };
   }
 
-  // 2. Verified Model Configuration & API Key Fallback Contract
-  const apiKey = process.env['GEMINI_API_KEY'];
-  const configuredModel = process.env['GEMINI_MODEL'] ?? 'gemini-3.5-flash';
+  // 2. Supervisor Routing to Specialist Role
+  const directive = routeToSpecialist({
+    organizationId: orgId,
+    leadId,
+    threadId,
+    channel: effectiveChannel,
+    currentStage: stageBefore,
+    customerMessage,
+    hasRequirements: Boolean(leadRecord.requirements),
+    matchedCount: leadRecord._count.matches,
+  });
 
+  // 3. Verified Model Configuration & API Key Fallback Contract
+  const apiKey = process.env['GEMINI_API_KEY'];
+  const platformCfg = await getPlatformConfig().catch(() => null);
+  const configuredModel = platformCfg?.primaryLlmModel || process.env['GEMINI_MODEL'] || 'gemini-2.5-flash';
   const ai = params.aiClient ?? (apiKey ? new GoogleGenAI({ apiKey }) : null);
+  const clientFullName = params.customerName || leadRecord.fullName || '';
+  const clientFirstName = clientFullName.split(' ')[0] || '';
 
   if (!ai) {
-    logger.warn('[Agent Runtime] GEMINI_API_KEY not set. Using safe consultative fallback.');
-    return await generateConsultativeFallback({
+    logger.warn('[Agent Runtime] GEMINI_API_KEY not set. Using DB-grounded consultative fallback.');
+    const fallback = await generateConsultativeFallback({
       customerMessage,
       leadId,
       organizationId: orgId,
       executedTools: [],
       reason: 'API key missing from environment',
+      customerName: clientFullName,
+      currency,
     });
+    await recordAgentRunTrace({
+      organizationId: orgId,
+      leadId,
+      threadId,
+      channel: effectiveChannel,
+      specialist: directive.specialist,
+      intent: directive.intent,
+      stageBefore,
+      stageAfter: stageBefore,
+      toolsExecuted: [],
+      guardrailFlags: ['NO_API_KEY_DB_FALLBACK'],
+      latencyMs: Date.now() - startTime,
+      modelUsed: 'db-fallback',
+    });
+    return {
+      ...fallback,
+      specialist: directive.specialist,
+      stage: stageBefore,
+      guardrailFlags: ['NO_API_KEY_DB_FALLBACK'],
+    };
   }
 
-  // 3. Prepare Multi-turn Conversation Contents with Untrusted-Data Delimiters
-  // Map recent messages to Gemini content format (bounded to last 10 messages)
+  // 4. Prepare Multi-turn Conversation Contents with Untrusted-Data Delimiters
   const historyContents: any[] = recentMessages.slice(-10).map((m) => ({
     role: m.senderType === 'CUSTOMER' ? 'user' : 'model',
     parts: [
@@ -306,14 +422,6 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     },
   ];
 
-
-  const leadRecord = await prisma.lead.findUnique({
-    where: { id: leadId },
-    select: { fullName: true },
-  });
-  const clientFullName = params.customerName || leadRecord?.fullName || '';
-  const clientFirstName = clientFullName.split(' ')[0] || '';
-
   const executedTools: ExecutedToolRecord[] = [];
   let capturedTaskProposal: unknown = null;
   let capturedRequirementProposal: unknown = null;
@@ -322,12 +430,21 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   let capturedSiteVisitBooking: unknown = null;
   let capturedEscalation: unknown = null;
   let capturedFollowUpProposal: unknown = null;
+  let capturedCollateral: unknown = null;
+  const verifiedPropertiesMap = new Map<
+    string,
+    { id: string; title: string; city: string; price: number; bedrooms: number; brochureUrl?: string | null; mapsUrl?: string | null }
+  >();
+
   let finalResponseText = '';
   let exhaustedLimit = false;
+  let modelUsed = configuredModel;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
-  // 4. Bounded Agent Loop (hard maximum 5 rounds)
+  // 5. Bounded Agent Loop (hard maximum 5 rounds)
   for (let round = 1; round <= MAX_AGENT_ROUNDS; round++) {
-    logger.info(`[Agent Runtime] Round ${round}/${MAX_AGENT_ROUNDS} for Lead ${leadId}`);
+    logger.info(`[Agent Runtime] [${directive.specialist}] Round ${round}/${MAX_AGENT_ROUNDS} for Lead ${leadId}`);
 
     // Re-verify takeover guard before every model invocation
     const currentThread = await prisma.conversationThread.findUnique({
@@ -341,21 +458,24 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
         suggestedFollowUps: [],
         reasoning: 'Human takeover engaged during execution',
         executedTools,
+        specialist: directive.specialist,
+        stage: stageBefore,
         exhaustedLimit: false,
         suppressed: true,
         suppressedReason: 'Human takeover activated mid-execution',
       };
     }
 
+    const effectivePrimary =
+      configuredModel === 'gemini-2.5-flash' ? 'gemini-3-flash-preview' : configuredModel;
     const candidateModels = Array.from(
-      new Set([
-        'gemini-2.5-flash-lite',
-        configuredModel,
-        'gemini-flash-lite-latest',
-        'gemini-3.8-flash',
-        'gemini-3.1-flash-lite',
-      ])
+      new Set([effectivePrimary, 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash-lite']),
     );
+
+    const forceMatcherToolOnRound1 =
+      round === 1 &&
+      executedTools.length === 0 &&
+      (directive.specialist === 'MATCHER' || directive.intent === 'COLLATERAL_REQUEST');
 
     let response: any;
     let lastModelErr: any = null;
@@ -364,28 +484,51 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout after 20000ms on ${modelCandidate}`)), 20000)
+            setTimeout(() => reject(new Error(`Timeout after 20000ms on ${modelCandidate}`)), 20000),
           );
           response = await Promise.race([
             ai.models.generateContent({
               model: modelCandidate,
               contents,
               config: {
-                systemInstruction: `${SYSTEM_INSTRUCTION}
+                systemInstruction: `${BASE_SYSTEM_INSTRUCTION}
+
+${directive.systemAddendum}
 
 ACTIVE CONVERSATION CONTEXT:
-- Client Name: "${clientFirstName || 'Client'}" (Address them casually and warmly, e.g. "Hey ${clientFirstName || 'there'},")
+- Client Name: "${clientFirstName || 'Client'}"
 - Current Date: "${new Date().toISOString().slice(0, 10)}"
-- Authorized Lead ID: "${leadId}"
-CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with ${clientFirstName || 'the client'}. Keep your message SHORT, CONVERSATIONAL, and DIRECT (maximum 2 to 4 sentences, strictly under 60 words). DO NOT write an essay or a marketing brochure.`,
+- Lead Lifecycle Stage: "${stageBefore}"
+- Currency: "${currency}"
+- Authorized Lead ID: "${leadId}"`,
                 tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
+                ...(forceMatcherToolOnRound1
+                  ? {
+                      toolConfig: {
+                        functionCallingConfig: {
+                          mode: 'ANY' as any,
+                          allowedFunctionNames: [
+                            'search_properties',
+                            'send_property_collateral',
+                            'propose_buyer_requirements',
+                          ],
+                        },
+                      },
+                    }
+                  : {}),
                 temperature: 0.3,
               },
             }),
             timeoutPromise,
           ]);
           if (response) {
+            modelUsed = modelCandidate;
             lastModelErr = null;
+            const usage = (response as any).usageMetadata;
+            if (usage) {
+              totalInputTokens += Number(usage.promptTokenCount || 0);
+              totalOutputTokens += Number(usage.candidatesTokenCount || 0);
+            }
             break;
           }
         } catch (candidateErr: any) {
@@ -397,27 +540,46 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
             continue;
           }
           logger.warn(
-            `[Agent Runtime] Candidate model ${modelCandidate} failed on round ${round} (attempt ${attempt}): ${msg.slice(0, 120)}. Attempting next candidate...`,
+            `[Agent Runtime] Candidate model ${modelCandidate} failed on round ${round} (attempt ${attempt}): ${msg.slice(0, 120)}`,
           );
           break;
         }
       }
-      if (response && !lastModelErr) {
-        break;
-      }
+      if (response && !lastModelErr) break;
     }
 
     if (!response || lastModelErr) {
       const errMessage = lastModelErr instanceof Error ? lastModelErr.message : String(lastModelErr);
       logger.error(`[Agent Runtime] All candidate models failed on round ${round}: ${errMessage}`);
-      return await generateConsultativeFallback({
+      const fallback = await generateConsultativeFallback({
         customerMessage,
         leadId,
         organizationId: orgId,
         executedTools,
         reason: `Model cascade error: ${errMessage.slice(0, 100)}`,
         customerName: clientFullName,
+        currency,
       });
+      await recordAgentRunTrace({
+        organizationId: orgId,
+        leadId,
+        threadId,
+        channel: effectiveChannel,
+        specialist: directive.specialist,
+        intent: directive.intent,
+        stageBefore,
+        stageAfter: stageBefore,
+        toolsExecuted: executedTools,
+        guardrailFlags: ['MODEL_CASCADE_FALLBACK'],
+        latencyMs: Date.now() - startTime,
+        modelUsed: 'db-fallback',
+      });
+      return {
+        ...fallback,
+        specialist: directive.specialist,
+        stage: stageBefore,
+        guardrailFlags: ['MODEL_CASCADE_FALLBACK'],
+      };
     }
 
     const functionCalls = response.functionCalls;
@@ -427,16 +589,13 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
         `[Agent Runtime] Model requested ${functionCalls.length} function call(s): ${functionCalls.map((f: any) => f.name).join(', ')}`,
       );
 
-      // Append model's turn with its function call(s)
       const modelContent = response.candidates?.[0]?.content ?? {
         role: 'model',
         parts: functionCalls.map((f: any) => ({ functionCall: f })),
       };
       contents.push(modelContent);
 
-      // Execute each requested tool with safe server boundaries
       for (const call of functionCalls) {
-        // Safe contextual normalization: If model omits leadId or provides a placeholder, bind to trustedContext.leadId
         const normalizedArgs = typeof call.args === 'object' && call.args !== null ? { ...call.args } : {};
         if (!normalizedArgs.leadId || normalizedArgs.leadId === '123' || normalizedArgs.leadId === 'leadId' || normalizedArgs.leadId === 'current') {
           normalizedArgs.leadId = trustedContext.leadId;
@@ -449,6 +608,22 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
           durationMs: toolResult.durationMs,
         });
 
+        if (call.name === 'search_properties' && toolResult.status === 'SUCCESS') {
+          const d = toolResult.data as any;
+          for (const p of [...(d?.properties ?? []), ...(d?.nearbyOrStretchOptions ?? [])]) {
+            if (p?.id && p?.title) {
+              verifiedPropertiesMap.set(p.id, {
+                id: p.id,
+                title: p.title,
+                city: p.city,
+                price: p.price,
+                bedrooms: p.bedrooms,
+                brochureUrl: p.brochureUrl,
+                mapsUrl: p.mapsUrl,
+              });
+            }
+          }
+        }
         if (call.name === 'propose_follow_up_task' && toolResult.status === 'SUCCESS') {
           capturedTaskProposal = (toolResult.data as any)?.proposal ?? toolResult.data;
         }
@@ -467,12 +642,31 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
         if (call.name === 'plan_lead_follow_up' && toolResult.status === 'SUCCESS') {
           capturedFollowUpProposal = toolResult.data;
         }
+        if (call.name === 'send_property_collateral' && toolResult.status === 'SUCCESS') {
+          capturedCollateral = toolResult.data;
+        }
         if (call.name === 'escalate_to_human') {
           capturedEscalation = toolResult.data;
-          // Break immediately to prevent further tool calls
+          const nextStage = computeNextStage({ currentStage: stageBefore, executedTools, escalated: true });
+          await recordAgentRunTrace({
+            organizationId: orgId,
+            leadId,
+            threadId,
+            channel: effectiveChannel,
+            specialist: directive.specialist,
+            intent: directive.intent,
+            stageBefore,
+            stageAfter: nextStage,
+            toolsExecuted: executedTools,
+            guardrailFlags: ['TOOL_ESCALATED_TO_HUMAN'],
+            latencyMs: Date.now() - startTime,
+            modelUsed,
+          });
           return {
             response:
-              "I have shared your request with our advisor team along with the relevant details. A dedicated human advisor will follow up with you directly.",
+              effectiveChannel === 'VOICE_CALL'
+                ? 'Let me connect you right away with our senior advisor who can help directly.'
+                : 'I have shared your request with our senior advisor team along with your requirements. A dedicated advisor will follow up with you directly.',
             suggestedFollowUps: ['A dedicated advisor will follow up with you shortly.'],
             reasoning: `Escalated to human advisor: ${(toolResult.data as any)?.reason ?? 'Advisor handoff requested'}`,
             executedTools,
@@ -481,7 +675,11 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
             qualificationResult: capturedQualificationResult,
             siteVisitProposal: capturedSiteVisitProposal,
             siteVisitBooking: capturedSiteVisitBooking,
+            collateralSent: capturedCollateral,
             escalation: capturedEscalation,
+            specialist: directive.specialist,
+            stage: nextStage,
+            guardrailFlags: ['TOOL_ESCALATED_TO_HUMAN'],
             exhaustedLimit: false,
           };
         }
@@ -507,7 +705,7 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
           });
           return {
             response:
-              "Thank you for your patience! I am verifying our systems with our advisor team to ensure you receive accurate details. An advisor will follow up with you shortly.",
+              'Thank you for your patience! I am syncing with our senior advisor team to verify the exact details and have someone follow up with you shortly.',
             suggestedFollowUps: ['An advisor will verify the details and follow up with you.'],
             reasoning: 'Handoff triggered due to repeated tool execution errors.',
             executedTools,
@@ -516,12 +714,15 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
             qualificationResult: capturedQualificationResult,
             siteVisitProposal: capturedSiteVisitProposal,
             siteVisitBooking: capturedSiteVisitBooking,
+            collateralSent: capturedCollateral,
             escalation: failureEscalation.data,
+            specialist: directive.specialist,
+            stage: 'ADVISOR_HANDOFF',
+            guardrailFlags: ['REPEATED_FAILURE_ESCALATION'],
             exhaustedLimit: false,
           };
         }
 
-        // Audit Log: Non-sensitive record with safe failure policy
         try {
           await prisma.auditLog.create({
             data: {
@@ -536,16 +737,14 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
                 status: toolResult.status,
                 durationMs: toolResult.durationMs,
                 leadId,
+                specialist: directive.specialist,
               },
             },
           });
         } catch (auditErr) {
-          logger.warn(
-            `[Agent Runtime] Failed to record audit log for tool ${call.name}: ${(auditErr as Error).message}`,
-          );
+          logger.warn(`[Agent Runtime] Audit log failed for ${call.name}: ${(auditErr as Error).message}`);
         }
 
-        // Append tool result as functionResponse back to conversation
         const outputPayload =
           toolResult.status === 'SUCCESS'
             ? { output: toolResult.data }
@@ -564,72 +763,98 @@ CRITICAL INSTRUCTION: You are having an authentic 1-on-1 human conversation with
         });
       }
 
-      // Check if we reached the round limit
       if (round === MAX_AGENT_ROUNDS) {
         exhaustedLimit = true;
         finalResponseText =
           response.text?.trim() ||
-          "I have reviewed your inquiry and our current inventory. An advisor will follow up with you shortly with complete details.";
+          'I have reviewed your requirements against our verified inventory. Would you like me to share the brochure or arrange a quick call with our advisor?';
         break;
       }
 
-      // Continue to next round so model can interpret tool results
       continue;
     }
 
-    // No function calls: model produced final response
     if (response.text) {
       finalResponseText = response.text.trim();
       break;
     }
 
-    // Empty response edge case
     finalResponseText =
-      "Thank you for your inquiry! I am reviewing the available properties and will get back to you shortly.";
+      'Thank you for reaching out! Could you share your preferred location and approximate budget so I can match verified options for you?';
     break;
   }
 
-  // Derive dynamic consultative follow-ups
-  const lowerResp = finalResponseText.toLowerCase();
+  // 6. Post-LLM Guardrails & Verification
+  const verifiedList = Array.from(verifiedPropertiesMap.values());
+  const guardrailResult = verifyAgentOutput({
+    draftText: finalResponseText,
+    verifiedPropertyTitles: verifiedList.map((p) => p.title),
+    hasCollateralToolSuccess: Boolean(capturedCollateral),
+    channel: effectiveChannel,
+  });
+  finalResponseText = guardrailResult.finalText;
+
+  // 7. Dynamic DB-Grounded Follow-Ups (zero hardcoded project names)
   const suggestedFollowUps: string[] = [];
-
-  if (lowerResp.includes('shantiniketan') || lowerResp.includes('prestige')) {
-    suggestedFollowUps.push('View Prestige Shantiniketan details');
+  for (const prop of verifiedList.slice(0, 2)) {
+    suggestedFollowUps.push(`Send brochure for ${prop.title}`);
   }
-  if (lowerResp.includes('splendour') || lowerResp.includes('godrej')) {
-    suggestedFollowUps.push('Explore Godrej Splendour options');
-  }
-  if (lowerResp.includes('woods') || lowerResp.includes('brigade')) {
-    suggestedFollowUps.push('Tell me about Brigade Woods');
-  }
-  if (lowerResp.includes('sentosa') || lowerResp.includes('sobha')) {
-    suggestedFollowUps.push('Explore Sobha Sentosa units');
-  }
-
-  if (suggestedFollowUps.length === 0) {
-    if (lowerResp.includes('whitefield') || lowerResp.includes('bengaluru')) {
-      suggestedFollowUps.push('Schedule a walkthrough this Saturday');
-      suggestedFollowUps.push('What are the possession timelines?');
-    } else {
-      suggestedFollowUps.push('Would you like to schedule a property tour?');
-      suggestedFollowUps.push('What is your target move-in timeline?');
-    }
+  if (verifiedList.length > 0) {
+    suggestedFollowUps.push('Schedule a site visit');
   } else {
-    suggestedFollowUps.push('Schedule a site walkthrough');
+    suggestedFollowUps.push('Share preferred location & budget');
+    suggestedFollowUps.push('Schedule a callback with an advisor');
+  }
+
+  // 8. Lifecycle Stage Progression & Observability Trace
+  const stageAfter = computeNextStage({
+    currentStage: stageBefore,
+    executedTools,
+    escalated: Boolean(capturedEscalation),
+  });
+
+  await recordAgentRunTrace({
+    organizationId: orgId,
+    leadId,
+    threadId,
+    channel: effectiveChannel,
+    specialist: directive.specialist,
+    intent: directive.intent,
+    stageBefore,
+    stageAfter,
+    toolsExecuted: executedTools,
+    guardrailFlags: guardrailResult.flags,
+    latencyMs: Date.now() - startTime,
+    modelUsed,
+  });
+
+  if (modelUsed !== 'db-fallback') {
+    await recordGeminiCost({
+      organizationId: orgId,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      model: modelUsed,
+      leadId,
+    });
   }
 
   return {
     response: finalResponseText,
-    suggestedFollowUps,
-    reasoning: `Generated by agent runtime using ${executedTools.length} tool call(s).`,
+    suggestedFollowUps: suggestedFollowUps.slice(0, 3),
+    reasoning: `Specialist ${directive.specialist} (${directive.intent}) completed with ${executedTools.length} tool call(s).`,
     executedTools,
     taskProposal: capturedTaskProposal,
     requirementProposal: capturedRequirementProposal,
     qualificationResult: capturedQualificationResult,
     siteVisitProposal: capturedSiteVisitProposal,
     siteVisitBooking: capturedSiteVisitBooking,
+    collateralSent: capturedCollateral,
     escalation: capturedEscalation,
     followUpProposal: capturedFollowUpProposal,
+    matchedProperties: verifiedList,
+    specialist: directive.specialist,
+    stage: stageAfter,
+    guardrailFlags: guardrailResult.flags,
     exhaustedLimit,
   };
 }

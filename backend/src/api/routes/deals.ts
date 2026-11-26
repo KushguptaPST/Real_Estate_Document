@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { asyncHandler, createError } from '../../middleware/errorHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { auditFieldChanges } from '../../utils/audit.js';
+import { PLAN_CONFIGS, type PlanTier } from '../../services/billing.service.js';
 
 const router = Router();
 
@@ -50,6 +51,25 @@ router.post(
 
     const orgId = req.user!.organizationId;
     const { propertyAddress, buyerName, sellerName, acceptanceDate } = parsed.data;
+
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { subscriptionTier: true, isSuspended: true },
+    });
+    if (org?.isSuspended) {
+      throw createError('Workspace is suspended', 403);
+    }
+    const tier = (org?.subscriptionTier as PlanTier) || 'SOLO';
+    const planConfig = PLAN_CONFIGS[tier] || PLAN_CONFIGS.SOLO;
+    if (planConfig.maxDeals !== null) {
+      const currentDeals = await prisma.deal.count({ where: { organizationId: orgId } });
+      if (currentDeals >= planConfig.maxDeals) {
+        throw createError(
+          `Deal limit reached (${currentDeals}/${planConfig.maxDeals} on ${planConfig.name}). Upgrade to Brokerage Team for unlimited deals.`,
+          402,
+        );
+      }
+    }
 
     const deal = await prisma.deal.create({
       data: {

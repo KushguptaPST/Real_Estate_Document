@@ -38,11 +38,30 @@ export async function createInvitation(params: {
     throw createError('This person is already a member of your organization', 409);
   }
 
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { subscriptionTier: true, isSuspended: true },
+  });
+  if (org?.isSuspended) {
+    throw createError('Your workspace is suspended and cannot invite new members', 403);
+  }
+
   const pendingCount = await prisma.invitation.count({
-    where: { organizationId, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
+    where: { organizationId, acceptedAt: null, revokedAt: null, expiresAt: { gt: now }, email: { not: email } },
   });
   if (pendingCount >= MAX_PENDING_INVITES_PER_ORG) {
     throw createError('Too many pending invitations. Revoke unused invitations first.', 429);
+  }
+
+  const { PLAN_CONFIGS } = await import('./billing.service.js');
+  const tier = (org?.subscriptionTier as keyof typeof PLAN_CONFIGS) || 'SOLO';
+  const planConfig = PLAN_CONFIGS[tier] || PLAN_CONFIGS.SOLO;
+  const activeSeatCount = await prisma.user.count({ where: { organizationId } });
+  if (activeSeatCount + pendingCount >= planConfig.maxAgents) {
+    throw createError(
+      `Seat limit reached: your ${planConfig.name} plan supports up to ${planConfig.maxAgents} workspace seat(s). Upgrade your plan to invite more advisors.`,
+      402,
+    );
   }
 
   // A new invitation supersedes any pending one for the same address in this org.
@@ -106,7 +125,7 @@ export async function revokeInvitation(organizationId: string, invitationId: str
 export async function listMembers(organizationId: string) {
   return prisma.user.findMany({
     where: { organizationId: requireOrgId(organizationId) },
-    select: { id: true, email: true, name: true, pictureUrl: true, role: true, lastLoginAt: true, createdAt: true },
+    select: { id: true, email: true, name: true, phone: true, pictureUrl: true, role: true, lastLoginAt: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
 }

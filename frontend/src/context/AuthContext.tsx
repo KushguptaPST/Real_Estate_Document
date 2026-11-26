@@ -16,7 +16,11 @@ interface AuthState {
     planTier?: 'SOLO' | 'TEAM' | 'ENTERPRISE';
   }) => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: (credential: string, inviteToken?: string) => Promise<void>;
+  signInWithGoogle: (
+    credential: string,
+    inviteToken?: string,
+  ) => Promise<{ user: User; isNewWorkspace?: boolean }>;
+  refreshUser: () => Promise<User | null>;
   signOut: () => void;
 }
 
@@ -60,6 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await authApi.signInWithGoogle(credential, inviteToken);
     setToken(session.token);
     setUser(session.user);
+    return { user: session.user, isNewWorkspace: session.isNewWorkspace };
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    if (!getToken()) return null;
+    try {
+      const res = await authApi.me();
+      setUser(res.user);
+      return res.user;
+    } catch {
+      return null;
+    }
   }, []);
 
   const signOut = useCallback(() => {
@@ -69,8 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, signOut }),
-    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, signOut],
+    () => ({ user, loading, registerOrg, loginWithPassword, signInWithGoogle, refreshUser, signOut }),
+    [user, loading, registerOrg, loginWithPassword, signInWithGoogle, refreshUser, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -20,6 +20,9 @@ import siteVisitsRouter from './api/routes/siteVisits.js';
 import knowledgeRouter from './api/routes/knowledge.js';
 import messagingWebhooksRouter from './api/routes/messagingWebhooks.js';
 import whatsappWebhookRouter from './api/routes/webhooks/whatsapp.js';
+import telegramWebhookRouter from './api/routes/webhooks/telegram.js';
+import plivoWebhookRouter from './api/routes/webhooks/plivo.js';
+import publicWidgetRouter from './api/routes/publicWidget.js';
 import billingRouter from './api/routes/billing.js';
 import adminRouter from './api/routes/admin.js';
 import campaignsRouter from './api/routes/campaigns.js';
@@ -102,6 +105,9 @@ export function createApp() {
   app.use('/api/inbound', inboundRouter); // HMAC signature (JSON) or INBOUND_WEBHOOK_SECRET (multipart)
   app.use('/api/inbound/whatsapp', whatsappWebhookRouter); // Meta WhatsApp Cloud API webhook
   app.use('/api/webhooks/whatsapp', whatsappWebhookRouter); // Alias for Meta App Dashboard
+  app.use('/api/webhooks/telegram', telegramWebhookRouter); // Multi-tenant Telegram bot webhook
+  app.use('/api/webhooks/plivo', plivoWebhookRouter); // Plivo Voice inbound/answer/hangup/transfer webhooks
+  app.use('/api/public/widget', publicWidgetRouter); // Embeddable client website chat widget SDK
   app.use('/api/webhooks', messagingWebhooksRouter); // Resend (Svix HMAC) & SendGrid delivery/bounce webhooks
   app.use('/api/leads', leadsRouter);
   app.use('/api/leads/:id/conversations', conversationsRouter);

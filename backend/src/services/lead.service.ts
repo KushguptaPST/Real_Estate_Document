@@ -513,7 +513,11 @@ Extract:
 /**
  * Returns complete details for a single lead scoped to tenant organization.
  */
-export async function getLeadDetails(leadId: string, organizationId: string) {
+export async function getLeadDetails(
+  leadId: string,
+  organizationId: string,
+  caller?: { id?: string; role?: string },
+) {
   const lead = await prisma.lead.findFirst({
     where: { id: leadId, organizationId: requireOrgId(organizationId) },
     include: {
@@ -572,6 +576,10 @@ export async function getLeadDetails(leadId: string, organizationId: string) {
   });
 
   if (!lead) throw createError('Lead not found', 404);
+
+  if (caller?.role === 'AGENT' && caller.id && lead.assignedUserId && lead.assignedUserId !== caller.id) {
+    throw createError('This lead is assigned to another advisor', 403);
+  }
 
   const now = Date.now();
   const activityDates: number[] = [new Date(lead.updatedAt).getTime()];
@@ -773,12 +781,15 @@ export async function getLeads(params: {
   assignedUserId?: string | null;
   unassignedOnly?: boolean;
   organizationId: string;
+  callerId?: string;
+  callerRole?: string;
 }) {
-  const { search, status, priority, assignedUserId, unassignedOnly, organizationId } = params;
+  const { search, status, priority, assignedUserId, unassignedOnly, organizationId, callerId, callerRole } = params;
 
   const whereClause: Record<string, unknown> = {
     organizationId: requireOrgId(organizationId),
   };
+  const andConditions: Record<string, unknown>[] = [];
 
   const isValidString = (val?: string) => val && val !== 'undefined' && val !== 'null' && val.trim().length > 0;
 
@@ -787,17 +798,31 @@ export async function getLeads(params: {
 
   if (unassignedOnly) {
     whereClause['assignedUserId'] = null;
+  } else if (callerRole === 'AGENT' && callerId) {
+    // Advisors only see their own claimed leads + unassigned shared pool leads.
+    andConditions.push({
+      OR: [{ assignedUserId: callerId }, { assignedUserId: null }],
+    });
+    if (isValidString(assignedUserId as string)) {
+      andConditions.push({ assignedUserId: assignedUserId! });
+    }
   } else if (isValidString(assignedUserId as string)) {
     whereClause['assignedUserId'] = assignedUserId;
   }
 
   if (isValidString(search)) {
     const q = search!.trim();
-    whereClause['OR'] = [
-      { fullName: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { phone: { contains: q, mode: 'insensitive' } },
-    ];
+    andConditions.push({
+      OR: [
+        { fullName: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  if (andConditions.length > 0) {
+    whereClause['AND'] = andConditions;
   }
 
   const leads = await prisma.lead.findMany({

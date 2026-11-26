@@ -34,10 +34,11 @@ import {
   type SubscriptionStatusResponse,
   type WalletStateResponse,
 } from '@/services/api';
+import { openRazorpayCheckout } from '@/utils/razorpay';
 
 export function PricingPage() {
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
 
   const [isAnnual, setIsAnnual] = useState(true);
@@ -79,19 +80,24 @@ export function PricingPage() {
     }
   }, [user, loadWallet]);
 
-  const handleDeposit = async (amount: number) => {
-    setDepositingAmount(amount);
+  const handleDeposit = async (amountInr: number) => {
+    setDepositingAmount(amountInr);
     try {
-      const res = await walletApi.depositCredits(amount);
-      if (res.checkoutUrl && !res.isSimulated) {
-        window.location.href = res.checkoutUrl;
-      } else {
-        await loadWallet();
-        toast.success(
-          'Wallet Credited',
-          `Successfully deposited $${amount.toFixed(2)} into your pre-paid telephony balance.`
-        );
-      }
+      const order = await billingApi.createRazorpayOrder({
+        type: 'WALLET_TOPUP',
+        amountInr,
+      });
+      const rzpResponse = await openRazorpayCheckout(order);
+      const verified = await billingApi.verifyRazorpayPayment({
+        ...rzpResponse,
+        type: 'WALLET_TOPUP',
+        amountInr,
+      });
+      await loadWallet();
+      toast.success(
+        'Wallet Credited via Razorpay',
+        `Added ₹${amountInr.toLocaleString('en-IN')}. New balance: ₹${(verified.newBalance ?? amountInr).toLocaleString('en-IN')}.`
+      );
     } catch (err: any) {
       toast.error('Deposit Failed', err.message || 'Could not process deposit');
     } finally {
@@ -146,17 +152,25 @@ export function PricingPage() {
     }
     setLoadingCheckout(plan);
     try {
-      const res = await billingApi.createCheckoutSession({
+      const order = await billingApi.createRazorpayOrder({
+        type: 'SUBSCRIPTION_PLAN',
         plan,
         isAnnual,
-        successUrl: `${window.location.origin}/pricing?checkout=success`,
-        cancelUrl: window.location.href,
       });
-      if (res.url) {
-        window.location.href = res.url;
-      }
+      const rzpResponse = await openRazorpayCheckout(order);
+      await billingApi.verifyRazorpayPayment({
+        ...rzpResponse,
+        type: 'SUBSCRIPTION_PLAN',
+        plan,
+        isAnnual,
+      });
+      const sub = await billingApi.getSubscription();
+      setSubscription(sub);
+      await refreshUser();
+      await loadWallet();
+      toast.success('Plan Activated', `Your ${plan} subscription is now active via Razorpay.`);
     } catch (err: any) {
-      toast.error('Checkout Error', err.message || 'Failed to initiate checkout');
+      toast.error('Checkout Error', err.message || 'Failed to initiate Razorpay checkout');
     } finally {
       setLoadingCheckout(null);
     }
@@ -189,23 +203,23 @@ export function PricingPage() {
   const faqs = [
     {
       q: 'How does the AI voice calling billing work?',
-      a: 'Inbound and outbound duplex calling runs on carrier-direct rates ($0.18/minute) billed second-by-second from your pre-paid wallet. There are no monthly minutes that expire, and auto-recharge ensures your AI copilot never drops a prospective buyer call.',
+      a: 'Each plan includes pre-loaded wallet credits (₹6,000 / ₹19,200 / ₹48,000) billed at ₹12/connected minute in fair 30-second pulses (₹6 per 30s), with ₹0 charged on unanswered dials. Top up anytime in INR via Razorpay.',
     },
     {
-      q: 'Does Eigen Estate replace our Transaction Coordinator?',
-      a: 'No, it supercharges them. Our 50-state statutory engine performs the deterministic date math, coordinates line citations (§4.2, Pg 4, Line 18), and dispatches warning alerts so your TC can manage 4x more files without E&O liability risk.',
+      q: 'What channels are included in every plan?',
+      a: 'Every plan supports our Plivo AI Calling Line, ElevenLabs Flash v2.5 voice, WhatsApp Business Cloud API (including Coexistence auto-pause), Telegram Bot API, and Embeddable Website Chat Widget. Website Widget and Telegram chats incur zero extra channel charges.',
     },
     {
-      q: 'Can human agents take over a live AI voice conversation?',
-      a: 'Yes. Our 3-tier takeover switchboard allows an agent or principal broker to monitor a live transcript and jump into the audio bridge with a single click. The AI voice politely introduces the licensed agent and drops off.',
+      q: 'Can human advisors take over an AI conversation or call?',
+      a: 'Yes. Live Warm Call Transfer bridges connected buyers directly to your senior advisor mobile with a 5-second AI whisper summary, and WhatsApp Coexistence automatically switches threads to HUMAN_TAKEOVER whenever your team replies from mobile.',
     },
     {
-      q: 'How are state-specific holidays and counting rules handled?',
-      a: 'The calculation engine contains codified statutory definitions for all 50 states (e.g. NWMLS Washington 9:00 PM cutoff, CAR California 11:59 PM cutoff, TREC Texas next business day rollover). No LLM guesses dates—all calculations are 100% deterministic.',
+      q: 'How does Deal & Contingency Document Intelligence work?',
+      a: 'Upload executed PDF contracts to extract clauses, verify page/line citations, calculate statutory deadlines, send email reminders, and log immutable actions inside your tenant Audit Trail.',
     },
     {
-      q: 'Can I export our audit logs in the event of an E&O dispute?',
-      a: 'Yes. Every alert dispatched, date confirmed, and document uploaded generates an immutable SHA-256 cryptographic audit receipt with email delivery headers admissible in legal arbitration.',
+      q: 'Can I bring leads from CSVs or our existing CRM?',
+      a: 'Yes. Upload leads in bulk via CSV directly from the Leads dashboard, create Plivo batch calling campaigns, or connect external systems using Tenant API Keys and HMAC-SHA256 signed JSON webhooks (/api/inbound/email).',
     },
   ];
 
@@ -228,7 +242,7 @@ export function PricingPage() {
           </h1>
 
           <p className="mt-5 text-base sm:text-lg text-[#4B5563] max-w-2xl mx-auto leading-relaxed font-normal">
-            One missed contingency deadline forfeits a $25,000+ deposit. One delayed inquiry response loses the buyer. Choose the tier engineered for high-producing teams.
+            High-volume ElevenLabs + Plivo AI cold calling, WhatsApp speed-to-lead, and deal document intelligence—billed transparently in INR via Razorpay.
           </p>
 
           {/* Billing Cycle Toggle */}
@@ -287,12 +301,12 @@ export function PricingPage() {
         </section>
       )}
 
-      {/* ── Active Subscription Strip (Logged-In User) ── */}
+      {/* ── Active Subscription Redirect Strip (Signed-In User) ── */}
       {user && subscription && (
         <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-10">
           <div className="bg-white rounded-2xl p-5 border border-[#E5E7EB] shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="h-10 w-10 rounded-xl bg-[#F8F9FA] text-[#0A0A0A] border border-[#E5E7EB] flex items-center justify-center font-bold shrink-0">
+              <div className="h-10 w-10 rounded-xl bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0] flex items-center justify-center font-bold shrink-0">
                 <CreditCard className="h-5 w-5" />
               </div>
               <div>
@@ -303,20 +317,19 @@ export function PricingPage() {
                   </Badge>
                 </div>
                 <p className="text-xs text-[#6B7280] mt-0.5">
-                  Jurisdiction: <span className="font-medium text-[#0A0A0A]">{subscription.stateJurisdiction}</span> &bull; Active Deals: <span className="font-medium text-[#0A0A0A]">{subscription.usage.activeDeals} / {subscription.usage.maxDeals ?? 'Unlimited'}</span> &bull; Agent Seats: <span className="font-medium text-[#0A0A0A]">{subscription.usage.seatsUsed} / {subscription.usage.maxSeats}</span>
+                  Manage plan upgrades, team quotas, wallet top-ups, and invoices inside your workspace console.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
               <Button
-                variant="outline"
+                asChild
                 size="sm"
-                onClick={handleOpenPortal}
-                disabled={openingPortal}
-                className="rounded-full text-xs font-semibold border-[#E5E7EB] hover:bg-[#F8F9FA]"
+                className="rounded-full text-xs font-semibold bg-[#0A0A0A] hover:bg-[#1F2937] text-white px-4"
               >
-                {openingPortal ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="mr-1.5 h-3.5 w-3.5" />}
-                Billing Portal &amp; Invoices
+                <Link to="/billing">
+                  Open Workspace Billing <ArrowRight className="ml-1.5 h-3.5 w-3.5 inline" />
+                </Link>
               </Button>
             </div>
           </div>
@@ -342,49 +355,49 @@ export function PricingPage() {
             )}
             <div className="mb-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-[#0A0A0A]">Solo Producer</h3>
-                <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Independent Agent</span>
+                <h3 className="text-lg font-bold text-[#0A0A0A]">Solo Channel Partner</h3>
+                <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">~40–50 Dials / Day</span>
               </div>
               <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
-                Autonomous contract surveillance and lead capture for high-volume solo agents.
+                Autonomous ElevenLabs calling + WhatsApp qualification for solo advisors &amp; CPs.
               </p>
               <div className="mt-5 flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold text-[#0A0A0A] font-mono tracking-tight">
-                  ₹{isAnnual ? '3,999' : '4,999'}
+                  ₹{isAnnual ? '5,999' : '7,499'}
                 </span>
                 <span className="text-xs font-medium text-[#6B7280]">/ month</span>
               </div>
               <p className="text-[11px] text-[#9CA3AF] mt-1 font-mono">
-                {isAnnual ? '₹47,988 billed annually (+ 18% GST)' : 'Billed monthly (+ 18% GST)'}
+                {isAnnual ? '₹71,988 billed annually (+ 18% GST)' : 'Billed monthly (+ 18% GST)'}
               </p>
             </div>
 
             <div className="border-t border-[#F3F4F6] pt-6 mb-8 flex-1">
               <span className="text-[11px] font-bold text-[#0A0A0A] uppercase tracking-wider block mb-3">Included Capabilities:</span>
               <ul className="space-y-3 text-xs text-[#4B5563]">
-                <li className="flex items-start gap-2.5">
+                <li className="flex items-start gap-2.5 font-medium text-[#0A0A0A]">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Up to <strong>15 active escrow transactions</strong> simultaneously</span>
+                  <span><strong>500 AI Calling Minutes</strong> (~1,000–1,250 cold dials/mo)</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Instant OCR ingestion for scanned PDFs &amp; executed addenda</span>
+                  <span>₹0 on unanswered calls &bull; 30s pulse billing (₹12/min)</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>NWMLS, CAR, FAR/BAR, TREC 50-state statutory date engine</span>
+                  <span>Unlimited Website Chat Widget &amp; Telegram Bot</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Verifiable PDF page citation deep-links (§4.2, Pg 4, Line 18)</span>
+                  <span>WhatsApp Speed-to-Lead, PDF Brochure &amp; Maps Pin Dispatch</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Transactional Outbox Email alerts (Client + Agent notify)</span>
+                  <span>Up to 50 Active Deals &amp; PDF Deadline Extraction</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Basic E&amp;O audit trail export</span>
+                  <span>Google-Verified Login &amp; Site Visit Scheduler</span>
                 </li>
               </ul>
             </div>
@@ -428,19 +441,19 @@ export function PricingPage() {
             <div className="mb-6 mt-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-[#0A0A0A]">Brokerage Team</h3>
-                <span className="text-[11px] font-semibold text-[#047857] uppercase tracking-wider">Top Producing Teams</span>
+                <span className="text-[11px] font-semibold text-[#047857] uppercase tracking-wider">Replaces 2 Callers</span>
               </div>
               <p className="text-xs text-[#6B7280] mt-1.5 leading-relaxed">
-                Full-stack AI speed-to-lead voice copilot + escrow risk radar for brokerages.
+                Full-stack ElevenLabs + Plivo cold-calling engine + WhatsApp Coexistence for brokerages.
               </p>
               <div className="mt-5 flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold text-[#0A0A0A] font-mono tracking-tight">
-                  ₹{isAnnual ? '11,999' : '14,999'}
+                  ₹{isAnnual ? '17,599' : '21,999'}
                 </span>
                 <span className="text-xs font-medium text-[#6B7280]">/ month</span>
               </div>
               <p className="text-[11px] text-[#9CA3AF] mt-1 font-mono">
-                {isAnnual ? 'Billed annually per team (+ 18% GST)' : 'Billed monthly per team (+ 18% GST)'}
+                {isAnnual ? '₹2,11,188 billed annually (+ 18% GST)' : 'Billed monthly per team (+ 18% GST)'}
               </p>
             </div>
 
@@ -449,27 +462,31 @@ export function PricingPage() {
               <ul className="space-y-3 text-xs text-[#4B5563]">
                 <li className="flex items-start gap-2.5 font-medium text-[#0A0A0A]">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span><strong>Unlimited active transactions</strong> across all team members</span>
+                  <span><strong>1,600 AI Calling Minutes</strong> (~3,200–4,000 cold dials/mo)</span>
+                </li>
+                <li className="flex items-start gap-2.5 font-medium text-[#0A0A0A]">
+                  <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
+                  <span><strong>Unlimited active deals</strong> &amp; contingency tracking</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>AI Inbound Phone Copilot (Sub-60s response + WhatsApp qualification)</span>
+                  <span>Up to <strong>10 licensed team seats</strong> via Google-verified invites</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>GraphRAG long-term buyer memory &amp; showing tour scheduler</span>
+                  <span>WhatsApp Coexistence (Auto-pauses AI on mobile reply)</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>3-tier live call takeover switchboard for licensed agents</span>
+                  <span>Plivo batch calling campaigns &amp; CSV bulk lead import</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Brokerage Risk Radar &amp; E&amp;O certified audit log downloads</span>
+                  <span>Live Warm Call Transfer with 5s AI advisor whisper</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Transaction Coordinator multi-agent pipeline routing</span>
+                  <span>Tenant Audit Trail, Analytics &amp; Lead Task pipelines</span>
                 </li>
               </ul>
             </div>
@@ -521,40 +538,41 @@ export function PricingPage() {
               </p>
               <div className="mt-5 flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold text-[#0A0A0A] font-mono tracking-tight">
-                  Custom
+                  ₹{isAnnual ? '43,999' : '54,999'}
                 </span>
+                <span className="text-xs font-medium text-[#6B7280]">/ month</span>
               </div>
               <p className="text-[11px] text-[#9CA3AF] mt-1 font-mono">
-                Volume-tiered licensing with dedicated enterprise SLA
+                {isAnnual ? '₹5,27,988 billed annually (+ 18% GST)' : 'Includes 4,000 AI mins (~9,000 dials/mo)'}
               </p>
             </div>
 
             <div className="border-t border-[#F3F4F6] pt-6 mb-8 flex-1">
-              <span className="text-[11px] font-bold text-[#0A0A0A] uppercase tracking-wider block mb-3">Enterprise Governance:</span>
+              <span className="text-[11px] font-bold text-[#0A0A0A] uppercase tracking-wider block mb-3">Builder &amp; Scale Capabilities:</span>
               <ul className="space-y-3 text-xs text-[#4B5563]">
                 <li className="flex items-start gap-2.5 font-medium text-[#0A0A0A]">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Custom state contract parser training &amp; proprietary riders</span>
+                  <span><strong>4,000 AI Calling Minutes</strong> (~8,000–10,000 cold dials/mo)</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Dedicated Plivo / Twilio telephony carrier SIP trunk</span>
+                  <span>Up to <strong>100 team seats</strong> with Owner &amp; Agent RBAC roles</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Single Sign-On (SSO) via Okta, SAML 2.0 &amp; Google Workspace</span>
+                  <span>Isolated Plivo subaccount &amp; India KYC DID provisioning</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>Managing Broker compliance review queue with dual-signoff</span>
+                  <span>Multi-project RERA inventory &amp; hybrid pgvector search</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>SOC2 Type II compliance audit packet &amp; E&amp;O carrier indemnity</span>
+                  <span>Tenant API Keys &amp; HMAC-SHA256 inbound lead webhooks</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <Check className="h-4 w-4 text-[#047857] shrink-0 mt-0.5" />
-                  <span>99.99% Uptime Guarantee &amp; 1-Hour Critical Response SLA</span>
+                  <span>Full Audit Log, Batch Dialing Campaigns &amp; Deal Copilot</span>
                 </li>
               </ul>
             </div>
@@ -572,8 +590,10 @@ export function PricingPage() {
                 </>
               ) : subscription?.tier === 'ENTERPRISE' ? (
                 'Current Active Plan'
+              ) : user ? (
+                'Upgrade to Builder Center'
               ) : (
-                'Contact Enterprise Sales'
+                'Get Started with Builder'
               )}
             </Button>
           </Card>
@@ -616,7 +636,7 @@ export function PricingPage() {
                   className="rounded-full text-xs font-medium border-[#E5E7EB] hover:bg-[#F8F9FA] h-8"
                 >
                   <Phone className="mr-1.5 h-3 w-3 text-[#047857]" />
-                  Simulate Call (-$0.54)
+                  Simulate Call (-₹12)
                 </Button>
                 <Button
                   variant="outline"
@@ -626,7 +646,7 @@ export function PricingPage() {
                   className="rounded-full text-xs font-medium border-[#E5E7EB] hover:bg-[#F8F9FA] h-8"
                 >
                   <MessageSquare className="mr-1.5 h-3 w-3 text-emerald-600" />
-                  Simulate WA (-$0.06)
+                  Simulate WA (-₹3)
                 </Button>
               </div>
             </div>
@@ -640,26 +660,26 @@ export function PricingPage() {
                   <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Available Balance</span>
                   <div className="mt-2 flex items-baseline gap-2">
                     <span className="text-3xl font-extrabold text-[#0A0A0A] font-mono tracking-tight">
-                      ${wallet ? wallet.balance.toFixed(2) : '482.50'}
+                      ₹{(wallet?.balance ?? 0).toLocaleString('en-IN')}
                     </span>
-                    <span className="text-xs font-medium text-[#6B7280]">USD</span>
+                    <span className="text-xs font-medium text-[#6B7280]">INR</span>
                   </div>
                   <p className="text-[11px] text-[#6B7280] mt-1">
-                    ~{wallet ? Math.floor(wallet.balance / 0.18) : 2680} voice call minutes available
+                    ~{wallet ? Math.floor(wallet.balance / (wallet.unitRates.voicePerMinute || 12)) : 0} connected voice mins (~{wallet ? Math.floor((wallet.balance / (wallet.unitRates.voicePerMinute || 12)) * 2.2) : 0} cold dials)
                   </p>
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
-                  <span className="text-[11px] font-semibold text-[#4B5563] block mb-2">Instant Credit Top-Up:</span>
+                  <span className="text-[11px] font-semibold text-[#4B5563] block mb-2">Instant Razorpay Top-Up:</span>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {[50, 150, 300, 500].map((amt) => (
+                    {[1000, 2500, 5000, 10000].map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => handleDeposit(amt)}
                         disabled={depositingAmount !== null}
-                        className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          amt === 150
+                        className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                          amt === 2500
                             ? 'bg-[#0A0A0A] text-white border-[#0A0A0A] hover:bg-[#1F2937]'
                             : 'bg-white text-[#0A0A0A] border-[#E5E7EB] hover:bg-[#F3F4F6]'
                         }`}
@@ -667,7 +687,7 @@ export function PricingPage() {
                         {depositingAmount === amt ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" />
                         ) : (
-                          `+$${amt}`
+                          `+₹${amt.toLocaleString('en-IN')}`
                         )}
                       </button>
                     ))}
@@ -683,38 +703,38 @@ export function PricingPage() {
                     <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
                       <div className="flex items-center gap-2">
                         <PhoneCall className="h-3.5 w-3.5 text-[#047857]" />
-                        <span className="font-medium text-[#0A0A0A]">Duplex Voice Telephony</span>
+                        <span className="font-medium text-[#0A0A0A]">ElevenLabs Voice (30s pulse)</span>
                       </div>
                       <span className="font-mono font-bold text-[#0A0A0A] bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">
-                        ${wallet?.unitRates.voicePerMinute.toFixed(2) ?? '0.18'} / min
+                        ₹{wallet?.unitRates.voicePerMinute ?? 12} / min
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
                       <div className="flex items-center gap-2">
                         <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="font-medium text-[#0A0A0A]">WhatsApp Inbound</span>
+                        <span className="font-medium text-[#0A0A0A]">WhatsApp Inbound Lead</span>
                       </div>
                       <span className="font-mono font-bold text-[#0A0A0A] bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">
-                        ${wallet?.unitRates.whatsappPerLead.toFixed(2) ?? '0.06'} / lead
+                        ₹{wallet?.unitRates.whatsappPerLead ?? 3} / lead
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <PhoneCall className="h-3.5 w-3.5 text-amber-500" />
-                        <span className="font-medium text-[#0A0A0A]">Digital Voice Twin</span>
+                        <span className="font-medium text-[#0A0A0A]">ElevenLabs Studio Voice</span>
                       </div>
                       <span className="font-mono font-bold text-[#047857]">
-                        {subscription?.tier === 'SOLO' ? '₹1,200' : 'Included'}
+                        Included
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#E5E7EB] text-[11px] text-[#6B7280] flex items-center justify-between">
-                  <span>Carrier: Plivo High-Throughput</span>
-                  <span className="text-[#047857] font-semibold">Sub-450ms STT/TTS</span>
+                  <span>ElevenLabs Flash v2.5 + Plivo</span>
+                  <span className="text-[#047857] font-semibold">Widget &amp; Telegram Free</span>
                 </div>
               </div>
 
@@ -747,13 +767,13 @@ export function PricingPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-[#6B7280]">Trigger Threshold:</span>
                       <span className="font-mono font-bold text-[#0A0A0A]">
-                        &lt; ${wallet?.autoRecharge.threshold.toFixed(2) ?? '50.00'}
+                        &lt; ₹{(wallet?.autoRecharge.threshold ?? 500).toLocaleString('en-IN')}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[#6B7280]">Auto-Top-Up:</span>
                       <span className="font-mono font-bold text-[#047857]">
-                        +${wallet?.autoRecharge.rechargeAmount.toFixed(2) ?? '200.00'}
+                        +₹{(wallet?.autoRecharge.rechargeAmount ?? 2000).toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
@@ -761,7 +781,7 @@ export function PricingPage() {
 
                 <div className="mt-3 pt-3 border-t border-[#E5E7EB] flex items-center gap-1.5 text-[11px] text-[#6B7280]">
                   <ShieldCheck className="h-3.5 w-3.5 text-[#047857] shrink-0" />
-                  <span>Stripe Auto-Billing Protected</span>
+                  <span>Razorpay INR Protected</span>
                 </div>
               </div>
 
@@ -916,51 +936,51 @@ export function PricingPage() {
               </thead>
               <tbody className="divide-y divide-[#F3F4F6]">
                 <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">50-State Statutory Date Engine (NWMLS, CAR, TREC, FAR/BAR)</td>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">ElevenLabs + Plivo AI Voice Calling (30s pulse)</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-[#0A0A0A]">500 mins</td>
+                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 font-semibold text-[#047857]">1,600 mins</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-[#0A0A0A]">4,000 mins</td>
+                </tr>
+                <tr>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Unlimited Website Chat Widget &amp; Telegram AI Bot</td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Verbatim PDF Line Citations (§4.2, Pg 4, Line 18)</td>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">WhatsApp Coexistence Mode + PDF &amp; Maps Dispatch</td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Transactional Outbox Alert Escalation (Email + Push)</td>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Plivo Batch Dialing Campaigns &amp; Live Warm Transfer</td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Duplex AI Inbound Voice Copilot &amp; Tour Booking</td>
-                  <td className="py-3.5 px-4 text-center text-[#9CA3AF]">—</td>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Contract PDF Extraction, Deadlines &amp; Citations</td>
+                  <td className="py-3.5 px-4 text-center">Up to 50 deals</td>
+                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 font-semibold text-[#047857]">Unlimited</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-[#0A0A0A]">Unlimited</td>
+                </tr>
+                <tr>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Licensed Team Seats (Google-Verified RBAC Invites)</td>
+                  <td className="py-3.5 px-4 text-center">1 seat</td>
+                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 font-semibold text-[#047857]">10 seats</td>
+                  <td className="py-3.5 px-4 text-center font-semibold text-[#0A0A0A]">100 seats</td>
+                </tr>
+                <tr>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">CSV Lead Import, Tenant API Keys &amp; HMAC Webhooks</td>
+                  <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Live Human Call Takeover Switchboard</td>
-                  <td className="py-3.5 px-4 text-center text-[#9CA3AF]">—</td>
+                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Isolated Plivo Subaccount &amp; Tenant Audit Trail</td>
+                  <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                   <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
-                  <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">E&amp;O Defense Audit Log Certification</td>
-                  <td className="py-3.5 px-4 text-center text-[#6B7280]">Basic CSV</td>
-                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 font-semibold text-[#047857]">SHA-256 Verified</td>
-                  <td className="py-3.5 px-4 text-center font-semibold text-[#047857]">Carrier Indemnified</td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">Custom Brokerage Addenda &amp; Rider Fine-Tuning</td>
-                  <td className="py-3.5 px-4 text-center text-[#9CA3AF]">—</td>
-                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 text-[#9CA3AF]">—</td>
-                  <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-6 font-medium text-[#0A0A0A]">SSO (Okta, SAML 2.0, Google Workspace) &amp; Dedicated SLA</td>
-                  <td className="py-3.5 px-4 text-center text-[#9CA3AF]">—</td>
-                  <td className="py-3.5 px-4 text-center bg-[#ECFDF5]/30 text-[#9CA3AF]">—</td>
                   <td className="py-3.5 px-4 text-center"><Check className="h-4 w-4 text-[#047857] mx-auto" /></td>
                 </tr>
               </tbody>
@@ -1005,15 +1025,15 @@ export function PricingPage() {
         <div className="rounded-3xl bg-white border border-[#E5E7EB] p-10 sm:p-14 relative overflow-hidden shadow-xs space-y-4">
           <div className="max-w-2xl mx-auto space-y-3">
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#0A0A0A]">
-              Ready to secure your active pipeline?
+              Ready to launch your AI sales workspace?
             </h2>
             <p className="text-sm sm:text-base text-[#4B5563] leading-relaxed max-w-xl mx-auto">
-              Start your 14-day free trial. Ingest an executed purchase agreement or test an inbound voice call in under 90 seconds.
+              Verify with Google, choose your plan via Razorpay, and connect your WhatsApp, Plivo AI line, and property inventory in minutes.
             </p>
             <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button asChild size="lg" className="rounded-full bg-[#0A0A0A] text-white hover:bg-[#1F2937] font-semibold text-xs px-6 h-11 shadow-xs">
                 <Link to="/signup">
-                  Start Free Trial <ArrowRight className="ml-1.5 h-4 w-4 inline" />
+                  Launch Your Brokerage <ArrowRight className="ml-1.5 h-4 w-4 inline" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="rounded-full border-[#E5E7EB] bg-white text-[#0A0A0A] hover:bg-[#F8F9FA] text-xs px-6 h-11 font-medium shadow-2xs">

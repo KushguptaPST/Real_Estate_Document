@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { leadsApi, leadTasksApi, siteVisitsApi } from '@/services/api';
+import { leadsApi, leadTasksApi, organizationApi, siteVisitsApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { CsvImportModal } from '@/components/CsvImportModal';
+import { CardGridSkeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
 import type {
   Lead,
   LeadTask,
@@ -61,8 +62,8 @@ export function LeadsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leads, setLeads] = useState<Lead[]>(() => leadsApi.getCached() ?? []);
+  const [loading, setLoading] = useState(() => !leadsApi.getCached());
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -78,6 +79,32 @@ export function LeadsPage() {
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState<Lead | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [setupIncomplete, setSetupIncomplete] = useState<{
+    telegramConnected: boolean;
+    hasInventory: boolean;
+  } | null>(() => {
+    const cached = organizationApi.getCachedOnboarding();
+    if (!cached || (cached.onboardingCompleted && cached.checklist?.telegramConnected)) return null;
+    return {
+      telegramConnected: Boolean(cached.checklist?.telegramConnected),
+      hasInventory: Boolean(cached.checklist?.hasInventory),
+    };
+  });
+
+  useEffect(() => {
+    if (user?.role !== 'OWNER') return;
+    organizationApi
+      .getOnboarding()
+      .then((res) => {
+        if (!res.onboardingCompleted || !res.checklist.telegramConnected) {
+          setSetupIncomplete({
+            telegramConnected: res.checklist.telegramConnected,
+            hasInventory: res.checklist.hasInventory,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [user?.role]);
 
   // Helper to extract effective requirements (including client heuristics when AI extraction is pending/partial)
   function getEffectiveRequirements(targetLead: Lead | null) {
@@ -433,25 +460,32 @@ export function LeadsPage() {
   }
 
   async function fetchLeads() {
-    try {
+    const params: Parameters<typeof leadsApi.list>[0] = {
+      search: search || undefined,
+      status: statusFilter || undefined,
+      priority: priorityFilter || undefined,
+    };
+
+    if (poolTab === 'MY' && user?.id) {
+      params.assignedUserId = user.id;
+    } else if (poolTab === 'UNASSIGNED') {
+      params.unassigned = true;
+    }
+
+    const cached = leadsApi.getCached(params);
+    if (cached) {
+      setLeads(cached);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       setError(null);
-      const params: Parameters<typeof leadsApi.list>[0] = {
-        search: search || undefined,
-        status: statusFilter || undefined,
-        priority: priorityFilter || undefined,
-      };
-
-      if (poolTab === 'MY' && user?.id) {
-        params.assignedUserId = user.id;
-      } else if (poolTab === 'UNASSIGNED') {
-        params.unassigned = true;
-      }
-
       const data = await leadsApi.list(params);
       setLeads(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load leads');
+      if (!cached) setError(err.message || 'Failed to load leads');
     } finally {
       setLoading(false);
     }
@@ -579,6 +613,31 @@ export function LeadsPage() {
           </button>
         </div>
       </div>
+
+      {setupIncomplete && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-950">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Telegram AI Channel Setup Incomplete</p>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                Connect your free Telegram Bot and first listing so buyers can message and book site visits automatically (
+                {[!setupIncomplete.telegramConnected && 'Telegram Bot', !setupIncomplete.hasInventory && 'First Property Listing']
+                  .filter(Boolean)
+                  .join(', ') || 'Checklist incomplete'}
+                ).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/onboarding')}
+            className="shrink-0 px-3.5 py-1.5 rounded-xl bg-amber-900 hover:bg-amber-950 text-white font-semibold text-xs cursor-pointer"
+          >
+            Complete Channel Setup →
+          </button>
+        </div>
+      )}
 
       {/* ── Unified Metric Ribbon (Always Live Data) ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -946,7 +1005,8 @@ export function LeadsPage() {
       </div>
 
       {/* ── Content States ── */}
-      <div key={poolTab} className="smooth-transition min-h-[480px]">
+      {/* Content wrapper kept stable across tab switches to avoid remount layout jitter */}
+      <div className="min-h-[480px]">
         {poolTab === 'ACTION_QUEUE' ? (
           <div className="space-y-4">
           {/* Action Command Toolbar: Category Pills + Live Search */}
@@ -1032,12 +1092,7 @@ export function LeadsPage() {
 
           {/* Action Queue Items Stream */}
           {loadingQueue && !actionQueueData ? (
-            <div className="flex justify-center py-20 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-              <div className="text-center">
-                <Loader2 className="h-7 w-7 animate-spin text-slate-900 mx-auto" />
-                <p className="text-xs text-slate-500 mt-2">Syncing agentic action queue...</p>
-              </div>
-            </div>
+            <TableRowsSkeleton rows={5} />
           ) : queueError ? (
             <div className="banner-error flex items-center justify-between p-4 bg-rose-50 border border-rose-200 rounded-2xl">
               <div className="flex items-center gap-2 text-rose-800">
@@ -1370,9 +1425,7 @@ export function LeadsPage() {
         </div>
       ) : poolTab === 'TASKS' ? (
         loadingTasks ? (
-          <div className="flex justify-center py-16 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-            <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
-          </div>
+          <CardGridSkeleton count={6} />
         ) : tasks.length === 0 ? (
           <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/90 shadow-xs">
             <ListTodo className="h-8 w-8 text-slate-400 mx-auto mb-2" />
@@ -1503,9 +1556,7 @@ export function LeadsPage() {
         )
       ) : poolTab === 'SITE_VISITS' ? (
         loadingVisits ? (
-          <div className="flex justify-center py-16 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-            <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
-          </div>
+          <TableRowsSkeleton rows={4} />
         ) : (
           <div className="space-y-4">
             {siteVisits.length === 0 ? (
@@ -1620,9 +1671,7 @@ export function LeadsPage() {
           </div>
         )
       ) : loading ? (
-        <div className="flex justify-center py-16 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
-          <Loader2 className="h-7 w-7 animate-spin text-slate-900" />
-        </div>
+        <TableRowsSkeleton rows={5} />
       ) : error ? (
         <div className="banner-error">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />

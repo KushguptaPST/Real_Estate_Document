@@ -1,10 +1,10 @@
 /**
  * Date Engine Service
  *
- * TypeScript implementation of the deadline calculation logic.
- * Mirrors the logic in the project-root dateEngine.js (which is used by
- * root-level Jest tests). Both stay in sync — update both if the business
- * rules change.
+ * Core jurisdiction-aware deadline calculation logic.
+ * Calculates legal expiration dates based on acceptance dates, day counts,
+ * and day types ('calendar' vs 'business'), skipping weekends and state-specific
+ * statutory holidays via date-holidays.
  */
 
 import { addDays, isWeekend, format } from 'date-fns';

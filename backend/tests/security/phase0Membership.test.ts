@@ -23,8 +23,8 @@ describe('Phase 0 — invite-only membership and OWNER/AGENT authorization', () 
   const createdOrgIds: string[] = [];
 
   beforeAll(async () => {
-    orgA = await prisma.organization.create({ data: { name: 'P0 Membership Org A' } });
-    orgB = await prisma.organization.create({ data: { name: 'P0 Membership Org B' } });
+    orgA = await prisma.organization.create({ data: { name: 'P0 Membership Org A', subscriptionTier: 'ENTERPRISE' } });
+    orgB = await prisma.organization.create({ data: { name: 'P0 Membership Org B', subscriptionTier: 'ENTERPRISE' } });
     createdOrgIds.push(orgA.id, orgB.id);
     ownerA = await createMemberSession(orgA.id, { role: 'OWNER' });
     agentA = await createMemberSession(orgA.id, { role: 'AGENT' });
@@ -44,16 +44,30 @@ describe('Phase 0 — invite-only membership and OWNER/AGENT authorization', () 
   }
 
   describe('sign-in without an invitation', () => {
-    it('a new Google identity with no invitation gets no organization and no session', async () => {
-      await expect(completeSignIn(identity(`stranger.${uid()}@example.com`))).rejects.toMatchObject({ statusCode: 403 });
+    it('a new Google identity with no invitation auto-provisions an isolated organization as OWNER', async () => {
+      const email = `stranger.${uid()}@example.com`;
+      const session = await completeSignIn(identity(email));
+      expect(session.user.role).toBe('OWNER');
+      expect(session.user.organizationId).toBeDefined();
+      expect(session.user.organizationId).not.toBe(orgA.id);
+      expect(session.user.organizationId).not.toBe(orgB.id);
+      await prisma.user.delete({ where: { email } });
+      if (session.user.organizationId) {
+        await prisma.organization.delete({ where: { id: session.user.organizationId } });
+      }
     });
 
     it('never auto-joins a shared default organization', async () => {
       const email = `stranger2.${uid()}@example.com`;
-      await completeSignIn(identity(email)).catch(() => undefined);
+      const session = await completeSignIn(identity(email));
       const user = await prisma.user.findUnique({ where: { email } });
-      expect(user?.organizationId).toBeNull();
+      expect(user?.organizationId).not.toBeNull();
+      expect(user?.organizationId).not.toBe(orgA.id);
+      expect(user?.organizationId).not.toBe(orgB.id);
       await prisma.user.delete({ where: { email } });
+      if (user?.organizationId) {
+        await prisma.organization.delete({ where: { id: user.organizationId } });
+      }
     });
   });
 

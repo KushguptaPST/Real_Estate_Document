@@ -706,12 +706,13 @@ describe('Phase 2G: Production Blocker Remediation Verification Suite', () => {
         threadId: threadA1Id,
       };
 
+      const futureDate = new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 10);
       const result = await executeAgentTool(
         'book_site_visit',
         {
           leadId: leadA1,
           propertyId: propA,
-          date: '2026-10-25',
+          date: futureDate,
           time: '14:00',
           buyerConsentEvidence: maliciousPrompt,
         },
@@ -733,11 +734,12 @@ describe('Phase 2G: Production Blocker Remediation Verification Suite', () => {
       };
 
       // Model tries to access propB (which belongs to Org B)
+      const futureDate = new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 10);
       const result = await executeAgentTool(
         'check_site_visit_availability',
         {
           propertyId: propB,
-          date: '2026-10-25',
+          date: futureDate,
         },
         ctx
       );

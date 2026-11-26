@@ -158,6 +158,21 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
     threadId: threadA,
   });
 
+  function getNextDayOfWeek(targetDay: number, minDaysAhead = 7): string {
+    const d = new Date();
+    d.setDate(d.getDate() + minDaysAhead);
+    while (d.getUTCDay() !== targetDay) {
+      d.setDate(d.getDate() + 1);
+    }
+    return d.toISOString().slice(0, 10);
+  }
+
+  const futureDay1 = new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 10);
+  const futureDay2 = new Date(Date.now() + 86400000 * 15).toISOString().slice(0, 10);
+  const nextTuesday = getNextDayOfWeek(2);
+  const nextWednesday = getNextDayOfWeek(3);
+  const futureDay5 = new Date(Date.now() + 86400000 * 18).toISOString().slice(0, 10);
+
   // ── 1. Tool Declaration Integrity ──────────────────────────────────────────
 
   describe('Tool Registration & Declarations', () => {
@@ -187,7 +202,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
     it('rejects foreign-tenant property when checking availability', async () => {
       const result = await executeAgentTool(
         'check_site_visit_availability',
-        { date: '2026-10-25', propertyId: propB },
+        { date: futureDay1, propertyId: propB },
         getContext(),
       );
       expect(result.status).toBe('ERROR');
@@ -197,12 +212,12 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
     it('returns actual available slots from real scheduling service for valid property and date', async () => {
       const result = await executeAgentTool(
         'check_site_visit_availability',
-        { date: '2026-10-25', propertyId: propA },
+        { date: futureDay1, propertyId: propA },
         getContext(),
       );
       expect(result.status).toBe('SUCCESS');
       const data = result.data as any;
-      expect(data.date).toBe('2026-10-25');
+      expect(data.date).toBe(futureDay1);
       expect(Array.isArray(data.availableSlots)).toBe(true);
       expect(data.availableSlots.length).toBeGreaterThan(0);
     });
@@ -219,7 +234,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propA,
-          date: '2026-10-26',
+          date: futureDay2,
           preferredTime: '14:00',
           durationMinutes: 45,
           notes: 'Customer interested in balcony view',
@@ -235,7 +250,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
       expect(data.requiresBuyerConfirmation).toBe(true);
       expect(data.property.id).toBe(propA);
       expect(data.advisor.id).toBe(userA);
-      expect(data.slot.date).toBe('2026-10-26');
+      expect(data.slot.date).toBe(futureDay2);
       expect(data.slot.time).toBe('14:00');
 
       // CRITICAL GUARANTEE: Zero site_visits rows created by proposal
@@ -264,7 +279,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propB,
-          date: '2026-10-26',
+          date: futureDay2,
           preferredTime: '10:00',
         },
         getContext(),
@@ -279,7 +294,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadB,
           propertyId: propA,
-          date: '2026-10-26',
+          date: futureDay2,
           preferredTime: '10:00',
         },
         getContext(),
@@ -298,7 +313,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propA,
-          date: '2026-10-27',
+          date: nextTuesday,
           time: '11:00',
           buyerConsentEvidence: 'ok', // too short (< 5 chars)
         },
@@ -314,7 +329,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propA,
-          date: '2026-10-27',
+          date: nextTuesday,
           time: '11:00',
           durationMinutes: 45,
           buyerConsentEvidence: 'Yes, Tuesday at 11am works perfectly for me!',
@@ -354,14 +369,14 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
     });
 
     it('prevents double-booking overlapping slots under concurrent requests', async () => {
-      // First booking is at 2026-10-27T11:00 to 11:45.
+      // First booking is at 11:00 to 11:45.
       // Attempting to book an overlapping visit at 11:15 to 12:00 on the same date for the same advisor:
       const conflictResult = await executeAgentTool(
         'book_site_visit',
         {
           leadId: leadA,
           propertyId: propA,
-          date: '2026-10-27',
+          date: nextTuesday,
           time: '11:15',
           durationMinutes: 45,
           buyerConsentEvidence: 'I want to see it at 11:15 on Tuesday please',
@@ -380,7 +395,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propB, // Belongs to Org B
-          date: '2026-10-28',
+          date: nextWednesday,
           time: '15:00',
           buyerConsentEvidence: 'I agree to the appointment on Wednesday',
         },
@@ -416,7 +431,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
         {
           leadId: leadA,
           propertyId: propA,
-          date: '2026-10-28',
+          date: nextWednesday,
           time: '16:00',
           buyerConsentEvidence: 'Confirmed Wednesday at 4pm',
         },
@@ -445,7 +460,7 @@ describe('Phase 2C — Site Visit Coordination & Booking Suite', () => {
                   args: {
                     leadId: leadA,
                     propertyId: propA,
-                    date: '2026-10-29',
+                    date: futureDay5,
                     preferredTime: '10:00',
                     durationMinutes: 45,
                   },

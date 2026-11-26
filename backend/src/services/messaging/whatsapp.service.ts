@@ -23,13 +23,18 @@ export interface InteractiveButton {
   title: string;
 }
 
+export interface WhatsAppCredentialsOverride {
+  token?: string;
+  phoneNumberId?: string;
+}
+
 export class WhatsAppService {
   private readonly apiVersion = 'v21.0';
 
-  private getCredentials(): { token?: string; phoneNumberId?: string } {
+  private getCredentials(override?: WhatsAppCredentialsOverride): { token?: string; phoneNumberId?: string } {
     return {
-      token: process.env['META_WHATSAPP_TOKEN'],
-      phoneNumberId: process.env['META_PHONE_NUMBER_ID'],
+      token: override?.token || process.env['META_WHATSAPP_TOKEN'],
+      phoneNumberId: override?.phoneNumberId || process.env['META_PHONE_NUMBER_ID'],
     };
   }
 
@@ -47,10 +52,10 @@ export class WhatsAppService {
   async sendTextMessage(
     toPhone: string,
     text: string,
-    options?: { previewUrl?: boolean }
+    options?: { previewUrl?: boolean; credentials?: WhatsAppCredentialsOverride }
   ): Promise<WhatsAppSendResult> {
     const cleanPhone = this.sanitizePhoneNumber(toPhone);
-    const { token, phoneNumberId } = this.getCredentials();
+    const { token, phoneNumberId } = this.getCredentials(options?.credentials);
 
     if (!token || !phoneNumberId) {
       const simId = `sim-wa-text-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -99,10 +104,10 @@ export class WhatsAppService {
   async sendVoiceNote(
     toPhone: string,
     oggOpusBuffer: Buffer,
-    options?: { caption?: string }
+    options?: { caption?: string; credentials?: WhatsAppCredentialsOverride }
   ): Promise<WhatsAppSendResult> {
     const cleanPhone = this.sanitizePhoneNumber(toPhone);
-    const { token, phoneNumberId } = this.getCredentials();
+    const { token, phoneNumberId } = this.getCredentials(options?.credentials);
 
     if (!token || !phoneNumberId) {
       const simId = `sim-wa-voice-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -182,10 +187,10 @@ export class WhatsAppService {
     toPhone: string,
     bodyText: string,
     buttons: InteractiveButton[],
-    options?: { headerText?: string; footerText?: string }
+    options?: { headerText?: string; footerText?: string; credentials?: WhatsAppCredentialsOverride }
   ): Promise<WhatsAppSendResult> {
     const cleanPhone = this.sanitizePhoneNumber(toPhone);
-    const { token, phoneNumberId } = this.getCredentials();
+    const { token, phoneNumberId } = this.getCredentials(options?.credentials);
 
     if (!token || !phoneNumberId) {
       const simId = `sim-wa-buttons-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -245,6 +250,144 @@ export class WhatsAppService {
     } catch (err: any) {
       logger.error(`[WhatsApp Exception] sendInteractiveButtons failed: ${err.message}`);
       return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Sends a PDF brochure or floor-plan document by public HTTPS URL.
+   */
+  async sendDocument(
+    toPhone: string,
+    documentUrl: string,
+    options?: { filename?: string; caption?: string; credentials?: WhatsAppCredentialsOverride }
+  ): Promise<WhatsAppSendResult> {
+    const cleanPhone = this.sanitizePhoneNumber(toPhone);
+    const { token, phoneNumberId } = this.getCredentials(options?.credentials);
+
+    if (!token || !phoneNumberId) {
+      const simId = `sim-wa-doc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      logger.info(`[WhatsApp Simulated Document] To: ${cleanPhone}, URL: ${documentUrl}, ID: ${simId}`);
+      return { success: true, messageId: simId, isSimulated: true };
+    }
+
+    try {
+      const response = await fetch(`https://graph.facebook.com/${this.apiVersion}/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: cleanPhone,
+          type: 'document',
+          document: {
+            link: documentUrl,
+            filename: options?.filename ?? 'Property_Brochure.pdf',
+            ...(options?.caption ? { caption: options.caption } : {}),
+          },
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      const data = (await response.json()) as any;
+      if (!response.ok) {
+        const errorMsg = data?.error?.message || `HTTP ${response.status}`;
+        logger.error(`[WhatsApp API Error] Failed to send document: ${errorMsg}`);
+        return { success: false, error: errorMsg };
+      }
+
+      return { success: true, messageId: data?.messages?.[0]?.id };
+    } catch (err: any) {
+      logger.error(`[WhatsApp Exception] sendDocument failed: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Sends a native WhatsApp location pin for site visits.
+   */
+  async sendLocation(
+    toPhone: string,
+    params: { latitude: number; longitude: number; name: string; address: string },
+    options?: { credentials?: WhatsAppCredentialsOverride }
+  ): Promise<WhatsAppSendResult> {
+    const cleanPhone = this.sanitizePhoneNumber(toPhone);
+    const { token, phoneNumberId } = this.getCredentials(options?.credentials);
+
+    if (!token || !phoneNumberId) {
+      const simId = `sim-wa-loc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      logger.info(`[WhatsApp Simulated Location] To: ${cleanPhone}, Place: ${params.name}, ID: ${simId}`);
+      return { success: true, messageId: simId, isSimulated: true };
+    }
+
+    try {
+      const response = await fetch(`https://graph.facebook.com/${this.apiVersion}/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: cleanPhone,
+          type: 'location',
+          location: {
+            latitude: params.latitude,
+            longitude: params.longitude,
+            name: params.name,
+            address: params.address,
+          },
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      const data = (await response.json()) as any;
+      if (!response.ok) {
+        const errorMsg = data?.error?.message || `HTTP ${response.status}`;
+        logger.error(`[WhatsApp API Error] Failed to send location: ${errorMsg}`);
+        return { success: false, error: errorMsg };
+      }
+
+      return { success: true, messageId: data?.messages?.[0]?.id };
+    } catch (err: any) {
+      logger.error(`[WhatsApp Exception] sendLocation failed: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Downloads inbound media binary (e.g., WhatsApp audio voice notes) from Meta Graph API.
+   */
+  async downloadMedia(
+    mediaId: string,
+    credentials?: WhatsAppCredentialsOverride
+  ): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    const { token } = this.getCredentials(credentials);
+    if (!token || !mediaId) return null;
+
+    try {
+      const metaRes = await fetch(`https://graph.facebook.com/${this.apiVersion}/${mediaId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!metaRes.ok) return null;
+      const metaData = (await metaRes.json()) as { url?: string; mime_type?: string };
+      if (!metaData.url) return null;
+
+      const mediaRes = await fetch(metaData.url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!mediaRes.ok) return null;
+
+      const buffer = Buffer.from(await mediaRes.arrayBuffer());
+      return { buffer, mimeType: metaData.mime_type || 'audio/ogg' };
+    } catch (err: any) {
+      logger.warn(`[WhatsApp Media Download] Failed for ${mediaId}: ${err.message}`);
+      return null;
     }
   }
 }

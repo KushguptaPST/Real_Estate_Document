@@ -7,6 +7,7 @@ import { prisma } from '../utils/prisma.js';
 import { logger } from '../utils/logger.js';
 import { getLeadDetails } from './lead.service.js';
 import { requireOrgId } from '../utils/tenant.js';
+import { createError } from '../middleware/errorHandler.js';
 
 
 export interface MatchCalculationResult {
@@ -190,6 +191,10 @@ export async function createProperty(data: {
   title: string;
   address: string;
   city: string;
+  microMarket?: string;
+  builderName?: string;
+  reraNumber?: string;
+  possessionStatus?: string;
   price: number;
   bedrooms: number;
   bathrooms: number;
@@ -197,6 +202,12 @@ export async function createProperty(data: {
   status?: 'AVAILABLE' | 'UNDER_CONTRACT' | 'SOLD' | 'OFF_MARKET';
   features?: string[];
   description?: string;
+  brochureUrl?: string;
+  floorPlanUrl?: string;
+  mapsUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  negotiationMarginNote?: string;
   organizationId: string;
 }) {
   const property = await prisma.property.create({
@@ -204,6 +215,10 @@ export async function createProperty(data: {
       title: data.title,
       address: data.address,
       city: data.city,
+      microMarket: data.microMarket ?? null,
+      builderName: data.builderName ?? null,
+      reraNumber: data.reraNumber ?? null,
+      possessionStatus: data.possessionStatus ?? null,
       price: data.price,
       bedrooms: data.bedrooms,
       bathrooms: data.bathrooms,
@@ -211,12 +226,175 @@ export async function createProperty(data: {
       status: data.status ?? 'AVAILABLE',
       features: data.features ?? [],
       description: data.description ?? null,
+      brochureUrl: data.brochureUrl ?? null,
+      floorPlanUrl: data.floorPlanUrl ?? null,
+      mapsUrl: data.mapsUrl ?? null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
+      negotiationMarginNote: data.negotiationMarginNote ?? null,
       organizationId: data.organizationId,
     },
   });
 
   logger.info(`[Property Service] Created property "${property.title}" ID: ${property.id}`);
   return property;
+}
+
+/**
+ * Updates an existing property listing scoped strictly to the tenant organizationId.
+ */
+export async function updateProperty(
+  propertyId: string,
+  organizationId: string,
+  data: {
+    title?: string;
+    address?: string;
+    city?: string;
+    microMarket?: string | null;
+    builderName?: string | null;
+    reraNumber?: string | null;
+    possessionStatus?: string | null;
+    price?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    propertyType?: string;
+    status?: 'AVAILABLE' | 'UNDER_CONTRACT' | 'SOLD' | 'OFF_MARKET';
+    features?: string[];
+    description?: string | null;
+    brochureUrl?: string | null;
+    floorPlanUrl?: string | null;
+    mapsUrl?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    negotiationMarginNote?: string | null;
+  },
+) {
+  const orgId = requireOrgId(organizationId);
+  const existing = await prisma.property.findFirst({
+    where: { id: propertyId, organizationId: orgId },
+  });
+  if (!existing) {
+    throw createError('Property not found or access denied', 404);
+  }
+
+  const normalizeOptional = (val: string | null | undefined) =>
+    val === undefined ? undefined : val && val.trim() ? val.trim() : null;
+
+  const updated = await prisma.property.update({
+    where: { id: existing.id },
+    data: {
+      ...(data.title !== undefined ? { title: data.title.trim() } : {}),
+      ...(data.address !== undefined ? { address: data.address.trim() } : {}),
+      ...(data.city !== undefined ? { city: data.city.trim() } : {}),
+      ...(data.microMarket !== undefined ? { microMarket: normalizeOptional(data.microMarket) } : {}),
+      ...(data.builderName !== undefined ? { builderName: normalizeOptional(data.builderName) } : {}),
+      ...(data.reraNumber !== undefined ? { reraNumber: normalizeOptional(data.reraNumber) } : {}),
+      ...(data.possessionStatus !== undefined ? { possessionStatus: normalizeOptional(data.possessionStatus) } : {}),
+      ...(data.price !== undefined ? { price: data.price } : {}),
+      ...(data.bedrooms !== undefined ? { bedrooms: data.bedrooms } : {}),
+      ...(data.bathrooms !== undefined ? { bathrooms: data.bathrooms } : {}),
+      ...(data.propertyType !== undefined ? { propertyType: data.propertyType } : {}),
+      ...(data.status !== undefined ? { status: data.status } : {}),
+      ...(data.features !== undefined ? { features: data.features } : {}),
+      ...(data.description !== undefined ? { description: normalizeOptional(data.description) } : {}),
+      ...(data.brochureUrl !== undefined ? { brochureUrl: normalizeOptional(data.brochureUrl) } : {}),
+      ...(data.floorPlanUrl !== undefined ? { floorPlanUrl: normalizeOptional(data.floorPlanUrl) } : {}),
+      ...(data.mapsUrl !== undefined ? { mapsUrl: normalizeOptional(data.mapsUrl) } : {}),
+      ...(data.latitude !== undefined ? { latitude: data.latitude } : {}),
+      ...(data.longitude !== undefined ? { longitude: data.longitude } : {}),
+      ...(data.negotiationMarginNote !== undefined
+        ? { negotiationMarginNote: normalizeOptional(data.negotiationMarginNote) }
+        : {}),
+    },
+  });
+
+  logger.info(`[Property Service] Updated property "${updated.title}" ID: ${updated.id}`);
+  return updated;
+}
+
+/**
+ * Hybrid search for AI agents:
+ * Tier 1: Exact SQL matches (city/microMarket/address/title, budget, bedrooms)
+ * Tier 2: Elastic stretch (+20% budget and MicroMarketAdjacency / broader org inventory)
+ */
+export async function searchPropertiesHybrid(params: {
+  search?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  bedrooms?: number;
+  city?: string;
+  organizationId: string;
+}): Promise<{
+  exactMatches: Property[];
+  stretchMatches: Array<{ property: Property; stretchReason: string }>;
+}> {
+  const exactMatches = await getProperties({
+    ...params,
+    status: 'AVAILABLE',
+  });
+
+  if (exactMatches.length >= 2) {
+    return { exactMatches: exactMatches.slice(0, 5), stretchMatches: [] };
+  }
+
+  const orgId = requireOrgId(params.organizationId);
+  const exactIds = new Set(exactMatches.map((p) => p.id));
+  const stretchMatches: Array<{ property: Property; stretchReason: string }> = [];
+
+  // Look up configured micro-market adjacencies if city/microMarket specified
+  let adjacentMarkets: Array<{ adjacentMarket: string; commuteNote: string | null }> = [];
+  if (params.city && params.city.trim().length > 0) {
+    adjacentMarkets = await prisma.microMarketAdjacency.findMany({
+      where: {
+        organizationId: orgId,
+        sourceMarket: { contains: params.city.trim(), mode: 'insensitive' },
+      },
+      select: { adjacentMarket: true, commuteNote: true },
+      take: 5,
+    });
+  }
+
+  // Elastic budget ceiling (+20%)
+  const elasticMaxPrice = params.maxPrice ? Math.round(params.maxPrice * 1.2) : undefined;
+  const candidatePool = await prisma.property.findMany({
+    where: {
+      organizationId: orgId,
+      status: 'AVAILABLE',
+      ...(params.bedrooms ? { bedrooms: { gte: params.bedrooms } } : {}),
+      ...(elasticMaxPrice ? { price: { lte: elasticMaxPrice } } : {}),
+    },
+    orderBy: { price: 'asc' },
+    take: 15,
+  });
+
+  for (const prop of candidatePool) {
+    if (exactIds.has(prop.id)) continue;
+
+    const reasons: string[] = [];
+    if (params.maxPrice && prop.price > params.maxPrice) {
+      const diffPct = Math.round(((prop.price - params.maxPrice) / params.maxPrice) * 100);
+      reasons.push(`${diffPct}% above target ceiling (${formatIndianPrice(prop.price)})`);
+    }
+
+    if (params.city && params.city.trim().length > 0) {
+      const propLoc = `${prop.city} ${prop.microMarket ?? ''} ${prop.address}`.toLowerCase();
+      const adj = adjacentMarkets.find((a) => propLoc.includes(a.adjacentMarket.toLowerCase()));
+      if (adj) {
+        reasons.push(adj.commuteNote || `Adjacent micro-market: ${adj.adjacentMarket}`);
+      } else if (!propLoc.includes(params.city.trim().toLowerCase())) {
+        reasons.push(`Alternative area: ${prop.microMarket || prop.city}`);
+      }
+    }
+
+    stretchMatches.push({
+      property: prop,
+      stretchReason: reasons.join('; ') || 'Close inventory alternative',
+    });
+
+    if (stretchMatches.length >= 3) break;
+  }
+
+  return { exactMatches: exactMatches.slice(0, 5), stretchMatches };
 }
 
 /**
@@ -260,6 +438,7 @@ export async function getProperties(params: {
     andConditions.push({
       OR: [
         { city: { contains: c, mode: 'insensitive' } },
+        { microMarket: { contains: c, mode: 'insensitive' } },
         { address: { contains: c, mode: 'insensitive' } },
         { title: { contains: c, mode: 'insensitive' } },
       ],

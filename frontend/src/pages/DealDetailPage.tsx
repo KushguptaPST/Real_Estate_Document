@@ -8,6 +8,7 @@ import { DealHeader } from '@/components/deal/DealHeader';
 import { DealChecklist } from '@/components/deal/DealChecklist';
 import { TransactionTaskPanel } from '@/components/deal/TransactionTaskPanel';
 import { UploadZone } from '@/components/UploadZone';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import {
   ChevronRight,
   AlertTriangle,
@@ -315,12 +316,7 @@ export function DealDetailPage() {
           </div>
         </div>
 
-        {loading && (
-          <div className="rounded-xl border border-border/70 bg-card flex items-center justify-center gap-2 py-14 text-xs text-muted-foreground shadow-2xs">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span>Computing contract timeline milestones...</span>
-          </div>
-        )}
+        {loading && <TableRowsSkeleton rows={4} compact />}
 
         {error && (
           <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">

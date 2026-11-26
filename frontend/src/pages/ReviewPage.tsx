@@ -4,6 +4,7 @@ import { useDeadlines } from '@/hooks/useDeadlines';
 import { deadlinesApi, dealsApi } from '@/services/api';
 import { DeadlineCard } from '@/components/DeadlineCard';
 import { DealHeader } from '@/components/deal/DealHeader';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import {
   ChevronLeft,
   ChevronRight,
@@ -81,12 +82,7 @@ export function ReviewPage() {
         </p>
       </div>
 
-      {loading && (
-        <div className="rounded-xl border border-border/70 bg-card p-12 flex items-center justify-center gap-2 text-xs text-muted-foreground shadow-2xs">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span>Loading extracted contract clauses...</span>
-        </div>
-      )}
+      {loading && <TableRowsSkeleton rows={4} />}
 
       {error && (
         <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">

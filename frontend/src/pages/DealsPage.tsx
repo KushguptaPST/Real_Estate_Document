@@ -6,6 +6,7 @@ import { formatDate } from '@/utils/date';
 import { formatPrice as formatCurrency } from '@/utils/currency';
 import { exportToCsv } from '@/utils/csvExport';
 import { useToast } from '@/context/ToastContext';
+import { Skeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
 import {
   Building2,
   Plus,
@@ -243,7 +244,7 @@ export function DealsPage() {
                 Active Escrows
               </span>
               <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
-                {loading ? '—' : activeCount}
+                {loading ? <Skeleton className="h-7 w-14 mt-1" /> : activeCount}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-800">
@@ -266,7 +267,7 @@ export function DealsPage() {
                 Upcoming Deadlines
               </span>
               <div className="text-2xl font-extrabold text-amber-600 mt-1 font-mono">
-                {loading ? '—' : `${Math.max(2, activeCount * 2)}`}
+                {loading ? <Skeleton className="h-7 w-14 mt-1" /> : `${Math.max(2, activeCount * 2)}`}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
@@ -308,7 +309,7 @@ export function DealsPage() {
                 Closed Deals
               </span>
               <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">
-                {loading ? '—' : closedCount}
+                {loading ? <Skeleton className="h-7 w-14 mt-1" /> : closedCount}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-800">
@@ -392,12 +393,7 @@ export function DealsPage() {
       </div>
 
       {/* Loading State */}
-      {loading && (
-        <div className="rounded-2xl flex flex-col items-center justify-center py-16 text-xs text-slate-500 bg-white border border-slate-200/90 shadow-2xs">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-900 mb-2" />
-          <span>Loading deals and escrow timelines...</span>
-        </div>
-      )}
+      {loading && <TableRowsSkeleton rows={5} />}
 
       {/* Error State */}
       {error && (

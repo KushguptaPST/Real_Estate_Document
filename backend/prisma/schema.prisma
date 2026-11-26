@@ -21,6 +21,8 @@ model Organization {
   stripeSubscriptionId String?      @unique
   planExpiresAt        DateTime?
   stateJurisdiction    String?      @default("CA")
+  isSuspended          Boolean      @default(false)
+  suspendedReason      String?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
@@ -36,6 +38,16 @@ model Organization {
   callLogs            LeadCallLog[]
   leadTasks           LeadTask[]
   siteVisits          SiteVisit[]
+  channels            OrganizationChannel?
+  plivoNumbers        PlivoNumber[]
+  campaigns           Campaign[]
+  campaignEnrollments CampaignEnrollment[]
+  voiceCallSessions   VoiceCallSession[]
+  agentRunTraces      AgentRunTrace[]
+  wallet              OrganizationWallet?
+  marketAdjacencies   MicroMarketAdjacency[]
+  providerCostEvents  ProviderCostEvent[]
+  adminAuditLogs      AdminAuditLog[]
 
   @@map("organizations")
 }
@@ -52,6 +64,7 @@ model User {
   email          String        @unique
   passwordHash   String?
   name           String?
+  phone          String?
   pictureUrl     String?
   organizationId String?
   role           UserRole      @default(AGENT)
@@ -123,32 +136,39 @@ model OrganizationApiKey {
 
 // ─── Lead & Lead Requirements ────────────────────────────────────────────────
 model Lead {
-  id             String       @id @default(cuid())
-  organizationId String?
-  source         LeadSource   @default(WEBSITE_FORM)
-  externalId     String?
-  fullName       String
-  email          String?
-  phone          String?
-  status         LeadStatus   @default(NEW)
-  priority       LeadPriority @default(MEDIUM)
-  assignedUserId String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                String             @id @default(cuid())
+  organizationId    String?
+  source            LeadSource         @default(WEBSITE_FORM)
+  externalId        String?
+  fullName          String
+  email             String?
+  phone             String?
+  status            LeadStatus         @default(NEW)
+  stage             LeadLifecycleStage @default(NEW_INBOUND)
+  priority          LeadPriority       @default(MEDIUM)
+  doNotCall         Boolean            @default(false)
+  preferredLanguage String?
+  assignedUserId    String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  organization  Organization?              @relation(fields: [organizationId], references: [id])
-  assignedUser  User?                      @relation(fields: [assignedUserId], references: [id])
-  requirements  LeadRequirement?
-  proposals     LeadRequirementProposal[]
-  conversations     ConversationThread[]
-  matches           PropertyMatch[]
-  deal              Deal?
-  assignmentHistory LeadAssignmentHistory[]
-  callLogs          LeadCallLog[]
-  tasks             LeadTask[]
-  siteVisits        SiteVisit[]
+  organization        Organization?              @relation(fields: [organizationId], references: [id])
+  assignedUser        User?                      @relation(fields: [assignedUserId], references: [id])
+  requirements        LeadRequirement?
+  proposals           LeadRequirementProposal[]
+  conversations       ConversationThread[]
+  matches             PropertyMatch[]
+  deal                Deal?
+  assignmentHistory   LeadAssignmentHistory[]
+  callLogs            LeadCallLog[]
+  tasks               LeadTask[]
+  siteVisits          SiteVisit[]
+  campaignEnrollments CampaignEnrollment[]
+  voiceCallSessions   VoiceCallSession[]
+  agentRunTraces      AgentRunTrace[]
 
   @@index([organizationId, status])
+  @@index([organizationId, stage])
   @@unique([organizationId, email])
   @@unique([organizationId, phone])
   @@index([email, phone])
@@ -159,8 +179,25 @@ enum LeadSource {
   WEBSITE_FORM
   PORTAL_INQUIRY
   WHATSAPP
+  TELEGRAM
+  VOICE_CALL
+  WEB_WIDGET
+  CSV_CAMPAIGN
   EMAIL
   MANUAL
+}
+
+enum LeadLifecycleStage {
+  NEW_INBOUND
+  DISCOVERY
+  MATCHED
+  COLLATERAL_SENT
+  VISIT_PROPOSED
+  VISIT_BOOKED
+  ADVISOR_HANDOFF
+  DEAL_NEGOTIATION
+  NURTURE
+  DISQUALIFIED
 }
 
 enum LeadStatus {
@@ -378,6 +415,9 @@ model ConversationThread {
 enum MessageChannel {
   EMAIL
   WHATSAPP
+  TELEGRAM
+  VOICE_CALL
+  WEB_WIDGET
   SMS
   WEB_CHAT
 }
@@ -470,21 +510,31 @@ enum ApprovalStatus {
 
 // ─── Property Inventory & Matching ──────────────────────────────────────────
 model Property {
-  id             String         @id @default(cuid())
-  organizationId String?
-  title          String
-  address        String
-  city           String
-  price          Float
-  bedrooms       Int
-  bathrooms      Float
-  propertyType   String
-  status         PropertyStatus @default(AVAILABLE)
-  possessionDate DateTime?
-  features       String[]
-  description    String?        @db.Text
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                    String         @id @default(cuid())
+  organizationId        String?
+  title                 String
+  address               String
+  city                  String
+  microMarket           String?
+  builderName           String?
+  reraNumber            String?
+  possessionStatus      String?
+  price                 Float
+  bedrooms              Int
+  bathrooms             Float
+  propertyType          String
+  status                PropertyStatus @default(AVAILABLE)
+  possessionDate        DateTime?
+  features              String[]
+  description           String?        @db.Text
+  brochureUrl           String?
+  floorPlanUrl          String?
+  mapsUrl               String?
+  latitude              Float?
+  longitude             Float?
+  negotiationMarginNote String?        @db.Text
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
   organization Organization?   @relation(fields: [organizationId], references: [id])
   matches      PropertyMatch[]
@@ -926,6 +976,12 @@ enum AuditAction {
   MESSAGE_DISPATCH_FAILED
   MESSAGE_BOUNCED
   MESSAGE_RETRY_REQUESTED
+  CAMPAIGN_CREATED
+  CAMPAIGN_UPDATED
+  VOICE_CALL_STARTED
+  VOICE_CALL_COMPLETED
+  COLLATERAL_SENT
+  WIDGET_SESSION_CREATED
 }
 
 // ─── Real Estate Site Visits ────────────────────────────────────────────────
@@ -974,4 +1030,317 @@ model SiteVisit {
   @@index([leadId, status, startAt])
   @@index([propertyId])
   @@map("site_visits")
+}
+
+// ─── Multi-Tenant Omnichannel Registry & Website Widget ──────────────────────
+model OrganizationChannel {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique
+  onboardingCompleted   Boolean  @default(false)
+  onboardingStep        Int      @default(1)
+  whatsappPhoneNumberId String?  @unique
+  whatsappWabaId        String?
+  whatsappAccessToken   String?  @db.Text
+  whatsappVerifyToken   String?
+  whatsappProvider      String?
+  bspAppId              String?
+  telegramBotToken      String?  @db.Text
+  telegramBotUsername   String?
+  telegramWebhookSecret String?  @unique
+  widgetPublicKey       String   @unique @default(cuid())
+  widgetAllowedOrigins  String[]
+  widgetTitle           String   @default("AI Property Advisor")
+  widgetGreeting        String   @default("Hi! Looking for a property? Tell me your preferred location, budget, or configuration.")
+  widgetThemeColor      String   @default("#0F172A")
+  plivoSubaccountId     String?
+  plivoComplianceStatus String?  @default("NOT_SUBMITTED")
+  plivoComplianceAppId  String?
+  defaultCurrency       String   @default("INR")
+  defaultTimezone       String   @default("Asia/Kolkata")
+  callingWindowStart    String   @default("09:30")
+  callingWindowEnd      String   @default("19:30")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_channels")
+}
+
+model PlivoNumber {
+  id             String   @id @default(cuid())
+  organizationId String
+  phoneNumber    String   @unique
+  plivoAlias     String?
+  city           String?
+  isActive       Boolean  @default(true)
+  isPrimary      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@map("plivo_numbers")
+}
+
+model MicroMarketAdjacency {
+  id             String   @id @default(cuid())
+  organizationId String
+  sourceMarket   String
+  adjacentMarket String
+  distanceKm     Float?
+  commuteNote    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sourceMarket, adjacentMarket])
+  @@index([organizationId, sourceMarket])
+  @@map("micro_market_adjacencies")
+}
+
+// ─── Persistent Outbound Plivo Campaigns & Enrollment Queue ──────────────────
+enum CampaignStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+enum CampaignEnrollmentStatus {
+  PENDING
+  DIALING
+  CONNECTED
+  VOICEMAIL
+  RETRY_SCHEDULED
+  COMPLETED
+  FAILED
+  DND_SKIPPED
+}
+
+model Campaign {
+  id                     String         @id @default(cuid())
+  organizationId         String
+  name                   String
+  status                 CampaignStatus @default(IDLE)
+  concurrencyTrunks      Int            @default(10)
+  scriptGoal             String?        @db.Text
+  totalLeads             Int            @default(0)
+  callsDialed            Int            @default(0)
+  liveHumansConnected    Int            @default(0)
+  voicemailsDetected     Int            @default(0)
+  busyOrNoAnswer         Int            @default(0)
+  siteVisitsLocked       Int            @default(0)
+  warmTransfersRequested Int            @default(0)
+  startedAt              DateTime?
+  completedAt            DateTime?
+  pauseReason            String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enrollments  CampaignEnrollment[]
+  callSessions VoiceCallSession[]
+
+  @@index([organizationId, status])
+  @@map("campaigns")
+}
+
+model CampaignEnrollment {
+  id            String                   @id @default(cuid())
+  campaignId    String
+  organizationId String
+  leadId        String
+  phone         String
+  status        CampaignEnrollmentStatus @default(PENDING)
+  attempts      Int                      @default(0)
+  maxAttempts   Int                      @default(3)
+  nextAttemptAt DateTime                 @default(now())
+  lastAmdResult String?
+  lastCallUuid  String?
+  notes         String?                  @db.Text
+  lockedAt      DateTime?
+  lockedBy      String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, campaignId])
+  @@map("campaign_enrollments")
+}
+
+// ─── Plivo Voice Call Sessions (Inbound + Outbound) ──────────────────────────
+enum VoiceCallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NO_ANSWER
+  BUSY
+  TRANSFERRED
+}
+
+model VoiceCallSession {
+  id              String          @id @default(cuid())
+  organizationId  String
+  leadId          String?
+  campaignId      String?
+  callUuid        String          @unique
+  direction       CallDirection
+  fromNumber      String
+  toNumber        String
+  status          VoiceCallStatus @default(INITIATED)
+  amdResult       String?
+  durationSeconds Int             @default(0)
+  recordingUrl    String?
+  transcript      Json?
+  summary         String?         @db.Text
+  outcome         String?
+  startedAt       DateTime        @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([leadId])
+  @@index([campaignId])
+  @@map("voice_call_sessions")
+}
+
+// ─── Agentic Observability & Traceability ────────────────────────────────────
+enum AgentSpecialist {
+  SUPERVISOR
+  QUALIFIER
+  MATCHER
+  CLOSER
+  DOCS_RAG
+  ESCALATION
+}
+
+model AgentRunTrace {
+  id             String           @id @default(cuid())
+  organizationId String
+  leadId         String
+  threadId       String?
+  channel        MessageChannel
+  specialist     AgentSpecialist
+  intent         String
+  stageBefore    LeadLifecycleStage
+  stageAfter     LeadLifecycleStage
+  toolsExecuted  Json?
+  guardrailFlags String[]
+  latencyMs      Int              @default(0)
+  modelUsed      String?
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([leadId, createdAt])
+  @@map("agent_run_traces")
+}
+
+// ─── Persistent Metered Telephony & Messaging Wallet ─────────────────────────
+model OrganizationWallet {
+  id                  String   @id @default(cuid())
+  organizationId      String   @unique
+  balance             Float    @default(0.0)
+  currency            String   @default("USD")
+  autoRechargeEnabled Boolean  @default(false)
+  rechargeThreshold   Float    @default(50.0)
+  rechargeAmount      Float    @default(200.0)
+  voiceMinutesBilled  Int      @default(0)
+  leadsQualified      Int      @default(0)
+  totalSpent          Float    @default(0)
+  totalDeposited      Float    @default(0.0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries      WalletLedgerEntry[]
+
+  @@map("organization_wallets")
+}
+
+model WalletLedgerEntry {
+  id           String   @id @default(cuid())
+  walletId     String
+  type         String
+  category     String
+  description  String
+  amount       Float
+  balanceAfter Float
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  wallet OrganizationWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@map("wallet_ledger_entries")
+}
+
+// ─── Provider COGS Sub-Ledger & Platform Admin Control Plane ──────────────────
+model ProviderCostEvent {
+  id              String   @id @default(cuid())
+  organizationId  String
+  provider        String
+  operation       String
+  units           Float
+  unitType        String
+  costInr         Float
+  leadId          String?
+  callSessionId   String?
+  agentRunTraceId String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([provider, createdAt])
+  @@map("provider_cost_events")
+}
+
+model PlatformConfig {
+  id                     String    @id @default("default")
+  primaryTtsEngine       String    @default("eleven_flash_v2_5")
+  primaryLlmModel        String    @default("gemini-2.5-flash")
+  outboundDialerPaused   Boolean   @default(false)
+  maxPlatformConcurrency Int       @default(50)
+  autoFailoverEnabled    Boolean   @default(true)
+  consecutiveTtsFailures Int       @default(0)
+  lastFailoverAt         DateTime?
+  failoverReason         String?
+  updatedBy              String?
+  updatedAt              DateTime  @updatedAt
+
+  @@map("platform_configs")
+}
+
+model AdminAuditLog {
+  id             String   @id @default(cuid())
+  adminEmail     String
+  organizationId String?
+  action         String
+  note           String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@map("admin_audit_logs")
 }

@@ -226,20 +226,20 @@ export function AlertPreferences({ settings, saving, onSave }: Props) {
           </div>
           <Button
             type="button"
-            variant="secondary"
+            variant="default"
             size="sm"
             disabled={!newEmail.trim() || isPersistingRecipient}
             onClick={() => handleAddRecipient()}
-            className="h-9.5 px-3.5 text-xs gap-1.5 shrink-0 bg-[#1A1A22] text-slate-800 border border-slate-200 hover:border-slate-300 hover:bg-[#22222C]"
+            className="h-9.5 px-3.5 text-xs gap-1.5 shrink-0 bg-[#0A0A0A] text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 border border-transparent shadow-xs transition-colors font-medium"
           >
             {isPersistingRecipient ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-900" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
                 <span>Saving...</span>
               </>
             ) : (
               <>
-                <Plus className="h-3.5 w-3.5 text-emerald-700" />
+                <Plus className={`h-3.5 w-3.5 ${!newEmail.trim() ? 'text-slate-400' : 'text-emerald-400'}`} />
                 <span>Add Recipient</span>
               </>
             )}

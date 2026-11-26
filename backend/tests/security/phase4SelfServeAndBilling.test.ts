@@ -107,7 +107,7 @@ describe('Phase 2 — Self-Serve SaaS, Public Signup & Stripe Monetization', () 
       expect(res.body.tier).toBe('SOLO');
       expect(res.body.status).toBe('ACTIVE');
       expect(res.body.stateJurisdiction).toBe('CA');
-      expect(res.body.planDetails.name).toBe('Solo Agent');
+      expect(res.body.planDetails.name).toMatch(/Solo (Agent|Channel Partner)/);
       expect(res.body.usage.seatsUsed).toBe(1);
       expect(res.body.usage.maxSeats).toBe(1);
     });

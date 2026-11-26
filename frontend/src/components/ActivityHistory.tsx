@@ -1,6 +1,7 @@
 import { useState, type ComponentType } from 'react';
 import type { AuditLog } from '@/types';
 import { formatAuditTimestamp, formatShortDate } from '@/utils/date';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import {
   Building2,
   FileText,
@@ -358,9 +359,8 @@ export function ActivityHistory({
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span>Loading audit history trail...</span>
+        <div className="p-4">
+          <TableRowsSkeleton rows={4} compact />
         </div>
       )}
 

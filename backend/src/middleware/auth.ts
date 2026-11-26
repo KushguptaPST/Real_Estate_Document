@@ -43,3 +43,16 @@ export function requireRole(...roles: UserRole[]) {
     next();
   };
 }
+
+/** Must run after requireAuth. Restricts access to Eigen Estate platform super-admins. */
+export function requirePlatformAdmin(req: Request, _res: Response, next: NextFunction): void {
+  if (!req.user) {
+    next(createError('Authentication required', 401));
+    return;
+  }
+  if (!req.user.isPlatformAdmin) {
+    next(createError('Platform super-admin access required', 403));
+    return;
+  }
+  next();
+}

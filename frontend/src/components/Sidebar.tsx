@@ -10,7 +10,6 @@ import {
   LogOut,
   TrendingUp,
   PhoneCall,
-  Cpu,
   ChevronsUpDown,
   Check,
   Settings,
@@ -18,11 +17,13 @@ import {
   Copy,
   PanelLeftClose,
   PanelLeftOpen,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useSidebar } from '@/context/SidebarContext';
 import { EigenEstateIcon } from '@/components/brand/EigenEstateLogo';
+import { prefetchRoute } from '@/routes/prefetch';
 
 const MAIN_NAV = [
   { href: '/deals', label: 'Deals & Escrows', shortLabel: 'Deals', icon: Layers },
@@ -32,8 +33,9 @@ const MAIN_NAV = [
 ];
 
 const SECONDARY_NAV = [
+  { href: '/onboarding', label: 'Channel Setup', shortLabel: 'Setup', icon: PhoneCall },
   { href: '/organization', label: 'Team & Settings', shortLabel: 'Team', icon: ShieldCheck },
-  { href: '/admin', label: 'Admin Console', shortLabel: 'Admin', icon: Cpu },
+  { href: '/billing', label: 'Plan & Billing', shortLabel: 'Billing', icon: CreditCard },
   { href: '/audit', label: 'Audit Trail', shortLabel: 'Audit', icon: History },
 ];
 
@@ -250,6 +252,18 @@ export function Sidebar() {
 
                 <button
                   type="button"
+                  onClick={() => {
+                    setWorkspaceMenuOpen(false);
+                    navigate('/billing');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 transition-colors cursor-pointer"
+                >
+                  <CreditCard className="h-4 w-4 text-emerald-600" />
+                  <span>Plan &amp; Billing</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleCopyOrgId}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
@@ -327,7 +341,9 @@ export function Sidebar() {
                   <div key={item.href} className="relative group flex justify-center">
                     <Link
                       to={item.href}
-                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all w-[68px] mx-auto border ${
+                      onMouseEnter={() => prefetchRoute(item.href)}
+                      onFocus={() => prefetchRoute(item.href)}
+                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-colors duration-150 w-[68px] mx-auto border ${
                         active
                           ? 'bg-slate-100 text-slate-900 border-slate-200/90 shadow-2xs font-bold'
                           : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
@@ -353,7 +369,9 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   to={item.href}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onFocus={() => prefetchRoute(item.href)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 ${
                     active
                       ? 'bg-slate-100 text-slate-900 border-slate-200/80 shadow-2xs font-semibold'
                       : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -390,7 +408,9 @@ export function Sidebar() {
                   <div key={item.href} className="relative group flex justify-center">
                     <Link
                       to={item.href}
-                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all w-[68px] mx-auto border ${
+                      onMouseEnter={() => prefetchRoute(item.href)}
+                      onFocus={() => prefetchRoute(item.href)}
+                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-colors duration-150 w-[68px] mx-auto border ${
                         active
                           ? 'bg-slate-100 text-slate-900 border-slate-200/90 shadow-2xs font-bold'
                           : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
@@ -416,7 +436,9 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   to={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onFocus={() => prefetchRoute(item.href)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 ${
                     active
                       ? 'bg-slate-100 text-slate-900 border-slate-200/80 shadow-2xs font-semibold'
                       : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -427,6 +449,47 @@ export function Sidebar() {
                 </Link>
               );
             })}
+            {user?.isPlatformAdmin && (
+              isCollapsed ? (
+                <div className="relative group flex justify-center">
+                  <Link
+                    to="/admin"
+                    onMouseEnter={() => prefetchRoute('/admin')}
+                    onFocus={() => prefetchRoute('/admin')}
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-colors duration-150 w-[68px] mx-auto border ${
+                      pathname === '/admin'
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                        : 'border-transparent text-emerald-700 hover:bg-emerald-50/70 font-medium'
+                    }`}
+                  >
+                    <ShieldCheck className="h-5 w-5 mb-1 text-emerald-700" />
+                    <span className="text-[11px] font-semibold leading-tight tracking-tight truncate max-w-full text-center">
+                      Admin
+                    </span>
+                  </Link>
+                  <div className="absolute left-full ml-3 px-3 py-1.5 rounded-lg bg-[#0A0A0A] text-white text-xs font-semibold whitespace-nowrap shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                    Platform Mission Control
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  to="/admin"
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                    pathname === '/admin'
+                      ? 'bg-emerald-50 text-emerald-950 border-emerald-200 font-semibold'
+                      : 'border-transparent text-emerald-800 hover:bg-emerald-50/70'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 text-emerald-700" />
+                    <span>Mission Control</span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    Ops
+                  </span>
+                </Link>
+              )
+            )}
           </nav>
         </div>
       </div>

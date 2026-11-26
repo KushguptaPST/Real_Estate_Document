@@ -6,14 +6,13 @@
 
 ```
 Real_Estate_Document/
-├── dateEngine.js          # Core business/calendar-day engine (built + tested)
-├── dateEngine.test.js     # Jest tests
-├── package.json           # Root – date engine package
-├── reference/             # Python mirror of date engine (reference only)
-├── backend/               # Express + TypeScript + Prisma API
-├── frontend/              # React (Vite) + TypeScript + Tailwind UI
-├── docker-compose.yml     # Local PostgreSQL (Docker)
-└── .env.example           # All environment variables documented
+├── backend/               # Express + TypeScript + Prisma API & Production Date Engine
+├── frontend/              # React 18 (Vite) + TypeScript + Tailwind UI
+├── docs/                  # Architecture blueprints, HLD, reports, and testing guides
+├── docker-compose.yml     # Local PostgreSQL 16 & pgvector (Docker)
+├── render.yaml            # Render backend cloud deployment spec
+├── vercel.json            # Vercel frontend cloud deployment spec
+└── package.json           # Root monorepo workspace orchestrator
 ```
 
 ---

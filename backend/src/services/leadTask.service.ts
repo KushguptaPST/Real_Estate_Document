@@ -434,7 +434,18 @@ export async function completeLeadTask(params: {
   }
 
   // If already completed, idempotent return without overwriting original completedAt or actor
+  // (Also ensure any linked scheduled site visit is marked completed)
   if (existing.status === 'COMPLETED') {
+    if (existing.siteVisitId) {
+      await prisma.siteVisit.updateMany({
+        where: { id: existing.siteVisitId, status: 'SCHEDULED' },
+        data: {
+          status: 'COMPLETED',
+          completedAt: existing.completedAt ?? new Date(),
+          completedById: callerId,
+        },
+      });
+    }
     return {
       ...existing,
       isOverdue: false,
@@ -462,6 +473,17 @@ export async function completeLeadTask(params: {
         completedUser: { select: { id: true, name: true, email: true } },
       },
     });
+
+    if (updated.siteVisitId) {
+      await tx.siteVisit.updateMany({
+        where: { id: updated.siteVisitId, status: 'SCHEDULED' },
+        data: {
+          status: 'COMPLETED',
+          completedAt,
+          completedById: callerId,
+        },
+      });
+    }
 
     // Touch lead's updatedAt on task completion to record fresh advisor activity
     await tx.lead.update({

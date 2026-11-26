@@ -4,6 +4,7 @@ import { dealsApi } from '@/services/api';
 import type { Deal } from '@/types';
 import { exportToCsv } from '@/utils/csvExport';
 import { useToast } from '@/context/ToastContext';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   BarChart3,
   Building2,
@@ -79,8 +80,8 @@ const LEAD_SOURCE_DATA = [
 
 export function AnalyticsPage() {
   const { toast } = useToast();
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [deals, setDeals] = useState<Deal[]>(() => dealsApi.getCached() ?? []);
+  const [loading, setLoading] = useState(() => !dealsApi.getCached());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -237,7 +238,7 @@ export function AnalyticsPage() {
           </div>
           <div>
             <div className="text-2xl font-black text-slate-800 font-mono tracking-tight">
-              {loading ? '...' : activeDealsCount}
+              {loading ? <Skeleton className="h-7 w-14" /> : activeDealsCount}
             </div>
             <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
               <span className="text-emerald-700 font-semibold text-[11px]">
@@ -260,7 +261,7 @@ export function AnalyticsPage() {
           </div>
           <div>
             <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-              {loading ? '...' : closedDealsCount}
+              {loading ? <Skeleton className="h-7 w-14" /> : closedDealsCount}
             </div>
             <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
               <span className="text-emerald-400 font-semibold text-[11px]">
@@ -283,7 +284,7 @@ export function AnalyticsPage() {
           </div>
           <div>
             <div className="text-2xl font-black text-slate-800 font-mono tracking-tight">
-              {loading ? '...' : totalDeadlinesCount}
+              {loading ? <Skeleton className="h-7 w-14" /> : totalDeadlinesCount}
             </div>
             <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
               <span className="text-emerald-700 font-semibold text-[11px]">

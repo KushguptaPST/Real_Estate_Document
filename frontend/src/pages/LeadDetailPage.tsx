@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { leadsApi, conversationsApi, propertiesApi, organizationApi, siteVisitsApi, voiceApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+import { WorkspacePageSkeleton, TableRowsSkeleton } from '@/components/ui/skeleton';
 import type {
   Lead,
   LeadAssignmentHistory,
@@ -1261,11 +1262,7 @@ export function LeadDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
-      </div>
-    );
+    return <WorkspacePageSkeleton />;
   }
 
   if (error || !lead) {
@@ -1840,7 +1837,7 @@ export function LeadDetailPage() {
               },
               NEW_MATCHING_INVENTORY: {
                 label: 'New Matching Inventory Ready',
-                badge: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                badge: 'bg-purple-50 text-purple-800 border-purple-200',
               },
               INACTIVE_LEAD_CHECKIN: {
                 label: 'Inactive Lead Periodic Check-in',
@@ -2292,7 +2289,7 @@ export function LeadDetailPage() {
                     type="button"
                     onClick={() => handleAcceptProposal(latest)}
                     disabled={!!processingProposalId}
-                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 text-black font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-lg bg-[#0A0A0A] text-white hover:bg-slate-800 font-extrabold text-[11px] shrink-0 transition-colors shadow-xs cursor-pointer flex items-center gap-1"
                   >
                     <Check className="h-3 w-3" />
                     {processingProposalId === latest?.id ? 'Applying...' : 'Apply Latest'}
@@ -2679,7 +2676,7 @@ export function LeadDetailPage() {
                             </span>
                           )}
                           {t.callLogId && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
                               From Call Log
                             </span>
                           )}
@@ -2875,10 +2872,7 @@ export function LeadDetailPage() {
             </button>
           </div>
         ) : loadingTimeline && timelineEvents.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 space-y-2">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto text-emerald-700" />
-            <p className="text-xs">Loading activity timeline...</p>
-          </div>
+          <TableRowsSkeleton rows={3} compact />
         ) : timelineEvents.length === 0 ? (
           <div className="p-10 rounded-xl border border-dashed border-slate-200 text-center space-y-2">
             <Clock className="h-8 w-8 text-slate-400 mx-auto" />

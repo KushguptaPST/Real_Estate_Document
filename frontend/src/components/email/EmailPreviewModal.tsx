@@ -4,6 +4,7 @@ import { Eye, X, Loader2, AlertTriangle, Mail, Code2, CheckCircle2 } from 'lucid
 import type { EmailPreviewResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
@@ -153,9 +154,9 @@ export function EmailPreviewModal({ dealId, isOpen, onClose }: Props) {
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {loading && (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <span>Compiling responsive email template...</span>
+              <div className="space-y-4 py-4">
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-48 w-full rounded-xl" />
               </div>
             )}
 

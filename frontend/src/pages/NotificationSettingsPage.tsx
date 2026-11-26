@@ -7,6 +7,7 @@ import { EmailLogTable } from '@/components/email/EmailLogTable';
 import { SendTestEmailButton } from '@/components/email/SendTestEmailButton';
 import { EmailPreviewModal } from '@/components/email/EmailPreviewModal';
 import { DealHeader } from '@/components/deal/DealHeader';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -161,9 +162,13 @@ export function NotificationSettingsPage() {
 
       {/* Preferences Form */}
       {loading ? (
-        <div className="rounded-xl border border-border/70 bg-card p-12 flex items-center justify-center gap-2 text-xs text-muted-foreground shadow-2xs">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span>Loading alert preferences...</span>
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-6 space-y-4 shadow-2xs">
+          <Skeleton className="h-5 w-44" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-14 w-full rounded-xl" />
+            <Skeleton className="h-14 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       ) : (
         <AlertPreferences
