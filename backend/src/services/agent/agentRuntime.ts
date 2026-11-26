@@ -14,6 +14,7 @@ import { logger } from '../../utils/logger.js';
 import { requireOrgId } from '../../utils/tenant.js';
 import { getPlatformConfig } from '../platformConfig.service.js';
 import { recordGeminiCost } from '../costTracker.service.js';
+import { generateEmbedding, cosineSimilarity } from '../embedding.service.js';
 import {
   AGENT_FUNCTION_DECLARATIONS,
   executeAgentTool,
@@ -150,6 +151,7 @@ async function generateConsultativeFallback(params: {
   }>;
   executedTools: ExecutedToolRecord[];
   trustedContext?: TrustedAgentContext;
+  recentMessages?: Array<{ senderType: string; content: string }>;
   reason: string;
   customerName?: string;
   currency?: string;
@@ -223,24 +225,43 @@ async function generateConsultativeFallback(params: {
     locationPhraseMatch?.[1]?.trim() ||
     (rawLocationTokens.length > 0 ? rawLocationTokens.join(' ') : '');
 
-  // Check if user mentioned a specific property title or micro-market/city
-  const mentionedProp = allOrgProps.find(
-    (p) =>
-      lower.includes(p.title.toLowerCase()) ||
-      (p.microMarket && lower.includes(p.microMarket.toLowerCase())) ||
-      lower.includes(p.city.toLowerCase()),
-  );
+  // Check if user mentioned a specific property title or micro-market/city (or in recent history)
+  const recentHistoryText = (params.recentMessages ?? []).map((m) => m.content.toLowerCase()).join(' ');
+  const lastAiMessage =
+    [...(params.recentMessages ?? [])]
+      .reverse()
+      .find((m) => m.senderType === 'AI' || m.senderType === 'AGENT')
+      ?.content.toLowerCase() ?? '';
+
+  const mentionedProp =
+    allOrgProps.find(
+      (p) =>
+        lower.includes(p.title.toLowerCase()) ||
+        (p.microMarket && lower.includes(p.microMarket.toLowerCase())) ||
+        lower.includes(p.city.toLowerCase()),
+    ) ??
+    allOrgProps.find((p) => recentHistoryText.includes(p.title.toLowerCase()));
   const primaryProp = mentionedProp ?? filteredProps[0] ?? allOrgProps[0];
 
   const isGreeting = /^(hi+|hii+|hello+|hey+|good\s*(morning|afternoon|evening)|namaste)[\s!.,?]*$/i.test(lower);
+  const isThanks = /^(thanks?|thank\s*you|ty|ok\s*thanks?|great\s*thanks?|bye|goodbye)[\s!.,?]*$/i.test(lower);
+  const isAffirmative = /^(yes+|yeah|yep|sure|ok+|okay|please|go\s*ahead|do\s*it|send\s*it|sounds\s*good)[\s!.,?]*$/i.test(lower);
+  const givesTimeSlot = /\b(tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend|\d{1,2}\s*(?:am|pm)|morning|afternoon|evening)\b/i.test(lower);
+
   const asksOrg = /\b(org|organisation|organization|company|brokerage|agency|who are you)\b/i.test(lower);
   const asksCountOrAll = /\b(only\s*one|how\s*many|all\s*propert|all\s*listing|list\s*all|every\s*propert|total\s*propert|show\s*all|what\s*all|available\s*propert)\b/i.test(lower);
   const asksLocation = /\b(where|location|address|map|direction|situated|located|area)\b/i.test(lower);
   const asksPrice = /\b(price|cost|how\s*much|rate|amount|crore|lakh)\b/i.test(lower);
   const asksDetails = /\b(detail|info|about|rera|builder|amenit|feature|spec|bath|bedroom|bhk|possession|ready|status|description)\b/i.test(lower);
-  const asksBrochure = /\b(brochure|pdf|floor\s*plan|document)\b/i.test(lower);
-  const asksVisit = /\b(visit|tour|schedule|book|see\s*it|walkthrough|slot|when\s*can\s*i)\b/i.test(lower);
-  const asksAdvisor = /\b(advisor|agent|human|call|phone|contact|number|speak|talk)\b/i.test(lower);
+  const asksBrochure =
+    /\b(brochure|pdf|floor\s*plan|document)\b/i.test(lower) ||
+    (isAffirmative && lastAiMessage.includes('brochure'));
+  const asksVisit =
+    /\b(visit|tour|schedule|book|see\s*it|walkthrough|slot|when\s*can\s*i)\b/i.test(lower) ||
+    (isAffirmative && (lastAiMessage.includes('site visit') || lastAiMessage.includes('book a visit')));
+  const asksAdvisor =
+    /\b(advisor|agent|human|call|phone|contact|number|speak|talk)\b/i.test(lower) ||
+    (isAffirmative && lastAiMessage.includes('advisor'));
 
   const formatPropFull = (p: (typeof allOrgProps)[number]) => {
     const parts = [
@@ -257,7 +278,13 @@ async function generateConsultativeFallback(params: {
   let response = '';
   const suggestedFollowUps: string[] = [];
 
-  if (asksOrg) {
+  if (isThanks) {
+    response = `You're very welcome, ${firstName || 'there'}! Feel free to reach out anytime if you'd like to revisit ${primaryProp ? primaryProp.title : `${orgLabel}'s listings`} or schedule a site visit.`;
+    suggestedFollowUps.push('Show all properties', 'Schedule a site visit');
+  } else if (givesTimeSlot && primaryProp && (lastAiMessage.includes('visit') || lastAiMessage.includes('slot') || asksVisit)) {
+    response = `${greeting}, got it! I've noted your preferred time ("${customerMessage.trim()}") for a site visit at ${primaryProp.title} (${primaryProp.microMarket || primaryProp.city}). Our ${orgLabel} advisor will confirm the appointment with you shortly!`;
+    suggestedFollowUps.push('Send brochure', 'Connect with an advisor');
+  } else if (asksOrg) {
     const advisorCount = advisors.length;
     const regionText = organizationJurisdiction ? ` (${organizationJurisdiction})` : '';
     const invNote =
@@ -348,11 +375,41 @@ async function generateConsultativeFallback(params: {
     const matchedProps = (bestMatches.length > 0 ? bestMatches : filteredProps.length > 0 ? filteredProps : allOrgProps).slice(0, 3);
 
     if (hasLocationQuery && locationMatchedProps.length === 0 && allOrgProps.length > 0) {
-      const availableAreas = Array.from(
-        new Set(allOrgProps.map((p) => p.microMarket || p.city).filter(Boolean)),
-      ).join(', ');
-      const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
-      response = `${greeting}, we don't currently have any verified listings in "${requestedLocationLabel}" at ${orgLabel}. Our active inventory is in ${availableAreas}:\n• ${summaryList}\n\nWould you like details on any of these, or should I connect you with an advisor to source options in ${requestedLocationLabel}?`;
+      // Try semantic search across uploaded organization DocumentChunks before saying no match
+      let semanticSnippet = '';
+      try {
+        const orgChunks = await prisma.documentChunk.findMany({
+          where: { organizationId },
+          select: { content: true, sectionTitle: true, embedding: true },
+          take: 30,
+        });
+        if (orgChunks.length > 0) {
+          const qEmb = await generateEmbedding(customerMessage);
+          const scored = orgChunks
+            .map((ch) => {
+              const vec = Array.isArray(ch.embedding) ? (ch.embedding as number[]) : [];
+              const semScore = vec.length > 0 ? cosineSimilarity(qEmb, vec) : 0;
+              const kwHits = rawLocationTokens.filter((t) => ch.content.toLowerCase().includes(t)).length;
+              return { content: ch.content, score: semScore * 0.7 + Math.min(1, kwHits * 0.3) * 0.3 };
+            })
+            .sort((a, b) => b.score - a.score);
+          if (scored[0] && scored[0].score > 0.35) {
+            semanticSnippet = scored[0].content.slice(0, 350).trim();
+          }
+        }
+      } catch {
+        // Non-critical semantic lookup
+      }
+
+      if (semanticSnippet) {
+        response = `${greeting}, here's what I found in ${orgLabel}'s records:\n\n${semanticSnippet}\n\nWould you like me to connect you with an advisor for more details?`;
+      } else {
+        const availableAreas = Array.from(
+          new Set(allOrgProps.map((p) => p.microMarket || p.city).filter(Boolean)),
+        ).join(', ');
+        const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
+        response = `${greeting}, we don't currently have any verified listings in "${requestedLocationLabel}" at ${orgLabel}. Our active inventory is in ${availableAreas}:\n• ${summaryList}\n\nWould you like details on any of these, or should I connect you with an advisor to source options in ${requestedLocationLabel}?`;
+      }
       suggestedFollowUps.push('Connect with an advisor', 'Schedule a site visit');
     } else if (matchedProps.length > 0) {
       const summaryList = matchedProps.map((p) => formatPropFull(p)).join('\n• ');
@@ -632,6 +689,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
       properties: orgProperties,
       executedTools: [],
       trustedContext,
+      recentMessages,
       reason: 'API key missing from environment',
       customerName: clientFullName,
       currency,
@@ -828,6 +886,7 @@ ${orgInventorySummary}`,
         properties: orgProperties,
         executedTools,
         trustedContext,
+        recentMessages,
         reason: `Model cascade error: ${errMessage.slice(0, 100)}`,
         customerName: clientFullName,
         currency,
