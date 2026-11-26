@@ -1023,6 +1023,19 @@ export async function initTelegramBot(): Promise<void> {
 }
 
 /**
+ * Stops only the global .env TELEGRAM_BOT_TOKEN polling loop (used when an org claims that token).
+ */
+export function stopGlobalTelegramPolling(): void {
+  if (!isRunning) return;
+  logger.info('[Telegram] Stopping global fallback poller because an organization claimed the token...');
+  isRunning = false;
+  if (pollingAbortController) {
+    pollingAbortController.abort();
+    pollingAbortController = null;
+  }
+}
+
+/**
  * Stops the Telegram Bot Polling loop cleanly.
  */
 export function stopTelegramBot(): void {

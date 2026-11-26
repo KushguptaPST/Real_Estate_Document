@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../../utils/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { getOrCreateOrgChannel } from '../channelRegistry.service.js';
-import { startOrgTelegramPolling, stopOrgTelegramPolling } from '../telegram.service.js';
+import { startOrgTelegramPolling, stopOrgTelegramPolling, stopGlobalTelegramPolling } from '../telegram.service.js';
 
 export interface WhatsAppEmbeddedSignupInput {
   code?: string;
@@ -197,6 +197,9 @@ export async function connectTelegramBotForOrg(
   }
 
   // Give priority to the latest organization when reusing the same bot token
+  if (cleanToken === process.env['TELEGRAM_BOT_TOKEN']?.trim()) {
+    stopGlobalTelegramPolling();
+  }
   const previousOwners = await prisma.organizationChannel.findMany({
     where: {
       organizationId: { not: organizationId },
