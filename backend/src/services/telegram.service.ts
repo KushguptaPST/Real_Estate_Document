@@ -715,16 +715,22 @@ async function handleIncomingMessage(
       },
     });
 
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    const orgDisplayName = org?.name || 'our Real Estate Advisory';
+
     const welcome =
       `👋 <b>Hello ${msg.from.first_name}!</b>\n\n` +
-      `Welcome to <b>Eigen Estate AI Copilot</b> (eigenestate.com). I am your autonomous real estate sales advisor.\n\n` +
+      `Welcome to <b>${orgDisplayName}</b>. I am your dedicated real estate sales advisor.\n\n` +
       `Here is what I can do for you:\n` +
-      `• 🔍 <b>Find Properties:</b> Tell me your budget, preferred city, or bedroom requirements.\n` +
+      `• 🔍 <b>Find Properties:</b> Tell me your budget, preferred area, or bedroom requirements.\n` +
       `• 📅 <b>Book Tours:</b> Schedule an on-site property walkthrough.\n` +
-      `• 📋 <b>Answer Questions:</b> Inquire about HOA fees, schools, price points, and features.\n\n` +
+      `• 📋 <b>Answer Questions:</b> Inquire about pricing, RERA, amenities, and property details.\n\n` +
       `<i>Try asking:</i>\n` +
-      `👉 "Show me 2-bedroom properties under ₹80 L"\n` +
-      `👉 "What homes are available in Whitefield or Bengaluru?"\n` +
+      `👉 "Show me all available properties"\n` +
+      `👉 "What are the details and price?"\n` +
       `👉 "/properties" to list verified inventory now!`;
 
     await sendTelegramMessage(chatId, welcome, {

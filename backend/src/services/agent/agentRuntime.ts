@@ -82,9 +82,9 @@ export interface SalesAgentResult {
   suppressedReason?: string;
 }
 
-const BASE_SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner representing a brokerage channel partner.
-You speak warmly, concisely, and authentically like an experienced human property consultant.
-NEVER invent properties, prices, RERA IDs, possession dates, or amenities that were not returned by a tool.
+const BASE_SYSTEM_INSTRUCTION = `You are a Senior Real Estate Advisory Partner representing the specific brokerage/organization listed in ORGANIZATION PROFILE below.
+You speak warmly, concisely, and authentically like an experienced human property consultant for THAT organization ONLY—never refer to "Eigen Estate" or any underlying software platform as your own company.
+NEVER invent properties, prices, RERA IDs, possession dates, or amenities that were not returned by a tool or listed in ORGANIZATION PROFILE.
 
 CORE OPERATING RULES:
 1. QUALIFICATION FIRST:
@@ -347,7 +347,7 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   };
 
   // 1. Mandatory Thread, Lead & Full Organization Context Verification
-  const [thread, leadRecord, orgChannel, organization, orgProperties, orgAdvisors] = await Promise.all([
+  const [thread, leadRecord, orgChannel, organization, orgProperties, orgAdvisors, orgKbDocs] = await Promise.all([
     prisma.conversationThread.findFirst({
       where: { id: threadId, organizationId: orgId },
     }),
@@ -388,7 +388,12 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
     }),
     prisma.user.findMany({
       where: { organizationId: orgId },
-      select: { name: true, role: true, phone: true },
+      select: { name: true, role: true, phone: true, email: true },
+      take: 10,
+    }),
+    prisma.kBDocument.findMany({
+      where: { organizationId: orgId },
+      select: { title: true, category: true },
       take: 10,
     }),
   ]);
@@ -533,17 +538,24 @@ export async function runSalesAgentLoop(params: RunSalesAgentParams): Promise<Sa
   const clientFullName = params.customerName || leadRecord.fullName || '';
   const clientFirstName = clientFullName.split(' ')[0] || '';
 
-  const orgName = organization?.name || 'Eigen Estate Brokerage';
+  const orgName = organization?.name || 'our Real Estate Advisory';
   const orgInventorySummary =
     orgProperties.length > 0
       ? orgProperties
           .map(
             (p) =>
-              `  * [${p.id}] ${p.title} — ${p.bedrooms}BHK ${p.propertyType} in ${p.microMarket || p.city} (${p.address}) | ${formatCurrencyShort(p.price, currency)}${p.builderName ? ` | Builder: ${p.builderName}` : ''}${p.reraNumber ? ` | RERA: ${p.reraNumber}` : ''}${p.possessionStatus ? ` | ${p.possessionStatus}` : ''}`,
+              `  * [${p.id}] ${p.title} — ${p.bedrooms}BHK ${p.propertyType} (${p.bathrooms} baths) in ${p.microMarket || p.city} (${p.address}) | ${formatCurrencyShort(p.price, currency)}${p.builderName ? ` | Builder: ${p.builderName}` : ''}${p.reraNumber ? ` | RERA: ${p.reraNumber}` : ''}${p.possessionStatus ? ` | ${p.possessionStatus}` : ''}${p.features?.length ? ` | Features: ${p.features.join(', ')}` : ''}${p.brochureUrl ? ` | Brochure: ${p.brochureUrl}` : ''}${p.mapsUrl ? ` | Map: ${p.mapsUrl}` : ''}`,
           )
           .join('\n')
       : '  * No active available listings currently in this organization.';
-  const advisorNames = orgAdvisors.map((a) => `${a.name || 'Advisor'} (${a.role})`).join(', ') || 'Advisory Team';
+  const advisorNames =
+    orgAdvisors
+      .map((a) => `${a.name || a.email || 'Advisor'} (${a.role}${a.phone ? `, ${a.phone}` : ''})`)
+      .join(', ') || 'Advisory Team';
+  const kbSummary =
+    orgKbDocs.length > 0
+      ? orgKbDocs.map((d) => `${d.title} (${d.category})`).join(', ')
+      : 'None uploaded';
 
   if (!ai) {
     logger.warn('[Agent Runtime] GEMINI_API_KEY not set. Using DB-grounded consultative fallback.');
@@ -689,6 +701,7 @@ ORGANIZATION PROFILE & VERIFIED INVENTORY (STRICT TENANT SCOPE):
 - Organization / Brokerage Name: "${orgName}"
 - Region / Jurisdiction: "${organization?.stateJurisdiction || 'India'}"
 - Team Advisors: ${advisorNames}
+- Knowledge Base Documents: ${kbSummary}
 - Active Available Listings (${orgProperties.length}):
 ${orgInventorySummary}`,
                 tools: [{ functionDeclarations: AGENT_FUNCTION_DECLARATIONS as any }],
