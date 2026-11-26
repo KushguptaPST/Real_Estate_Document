@@ -244,10 +244,26 @@ router.put(
     if (!parsed.success) throw createError(parsed.error.message, 422);
 
     await getOrCreateOrgChannel(req.user!.organizationId);
+    const { telegramBotToken, ...restData } = parsed.data;
     const updated = await prisma.organizationChannel.update({
       where: { organizationId: req.user!.organizationId },
-      data: parsed.data,
+      data: {
+        ...restData,
+        ...(telegramBotToken === null ? { telegramBotToken: null, telegramBotUsername: null } : {}),
+      },
     });
+
+    if (telegramBotToken) {
+      const proto = req.header('x-forwarded-proto') || req.protocol || 'http';
+      const host = req.header('x-forwarded-host') || req.get('host') || 'localhost:3001';
+      await connectTelegramBotForOrg(req.user!.organizationId, {
+        botToken: telegramBotToken,
+        publicBaseUrl: `${proto}://${host}`,
+      });
+    } else if (telegramBotToken === null) {
+      const { stopOrgTelegramPolling } = await import('../../services/telegram.service.js');
+      stopOrgTelegramPolling(req.user!.organizationId);
+    }
 
     res.json({
       updated: true,

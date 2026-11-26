@@ -65,6 +65,14 @@ interface OrgPollerState {
 
 const orgPollers = new Map<string, OrgPollerState>();
 
+export function stopOrgTelegramPolling(organizationId: string): void {
+  const prev = orgPollers.get(organizationId);
+  if (!prev) return;
+  prev.running = false;
+  prev.controller?.abort();
+  orgPollers.delete(organizationId);
+}
+
 export async function startOrgTelegramPolling(organizationId: string, botToken: string): Promise<void> {
   if (process.env['NODE_ENV'] === 'test' || !botToken.trim()) return;
   const cleanToken = botToken.trim();
@@ -926,26 +934,53 @@ async function pollUpdates(orgId: string): Promise<void> {
  * Initializes and starts the Telegram Bot Service.
  */
 export async function initTelegramBot(): Promise<void> {
-  // Start per-organization Telegram bot polling on localhost/dev when public HTTPS isn't active
-  const publicUrl = process.env['APP_PUBLIC_URL'] || process.env['API_PUBLIC_URL'] || '';
-  if (!publicUrl.startsWith('https://')) {
-    try {
-      const channels = await prisma.organizationChannel.findMany({
-        where: { telegramBotToken: { not: null } },
-        select: { organizationId: true, telegramBotToken: true },
-      });
-      for (const ch of channels) {
-        if (ch.telegramBotToken) {
-          await startOrgTelegramPolling(ch.organizationId, ch.telegramBotToken);
+  // Initialize per-organization Telegram bots (webhooks in HTTPS prod, long-polling in local/dev)
+  const publicUrl = (
+    process.env['API_PUBLIC_URL'] ||
+    process.env['APP_PUBLIC_URL'] ||
+    process.env['RENDER_EXTERNAL_URL'] ||
+    ''
+  ).trim();
+  const orgTokens = new Set<string>();
+
+  try {
+    const channels = await prisma.organizationChannel.findMany({
+      where: { telegramBotToken: { not: null } },
+      select: { organizationId: true, telegramBotToken: true, telegramWebhookSecret: true },
+    });
+    for (const ch of channels) {
+      if (!ch.telegramBotToken) continue;
+      const cleanOrgToken = ch.telegramBotToken.trim();
+      orgTokens.add(cleanOrgToken);
+
+      if (publicUrl.startsWith('https://')) {
+        if (ch.telegramWebhookSecret) {
+          const webhookUrl = `${publicUrl.replace(/\/$/, '')}/api/webhooks/telegram/${ch.telegramWebhookSecret}`;
+          fetch(`https://api.telegram.org/bot${cleanOrgToken}/setWebhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: webhookUrl }),
+            signal: AbortSignal.timeout(8000),
+          }).catch((err: any) => {
+            logger.warn(`[Telegram] Failed to ensure webhook for org ${ch.organizationId}: ${err.message}`);
+          });
         }
+      } else {
+        await startOrgTelegramPolling(ch.organizationId, cleanOrgToken);
       }
-    } catch (err: any) {
-      logger.warn(`[Telegram] Failed loading org bot pollers: ${err.message}`);
     }
+  } catch (err: any) {
+    logger.warn(`[Telegram] Failed loading org bot pollers: ${err.message}`);
   }
 
-  const token = process.env['TELEGRAM_BOT_TOKEN'];
+  const token = process.env['TELEGRAM_BOT_TOKEN']?.trim();
   if (!token) {
+    return;
+  }
+
+  // Avoid 409 Conflict if an organization already registered this exact token
+  if (orgTokens.has(token)) {
+    logger.info('[Telegram] Global TELEGRAM_BOT_TOKEN is already managed by an organization channel; skipping duplicate poller.');
     return;
   }
 

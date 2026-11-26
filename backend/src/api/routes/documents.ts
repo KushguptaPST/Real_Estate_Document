@@ -78,20 +78,19 @@ router.post(
       },
     });
 
-    // ── Gemini extraction pipeline (Parallelized) ────────────────────────
-    logger.info(`[Pipeline] Starting parallel clause & milestone task extraction for document ${document.id}`);
+    // ── Gemini clause extraction (critical path) ─────────────────────────
+    logger.info(`[Pipeline] Starting clause extraction for document ${document.id}`);
 
     await prisma.auditLog.create({
       data: { dealId, organizationId: orgId, action: 'EXTRACTION_STARTED', entityType: 'Document', entityId: document.id, actor: 'system' },
     });
 
-    const [extraction, _tasks] = await Promise.all([
-      extractClausesFromPdf(file.path),
-      extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
-        logger.warn(`[Pipeline] Task extraction failed: ${err.message}`);
-        return [];
-      }),
-    ]);
+    const extraction = await extractClausesFromPdf(file.path);
+
+    // Run secondary milestone task extraction in the background so upload responds immediately
+    void extractTransactionTasksFromPdf(file.path, dealId, document.id, orgId).catch((err) => {
+      logger.warn(`[Pipeline] Background task extraction failed: ${err.message}`);
+    });
 
     const clauses = await Promise.all(
       extraction.clauses.map((clause) =>

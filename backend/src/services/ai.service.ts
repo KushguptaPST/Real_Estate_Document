@@ -75,14 +75,11 @@ export async function extractClausesFromPdf(filePath: string): Promise<Extractio
   const apiKey = process.env['GEMINI_API_KEY'];
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
-  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-3.6-flash';
+  const envModel = process.env['GEMINI_MODEL'] ?? 'gemini-2.5-flash-lite';
   const candidateModels = Array.from(new Set([
     envModel,
     'gemini-2.5-flash-lite',
-    'gemini-3.5-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-3.8-flash',
-    'gemini-flash-latest',
+    'gemini-2.5-flash',
   ].filter(Boolean) as string[]));
 
 
