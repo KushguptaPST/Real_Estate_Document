@@ -946,11 +946,13 @@ export async function initTelegramBot(): Promise<void> {
   try {
     const channels = await prisma.organizationChannel.findMany({
       where: { telegramBotToken: { not: null } },
+      orderBy: { updatedAt: 'desc' },
       select: { organizationId: true, telegramBotToken: true, telegramWebhookSecret: true },
     });
     for (const ch of channels) {
       if (!ch.telegramBotToken) continue;
       const cleanOrgToken = ch.telegramBotToken.trim();
+      if (orgTokens.has(cleanOrgToken)) continue;
       orgTokens.add(cleanOrgToken);
 
       if (publicUrl.startsWith('https://')) {
